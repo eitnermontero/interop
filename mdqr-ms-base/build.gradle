@@ -50,19 +50,3 @@ dependencies {
     testImplementation 'org.wiremock:wiremock-standalone:3.3.1'
     testImplementation 'org.awaitility:awaitility:4.2.2'
 }
-
-compileTestJava {
-    exclude '**/LiquibaseMigrationTest.java'
-    exclude '**/CurrencyEngineClientTest.java'
-    exclude '**/TransactionTimerServiceIT.java'
-    // Tests legacy que referencian código eliminado (SDK intraplatinum, genesis service,
-    // currencyengine dto, NativeHints) — excluidos hasta que esas dependencias sean restauradas.
-    exclude '**/ExchangeRateServiceTest.java'
-    exclude '**/PaymentServiceTest.java'
-    exclude '**/AccountServiceScheduleValidationTest.java'
-    exclude '**/IdempotencyServiceTest.java'
-    // Reemplazado por CasoInboundIT — apuntaba al endpoint /api/qr/decode con
-    // headers X-Request-Id / Idempotency-Key (ADR-0004). CasoInboundIT cubre el
-    // mismo pipeline sobre /api/inbound/CASO_PENAL/v1 con los headers del ADR-0005.
-    exclude '**/QrDecodePartnerIT.java'
-}
