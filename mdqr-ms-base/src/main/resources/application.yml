@@ -1,0 +1,184 @@
+logging:
+  config: classpath:logback-spring.xml
+  file:
+    name: logs/${spring.application.name}.log
+  pattern:
+    file: "%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p [%15.15t] %X{traceId} %logger{39} : %m%n%wEx"
+    console: "%clr(%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}){faint} %clr(%5p) %clr([%15.15t]){faint} %clr(%X{traceId}){magenta} %clr(%-40.40logger{39}){cyan} %clr(:){faint} %m %n%wEx"
+
+management:
+  endpoints:
+    web:
+      base-path: /management
+      exposure:
+        include: health,info,metrics,prometheus
+  endpoint:
+    health:
+      show-details: when-authorized
+  health:
+    redis:
+      enabled: true
+    db:
+      enabled: true
+    vault:
+      enabled: false  # Deshabilitado temporalmente
+
+spring:
+  application:
+    name: mdqr-ms-base
+
+  config:
+    import: "optional:consul:,optional:vault:,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/system/database?prefix=system.database.,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/system/redis?prefix=system.redis.,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/keycloak/service-client?prefix=keycloak.service-client.,optional:classpath:git.properties"
+
+  cloud:
+    vault:
+      host: ${VAULT_HOST:localhost}
+      port: ${VAULT_PORT:8200}
+      scheme: ${VAULT_SCHEME:http}
+      authentication: ${VAULT_AUTHENTICATION:TOKEN}
+      token: ${VAULT_TOKEN:root}
+      app-role:
+        role-id: ${VAULT_ROLE_ID:}
+        secret-id: ${VAULT_SECRET_ID:}
+      kv:
+        enabled: true
+        backend: secret
+        default-context: mdqr-decode
+        application-name: mdqr-decode
+    consul:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+      config:
+        enabled: true
+        prefix: config
+        default-context: mdqr-decode
+        format: KEY_VALUE
+        watch:
+          enabled: true
+          delay: 10000
+      discovery:
+        enabled: true
+        # El gateway discovery locator espera este nombre para rutas /services/mdqrbaseservice/**
+        # y /partner/v1/** (rewrite → /api/**).
+        service-name: mdqrbaseservice
+        instance-id: ${spring.application.name}:${random.value}
+        healthCheckPath: /management/health/readiness
+        health-check-interval: 15s
+        prefer-ip-address: true
+
+  datasource:
+    url: jdbc:postgresql://${system.database.host:localhost}:${system.database.port:5432}/${system.database.name:mdqr_decode}
+    username: ${system.database.username:postgres}
+    password: ${system.database.password:postgres}
+    hikari:
+      maximum-pool-size: 20
+      minimum-idle: 5
+      idle-timeout: 300000
+      connection-timeout: 20000
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate: {}
+    open-in-view: false
+
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+
+  data:
+    redis:
+      host: ${system.redis.host:localhost}
+      port: ${system.redis.port:6379}
+      password: ${system.redis.password:}
+      timeout: 5000ms
+      lettuce:
+        pool:
+          max-active: 20
+          max-idle: 10
+          min-idle: 5
+
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${application.keycloak.external-url}/realms/${application.keycloak.realm}
+          jwk-set-uri: ${application.keycloak.auth-server-url}/realms/${application.keycloak.realm}/protocol/openid-connect/certs
+
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+    use-code-as-default-message: true
+
+  output:
+    ansi:
+      enabled: always
+
+server:
+  port: 8081
+  servlet:
+    context-path: /
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+    oauth:
+      client-id: ${application.keycloak.resource}
+      client-secret: ${application.keycloak.credentials.secret}
+      use-pkce-with-authorization-code-grant: true
+      scopes: openid profile
+  show-actuator: false
+
+# ─── Application Properties (type-safe via ApplicationProperties.java) ───
+application:
+  gateway-url: ${GATEWAY_URL:http://localhost:8090}
+  keycloak:
+    auth-server-url: ${keycloak.service-client.auth-server-url:http://localhost:8180}
+    external-url: ${KEYCLOAK_EXTERNAL_URL:http://localhost:8180}
+    # Realm para APIs internas (frontend admin). Las APIs externas (partner)
+    # usan mdqr-partner — se configura el decoder multi-issuer en SecurityConfiguration.
+    realm: ${keycloak.service-client.realm:mdqr-admin}
+    resource: ${keycloak.service-client.client-id:mdqradminservice}
+    credentials:
+      secret: ${keycloak.service-client.client-secret:mdqradminservice-secret}
+
+  # ─── Tuxedo Certificate API (Go) ───────────────────────────────────────
+  tuxedo:
+    api-url: ${TUXEDO_API_URL:http://localhost:5050}
+    api-key: ${TUXEDO_API_KEY:}
+    timeout-ms: ${TUXEDO_API_TIMEOUT:30000}
+
+  # ─── Certificate Sync Configuration ────────────────────────────────────
+  certificate:
+    sync:
+      enabled: ${CERTIFICATE_SYNC_ENABLED:true}
+      cron: ${CERTIFICATE_SYNC_CRON:0 0 * * * *}  # Every 1 hour (at minute 0)
+      on-startup: ${CERTIFICATE_SYNC_ON_STARTUP:false}
+
+  # ─── QR Decryption Configuration ───────────────────────────────────────
+  qr:
+    decryption:
+      cache-enabled: true
+      cache-ttl-minutes: 1440  # 24 hours (as per plan)
+      audit-enabled: true
+
+# ─── Hub de interoperabilidad (adaptadores outbound) ─────────────────────────
+hub:
+  outbound:
+    efxrate:
+      url: https://api.efxrate.example.com
+      timeout-ms: 5000
+      vault-path: mdqr-decode/data/efxrate/api-key
+      cache-ttl-minutes: 60
+      resilience4j:
+        retry-max-attempts: 3
+        retry-wait-ms: 500
+        cb-failure-rate-threshold: 50
+        cb-wait-duration-ms: 30000
+        bulkhead-max-concurrent: 10

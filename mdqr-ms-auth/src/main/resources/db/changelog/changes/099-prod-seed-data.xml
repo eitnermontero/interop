@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Production seed: runs in ALL environments (no Liquibase context filter).
+        Establishes the baseline catalog of actions, menus and the SUPER_ADMIN grants
+        that every deployment needs to be functional.
+
+        The first two changesets use loadData (insert-only) so admin-modified rows
+        in production never get overwritten by future deployments.
+    -->
+
+    <changeSet id="099-1" author="middleware-core">
+        <comment>Seed system catalog of actions (CRUD + operational verbs)</comment>
+        <loadData
+            file="db/changelog/changes/data/099-actions.csv"
+            tableName="action"
+            separator=";"/>
+    </changeSet>
+
+    <changeSet id="099-2" author="middleware-core">
+        <comment>Seed default menu tree (parents resolved by FK in parent_id column)</comment>
+        <loadData
+            file="db/changelog/changes/data/099-menus.csv"
+            tableName="menu"
+            separator=";"/>
+    </changeSet>
+
+    <changeSet id="099-3" author="middleware-core" runAlways="true">
+        <comment>
+            Idempotent SUPER_ADMIN grant sync. Runs on every Liquibase update so
+            any new menu/action shipped in a future release is automatically
+            granted to SUPER_ADMIN. ON CONFLICT keeps it safe to re-run.
+        </comment>
+        <sql>
+            INSERT INTO admin.role_menu_action
+                (keycloak_role_name, menu_id, action_id, is_granted, created_by, created_date)
+            SELECT 'SUPER_ADMIN', m.id, a.id, TRUE, 'system', NOW()
+            FROM admin.menu m
+            CROSS JOIN admin.action a
+            WHERE m.is_active = TRUE
+            ON CONFLICT (keycloak_role_name, menu_id, action_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

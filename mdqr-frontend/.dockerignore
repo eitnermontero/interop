@@ -1,0 +1,12 @@
+node_modules
+package-lock.json
+.git
+.gitignore
+*.md
+docs/
+e2e/
+
+# dist/ is NOT excluded: single-stage builds require dist/<app>/browser to be present
+# in the build context (pre-built by bun run build:<app> before docker build).
+# Multistage builds compile from source inside the build stage and never read dist/ from
+# the host context, so including it here adds a small overhead but does not break anything.

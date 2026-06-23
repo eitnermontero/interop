@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"description":{"type":"string","example":"ID.PAGO:3272421         PERIODO:2022/12"},"amount":{"type":"number","example":22}},"title":"Subitem"},"schemaType":"response"}

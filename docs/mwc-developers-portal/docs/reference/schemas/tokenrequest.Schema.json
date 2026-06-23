@@ -1,0 +1,1 @@
+{"schema":{"type":"object","required":["clientId","clientSecret"],"properties":{"clientId":{"type":"string","description":"Identificador del partner","example":"cartcore_stage_demo01"},"clientSecret":{"type":"string","description":"Secreto del partner","example":"cartcore_stage_demo01"}},"title":"TokenRequest"},"schemaType":"response"}

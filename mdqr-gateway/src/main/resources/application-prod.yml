@@ -1,0 +1,19 @@
+logging:
+  level:
+    bo.com.sintesis.mdqr.gateway: INFO
+    org.springframework.cloud.gateway: WARN
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+application:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+    allowed-headers: Authorization,Content-Type,Accept
+    exposed-headers: Authorization,Link,X-Total-Count
+    allow-credentials: true
+    max-age: 1800

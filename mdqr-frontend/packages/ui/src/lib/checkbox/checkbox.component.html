@@ -1,0 +1,16 @@
+<label [ngClass]="containerClasses">
+  <input
+    type="checkbox"
+    [id]="id"
+    [checked]="checked"
+    [disabled]="disabled"
+    (change)="onToggle()"
+    [attr.aria-checked]="checked"
+    [attr.aria-label]="ariaLabel"
+    [ngClass]="checkboxClasses"
+    class="w-4 h-4 cursor-pointer rounded accent-brand-500"
+  />
+  <span *ngIf="label" class="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">
+    {{ label }}
+  </span>
+</label>

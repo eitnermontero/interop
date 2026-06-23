@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"id":{"type":"integer","example":1},"name":{"type":"string","example":"Grupo Principal"},"type":{"type":"string","example":"DEFAULT"},"icon":{"type":"string","example":"https://..."}},"title":"Group"},"schemaType":"response"}

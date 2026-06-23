@@ -1,0 +1,4 @@
+name,description
+ADMIN,Acceso administrativo completo — usuarios, certificados, auditoría
+OPERATOR,Acceso operacional — lectura y escritura limitada en certificados
+AUDITOR,Acceso de solo lectura para auditoría y reportes

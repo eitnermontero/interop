@@ -1,0 +1,49 @@
+{
+  "COMMON": {
+    "SEARCH": "Buscar",
+    "SAVE": "Guardar",
+    "CANCEL": "Cancelar",
+    "CONFIRM": "Confirmar",
+    "DELETE": "Eliminar",
+    "EDIT": "Editar",
+    "BACK": "Atrás",
+    "NEXT": "Siguiente",
+    "LOADING": "Cargando...",
+    "ERROR": "Error",
+    "SUCCESS": "Éxito",
+    "WARNING": "Advertencia",
+    "INFO": "Información"
+  },
+  "AUTH": {
+    "LOGOUT": "Cerrar sesión",
+    "LOGIN": "Iniciar sesión",
+    "USERNAME": "Usuario",
+    "PASSWORD": "Contraseña",
+    "EMAIL": "Correo electrónico",
+    "REMEMBER_ME": "Recuérdame"
+  },
+  "SIDEBAR": {
+    "REPORTS": "Mis Reportes",
+    "PENDING": "Pendientes",
+    "PAYMENTS": "Pagos",
+    "RECEIPTS": "Comprobantes",
+    "COLLECTION": "Cobranza",
+    "RECONCILIATION": "Conciliación",
+    "EMPTY": "No tienes opciones disponibles"
+  },
+  "DASHBOARD": {
+    "TITLE": "Portal de Reportes",
+    "SUBTITLE": "Accede a tus reportes y documentos",
+    "PENDING_DEBTS": "Deudas Pendientes",
+    "RECENT_PAYMENTS": "Pagos Recientes",
+    "AVAILABLE_RECEIPTS": "Comprobantes Disponibles"
+  },
+  "REPORTS": {
+    "TITLE": "Reportes",
+    "PENDING_TITLE": "Reportes Pendientes",
+    "PAYMENTS_TITLE": "Pagos",
+    "RECEIPTS_TITLE": "Comprobantes",
+    "COLLECTION_TITLE": "Cobranza",
+    "RECONCILIATION_TITLE": "Conciliación"
+  }
+}

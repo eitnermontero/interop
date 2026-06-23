@@ -1,0 +1,5 @@
+name,displayName,uris,scopes
+catalogs,Catalog Resources,/api/v1/departments;/api/v1/categories;/api/v1/providers/**,read
+accounts,Account Resources,/api/v1/accounts/**,read
+payments,Payment Resources,/api/v1/payments/**,execute
+receipts,Receipt Resources,/api/v1/payments/*/receipt,read

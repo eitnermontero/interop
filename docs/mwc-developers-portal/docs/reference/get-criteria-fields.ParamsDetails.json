@@ -1,0 +1,1 @@
+{"parameters":[{"name":"criteriaId","in":"path","required":true,"schema":{"type":"integer"}},{"name":"providerId","in":"query","required":true,"schema":{"type":"integer"}}]}

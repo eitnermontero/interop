@@ -1,0 +1,103 @@
+services:
+  mdqr-admin-service:
+    image: ${MDQR_ADMIN_IMAGE:-cr.sintesis.com.bo/mdqr-dev/mdqr-admin-service}:${MDQR_ADMIN_VERSION:-latest}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${MDQR_ADMIN_MEM_LIMIT:-1024M}
+        reservations:
+          memory: ${MDQR_ADMIN_MEM_RESERVATION:-512M}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ${LOG_DIR:-~/logs/mdqr}${TENANT_ID:+-}${TENANT_ID}/admin-service/:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      TZ: America/La_Paz
+      TENANT_ID: ${TENANT_ID:-}
+
+      # --- JVM ---
+      _JAVA_OPTIONS: ${MDQR_ADMIN_JAVA_OPTS:-}
+
+      # --- Spring profile ---
+      SPRING_PROFILES_ACTIVE: ${MDQR_ADMIN_PROFILE:-dev}
+
+      # --- Server ---
+      SERVER_PORT: 8083
+
+      # --- Service discovery (Consul) ---
+      SPRING_CLOUD_CONSUL_HOST: ${MDQR_CONSUL_HOST:-host.docker.internal}
+      SPRING_CLOUD_CONSUL_PORT: ${MDQR_CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_SCHEME: ${MDQR_CONSUL_SCHEME:-http}
+      SPRING_CLOUD_CONSUL_TOKEN: ${MDQR_CONSUL_TOKEN:-}
+      # Service-name en Consul SIN guiones (convencion del sistema; igual que decrypt/gateway).
+      SPRING_CLOUD_CONSUL_DISCOVERY_SERVICE_NAME: mdqradminservice${TENANT_ID:+-}${TENANT_ID}
+      SPRING_CLOUD_CONSUL_CONFIG_ENABLED: ${MDQR_CONSUL_CONFIG_ENABLED:-false}
+      # Consul external (otra Docker network) no alcanza el IP interno del container, asi que
+      # desactivamos el HTTP active check. La service queda registrada en el catalog sin health-check.
+      SPRING_CLOUD_CONSUL_DISCOVERY_REGISTER_HEALTH_CHECK: "false"
+
+      # --- Vault ---
+      SPRING_CLOUD_VAULT_HOST: ${MDQR_VAULT_HOST:-host.docker.internal}
+      SPRING_CLOUD_VAULT_PORT: ${MDQR_VAULT_PORT:-8200}
+      SPRING_CLOUD_VAULT_SCHEME: ${MDQR_VAULT_SCHEME:-http}
+      SPRING_CLOUD_VAULT_AUTHENTICATION: ${MDQR_VAULT_AUTHENTICATION:-TOKEN}
+      SPRING_CLOUD_VAULT_TOKEN: ${MDQR_VAULT_TOKEN:-root}
+      SPRING_CLOUD_VAULT_APP_ROLE_ROLE_ID: ${MDQR_VAULT_ROLE_ID:-}
+      SPRING_CLOUD_VAULT_APP_ROLE_SECRET_ID: ${MDQR_VAULT_SECRET_ID:-}
+      # Namespace tenant-aware: secret/mdqr-auth[-<tenant>]/...
+      SPRING_CLOUD_VAULT_KV_DEFAULT_CONTEXT: ${MDQR_AUTH_VAULT_NS:-mdqr-auth}${TENANT_ID:+-}${TENANT_ID}
+      SPRING_CLOUD_VAULT_KV_APPLICATION_NAME: ${MDQR_AUTH_VAULT_NS:-mdqr-auth}${TENANT_ID:+-}${TENANT_ID}
+      # KV mount: 'secret' (dev) o 'kv' (stage, vault cluster monta kv/).
+      SPRING_CLOUD_VAULT_KV_BACKEND: ${MDQR_VAULT_KV_BACKEND:-secret}
+      # Namespace tenant-aware para los config.import de Vault (ver application.yml).
+      MDQR_VAULT_NS: ${MDQR_AUTH_VAULT_NS:-mdqr-auth}${TENANT_ID:+-}${TENANT_ID}
+      # Mount KV de Vault para los config.import (dev=secret, stage=kv).
+      MDQR_VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
+      # VAULT_NS y VAULT_MOUNT son leídos directamente por ${VAULT_NS:...} en application.yml
+      VAULT_NS: ${MDQR_AUTH_VAULT_NS:-mdqr-auth}${TENANT_ID:+-}${TENANT_ID}
+      VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
+
+      # --- Database (PostgreSQL) — schema 'admin' ---
+      SPRING_DATASOURCE_URL: ${MDQR_ADMIN_DB_URL:-jdbc:postgresql://host.docker.internal:5432/mdqr}
+      # username/password (claves) -> Vault secret/<ns>/system/database. NO en env.
+
+      # --- Redis (RedisTemplate, aislamiento multi-tenant por prefijo de key) ---
+      SYSTEM_REDIS_HOST: ${MDQR_REDIS_HOST:-host.docker.internal}
+      SYSTEM_REDIS_PORT: ${MDQR_REDIS_PORT:-6379}
+      # password (clave) -> Vault secret/<ns>/system/redis. NO en env.
+      # Spring Data cluster: NO se setea aca (lista vacia rompe Lettuce). En stage se
+      # activa con el perfil 'redis-cluster' (SPRING_PROFILES_ACTIVE) + MDQR_REDIS_CLUSTER_NODES.
+
+      # --- Keycloak / OIDC ---
+      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_SERVICE_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
+      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}}
+      APPLICATION_KEYCLOAK_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
+      # Service account para invocar la Keycloak Admin API (gestion de users/roles + poll de eventos LOGIN/LOGOUT).
+      KEYCLOAK_ADMIN_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_ADMIN_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
+      # client-id, client-secret, grant-type -> Vault keycloak/admin-client (100% de Vault, igual
+      # que service-client). Tenerlos en env interferia con la carga del client-secret de Vault.
+      # Shared secret for the Keycloak HTTP Event Listener webhook (X-Keycloak-Secret header).
+      # Must match AUDIT_KC_SECRET seeded in Vault (audit/keycloak-secret) and configured
+      # in the Keycloak realm event listener when the keycloak-http-event-listener SPI provider
+      # is deployed. Override here only if not using Vault.
+      APPLICATION_AUDIT_KEYCLOAK_SECRET: ${MDQR_ADMIN_AUDIT_KC_SECRET:-}
+
+      # --- Logging ---
+      # LOG_DIR + LOG_FILE los lee logback-spring.xml para el RollingFileAppender.
+      LOG_DIR: /app/logs
+      LOG_FILE: admin.log
+      LOGGING_LEVEL_ROOT: ${MDQR_ADMIN_ROOT_LOG_LEVEL:-INFO}
+      LOGGING_LEVEL_BO_COM_SINTESIS_MDQR_AUTH: ${MDQR_ADMIN_LOG_LEVEL:-INFO}
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: ${MDQR_LOG_MAX_FILE_SIZE:-500MB}
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: ${MDQR_LOG_MAX_HISTORY:-90}
+
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O- http://localhost:8083/management/health | grep -q '\"status\":\"UP\"'"]
+      interval: ${MDQR_HC_API_INTERVAL:-30s}
+      timeout: ${MDQR_HC_API_TIMEOUT:-10s}
+      retries: ${MDQR_HC_API_RETRIES:-3}
+      start_period: ${MDQR_HC_API_START_PERIOD:-60s}

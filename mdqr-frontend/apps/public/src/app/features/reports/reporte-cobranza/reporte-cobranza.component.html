@@ -1,0 +1,83 @@
+<div>
+  <app-page-breadcrumb pageTitle="Reporte de Cobranzas SAP - SOBOCE" />
+
+  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker
+          id="cobranza-fecha"
+          label="Fecha"
+          [defaultDate]="fecha()"
+          placeholder="dd/mm/aaaa"
+          (dateChange)="onFechaChange($event)"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-label>Sociedad</app-label>
+        <app-input-field
+          type="text"
+          [value]="sociedad()"
+          placeholder="Ingrese sociedad"
+          className="w-48"
+          (valueChange)="sociedad.set($event.toString())"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-label>Canales</app-label>
+        <app-select
+          [options]="canalesOptions"
+          [value]="canal()"
+          className="w-48"
+          (valueChange)="canal.set($event)"
+        />
+      </div>
+
+      <app-button variant="primary" [startIcon]="iconSearch" [disabled]="loading()" (btnClick)="onBuscar()">
+        Buscar
+      </app-button>
+      <div class="flex flex-wrap gap-2 ml-auto">
+        <app-button variant="success" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarExcelSoboce()">
+          Excel SOBOCE
+        </app-button>
+        <app-button variant="info" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarCsvSoboce()">
+          CSV SOBOCE
+        </app-button>
+        <app-button variant="danger" [startIcon]="iconPdf" [disabled]="!buscado() || !hayResultados() || !servicio()" (btnClick)="onGenerarComprobantePdf()">
+          PDF SOBOCE
+        </app-button>
+        <app-button variant="primary" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarExcelSintesis()">
+          Excel SINTESIS
+        </app-button>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-white/[0.03] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+      Cargando...
+    </div>
+  }
+  @if (error()) {
+    <div class="mb-4">
+      <app-alert variant="error" title="Error al consultar el reporte" [message]="error() ?? ''" />
+    </div>
+  }
+  @if (!buscado() && !loading()) {
+    <app-alert
+      variant="info"
+      title="Sin búsqueda activa"
+      message="Seleccione una fecha y sociedad, luego presione Buscar para ver los resultados."
+    />
+  }
+  @if (buscado() && !loading() && !error() && !hayResultados()) {
+    <app-alert
+      variant="warning"
+      title="Sin registros"
+      message="No se encontraron cobranzas para los filtros seleccionados."
+    />
+  }
+
+  @if (buscado() && !loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="resultados()" />
+  }
+</div>

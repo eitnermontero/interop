@@ -1,0 +1,3 @@
+clientId,description,redirectUris,webOrigins,defaultRoles
+mwc-public-fe,SOBOCE public SPA,http://localhost:3001/*;http://localhost:4200/*,http://localhost:3001;http://localhost:4200,soboce:cliente
+mwc-admin-fe,Admin SPA,http://localhost:3000/*;http://localhost:4300/*,http://localhost:3000;http://localhost:4300,soboce:operador

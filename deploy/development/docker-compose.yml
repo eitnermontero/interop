@@ -1,0 +1,88 @@
+# Stack de DEVELOPMENT — apps (gateway, decrypt, admin) + frontends (admin, public).
+#
+# Las tools (Consul, Redis, Vault, Keycloak) viven en deploy/tools/ y se
+# conectan via IP del host. Levantar primero deploy/tools/ y luego este stack.
+#
+# Las apps usan extra_hosts para resolver host.docker.internal (Linux: maps a
+# host-gateway). En el .env, las URLs de tools apuntan a host.docker.internal.
+name: ${MDQR_STACK_NAME:-mdqr-dev}
+
+# Red externa compartida — debe existir ANTES de levantar el stack.
+# Crearla una sola vez con:
+#   docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 mdqr-shared
+# Override del nombre con MDQR_SHARED_NETWORK en .env.
+networks:
+  mdqr_net:
+    name: ${MDQR_NETWORK_NAME:-mdqr-net}
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "${MDQR_NETWORK_MTU:-1500}"
+  mdqr_shared:
+    name: ${MDQR_SHARED_NETWORK:-mdqr-shared}
+    external: true
+
+services:
+  gateway:
+    extends:
+      file: ../services/001-gateway.yml
+      service: mdqr-gateway
+    container_name: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+      - mdqr_shared
+    ports:
+      - "${MDQR_GATEWAY_PORT:-0.0.0.0:8000}:8080"
+    environment:
+      LOG_FILE: gateway.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrgateway${TENANT_ID:+-}${TENANT_ID}-1
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}
+
+  decrypt-service:
+    extends:
+      file: ../services/002-decrypt-service.yml
+      service: mdqr-decode-service
+    container_name: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+      - mdqr_shared
+    ports:
+      - "${MDQR_DECRYPT_PORT:-127.0.0.1:8002}:8081"
+    environment:
+      LOG_FILE: decrypt-service.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrdecryptservice${TENANT_ID:+-}${TENANT_ID}-1
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}
+
+  admin-service:
+    extends:
+      file: ../services/003-admin-service.yml
+      service: mdqr-admin-service
+    container_name: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+      - mdqr_shared
+    ports:
+      - "${MDQR_ADMIN_PORT:-127.0.0.1:8001}:8083"
+    environment:
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqradminservice${TENANT_ID:+-}${TENANT_ID}-1
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}
+
+  # Frontend
+  admin-fe:
+    extends:
+      file: ../services/100-admin-fe.yml
+      service: mdqr-admin-fe
+    container_name: mdqr-admin-fe${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_ADMIN_FE_PORT:-0.0.0.0:3000}:80"
+
+  public-fe:
+    extends:
+      file: ../services/101-public-fe.yml
+      service: mdqr-public-fe
+    container_name: mdqr-public-fe${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_PUBLIC_FE_PORT:-0.0.0.0:3001}:80"

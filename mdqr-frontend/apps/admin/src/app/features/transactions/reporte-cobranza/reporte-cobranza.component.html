@@ -1,0 +1,83 @@
+<div>
+  <app-page-breadcrumb pageTitle="Reporte de Cobranzas SAP - SOBOCE" />
+
+  <app-card padding="md" class="mb-6">
+    <div class="flex flex-col sm:flex-row flex-wrap gap-3 sm:gap-4 items-start sm:items-end">
+      <div class="flex flex-col gap-1.5 w-full sm:w-auto">
+        <app-date-masck-picker
+          id="cobranza-fecha"
+          label="Fecha"
+          [defaultDate]="fecha()"
+          placeholder="dd/mm/aaaa"
+          (dateChange)="onFechaChange($event)"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5 w-full sm:w-48">
+        <app-label>Sociedad</app-label>
+        <app-input-field
+          type="text"
+          [value]="sociedad()"
+          placeholder="Ingrese sociedad"
+          className="w-full"
+          (valueChange)="sociedad.set($event.toString())"
+        />
+      </div>
+      <div class="flex flex-col gap-1.5 w-full sm:w-48">
+        <app-label>Canales</app-label>
+        <app-select
+          [options]="canalesOptions"
+          [value]="canal()"
+          className="w-full"
+          (valueChange)="canal.set($event)"
+        />
+      </div>
+
+      <app-button variant="primary" [startIcon]="iconSearch" [disabled]="loading()" (btnClick)="onBuscar()" class="w-full sm:w-auto">
+        Buscar
+      </app-button>
+      <div class="flex flex-col sm:flex-row flex-wrap gap-2 w-full sm:w-auto sm:ml-auto">
+        <app-button variant="success" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarExcelSoboce()" class="w-full sm:w-auto text-xs sm:text-sm truncate">
+          Excel SOBOCE
+        </app-button>
+        <app-button variant="info" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarCsvSoboce()" class="w-full sm:w-auto text-xs sm:text-sm truncate">
+          CSV SOBOCE
+        </app-button>
+        <app-button variant="danger" [startIcon]="iconPdf" [disabled]="!buscado() || !hayResultados() || !servicio()" (btnClick)="onGenerarComprobantePdf()" class="w-full sm:w-auto text-xs sm:text-sm truncate">
+          PDF SOBOCE
+        </app-button>
+        <app-button variant="primary" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onGenerarExcelSintesis()" class="w-full sm:w-auto text-xs sm:text-sm truncate">
+          Excel SINTESIS
+        </app-button>
+      </div>
+    </div>
+  </app-card>
+
+  @if (loading()) {
+    <app-card class="flex items-center justify-center py-8" [attr.aria-busy]="true" [attr.aria-label]="'Cargando reporte...'">
+      <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+    </app-card>
+  }
+  @if (error()) {
+    <div class="mb-4">
+      <app-alert variant="error" title="Error al consultar el reporte" [message]="error() ?? ''" />
+    </div>
+  }
+  @if (!buscado() && !loading()) {
+    <app-alert
+      variant="info"
+      title="Sin búsqueda activa"
+      message="Seleccione una fecha y sociedad, luego presione Buscar para ver los resultados."
+    />
+  }
+  @if (buscado() && !loading() && !error() && !hayResultados()) {
+    <app-alert
+      variant="warning"
+      title="Sin registros"
+      message="No se encontraron cobranzas para los filtros seleccionados."
+    />
+  }
+
+  @if (buscado() && !loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="resultados()" />
+  }
+</div>

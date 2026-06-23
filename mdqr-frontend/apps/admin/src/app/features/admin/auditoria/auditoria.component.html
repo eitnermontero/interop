@@ -1,0 +1,125 @@
+<app-page-breadcrumb pageTitle="Auditoría" />
+
+@if (error()) {
+  <div class="px-4 lg:px-8 py-4">
+    <app-alert variant="error" title="Error" [message]="error()!" />
+  </div>
+}
+
+<div class="px-4 lg:px-8 py-4 space-y-4">
+  <div class="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-2">
+    <div>
+      <app-label>Desde</app-label>
+      <app-input-field type="date" [value]="fromDate()" (valueChange)="fromDate.set($any($event))" />
+    </div>
+    <div>
+      <app-label>Hasta</app-label>
+      <app-input-field type="date" [value]="toDate()" (valueChange)="toDate.set($any($event))" />
+    </div>
+    <div>
+      <app-label>Usuario</app-label>
+      <app-input-field [value]="username()" (valueChange)="username.set($any($event))" placeholder="Username" />
+    </div>
+    <div>
+      <app-label>Tipo de Evento</app-label>
+      <app-select [options]="[{ value: '', label: 'Todos' }, ...eventTypeOptions()]" [value]="eventType()" (valueChange)="eventType.set($event)" />
+    </div>
+    <div>
+      <app-label>Módulo</app-label>
+      <app-select [options]="[{ value: '', label: 'Todos' }, ...moduleOptions()]" [value]="module()" (valueChange)="module.set($event)" />
+    </div>
+  </div>
+
+  <div class="flex gap-2">
+    <app-input-field [value]="searchText()" (valueChange)="searchText.set($any($event))" placeholder="Buscar..." class="flex-1" />
+    <app-button variant="primary" [startIcon]="iconRefresh" (btnClick)="doSearch()">Buscar</app-button>
+    <app-button variant="outline" [startIcon]="iconDownload" (btnClick)="export()">Exportar CSV</app-button>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="px-4 lg:px-8 py-4 text-center" aria-busy="true" aria-label="Cargando eventos...">
+    <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+  </div>
+} @else if (hayResultados()) {
+  <div class="px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <app-data-table
+      [columns]="visibleColumns()"
+      [data]="logs()"
+      [config]="dataTableConfig()"
+    />
+  </div>
+} @else {
+  <div class="px-4 lg:px-8 py-4 text-center">
+    <p class="text-muted">No hay eventos</p>
+  </div>
+}
+
+<app-modal [isOpen]="detailOpen()" (close)="closeDetail()" className="max-w-2xl mx-4 p-6 lg:p-8">
+  <div class="space-y-4 text-sm">
+    <h3 class="text-lg font-semibold">Detalles del Evento</h3>
+
+    @if (detailItem()) {
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <p class="text-muted font-semibold">ID</p>
+          <p>{{ detailItem()!.id }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Hora</p>
+          <p>{{ detailItem()!.eventTime | date: 'medium' }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Evento</p>
+          <p>{{ detailItem()!.eventType }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Módulo</p>
+          <p>{{ detailItem()!.module }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Usuario</p>
+          <p>{{ detailItem()!.username || '—' }} ({{ detailItem()!.fullName || '—' }})</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Servicio</p>
+          <p>{{ detailItem()!.serviceName }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Endpoint</p>
+          <p class="font-mono text-xs">{{ detailItem()!.endpoint || '—' }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Estado HTTP</p>
+          <p>{{ detailItem()!.responseStatus || '—' }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">Duración (ms)</p>
+          <p>{{ detailItem()!.durationMs || '—' }}</p>
+        </div>
+        <div>
+          <p class="text-muted font-semibold">IP</p>
+          <p>{{ detailItem()!.ipAddress || '—' }}</p>
+        </div>
+      </div>
+
+      @if (detailItem()!.details) {
+        <div>
+          <p class="text-muted font-semibold mb-2">Detalles</p>
+          <pre class="bg-muted/10 p-2 rounded text-xs overflow-auto">{{ detailItem()!.details | json }}</pre>
+        </div>
+      }
+
+      @if (detailItem()!.roles && detailItem()!.roles!.length > 0) {
+        <div>
+          <p class="text-muted font-semibold">Roles</p>
+          <p>{{ detailItem()!.roles!.join(', ') }}</p>
+        </div>
+      }
+    }
+
+    <div class="flex justify-end pt-4">
+      <app-button variant="outline" (btnClick)="closeDetail()">Cerrar</app-button>
+    </div>
+  </div>
+</app-modal>

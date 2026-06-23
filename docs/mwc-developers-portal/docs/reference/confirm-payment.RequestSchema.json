@@ -1,0 +1,1 @@
+{"title":"Body","body":{"required":true,"content":{"application/json":{"schema":{"type":"object","required":["txCode"],"properties":{"txCode":{"type":"string","format":"uuid","example":"d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1"}},"title":"ConfirmPaymentRequest"}}}}}

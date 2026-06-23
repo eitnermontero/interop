@@ -1,0 +1,18 @@
+id;code;name;icon;route;parent_id;order_index;is_active;created_by;created_date
+1;DASHBOARD;Dashboard;dashboard;/dashboard;;10;true;system;2026-01-01 00:00:00
+2;PAGOS;Pagos;payment;/pagos;;20;true;system;2026-01-01 00:00:00
+3;PARTNERS;Partners;group;/partners;;30;true;system;2026-01-01 00:00:00
+4;REPORTES;Reportes;bar_chart;/reportes;;40;true;system;2026-01-01 00:00:00
+5;ADMINISTRACION;Administración;settings;/admin;;90;true;system;2026-01-01 00:00:00
+21;TRANSACCIONES;Transacciones;receipt;/pagos/transacciones;2;10;true;system;2026-01-01 00:00:00
+22;TIPO_CAMBIO;Tipo de Cambio;currency_exchange;/pagos/tipo-cambio;2;20;true;system;2026-01-01 00:00:00
+31;PARTNERS_LISTA;Lista de Partners;list;/partners/lista;3;10;true;system;2026-01-01 00:00:00
+32;API_KEYS;API Keys;vpn_key;/partners/api-keys;3;20;true;system;2026-01-01 00:00:00
+41;SOBOCE;Reportes SOBOCE;description;/reportes/soboce;4;10;true;system;2026-01-01 00:00:00
+42;CONCILIACION;Conciliación;compare_arrows;/reportes/conciliacion;4;20;true;system;2026-01-01 00:00:00
+51;USUARIOS;Usuarios;person;/admin/usuarios;5;10;true;system;2026-01-01 00:00:00
+52;ROLES;Roles;admin_panel_settings;/admin/roles;5;20;true;system;2026-01-01 00:00:00
+53;MENUS;Menús;menu;/admin/menus;5;30;true;system;2026-01-01 00:00:00
+54;PERMISOS;Permisos;lock;/admin/permisos;5;40;true;system;2026-01-01 00:00:00
+55;ACCIONES;Acciones;bolt;/admin/acciones;5;50;true;system;2026-01-01 00:00:00
+56;AUDITORIA;Auditoría;history;/admin/auditoria;5;60;true;system;2026-01-01 00:00:00

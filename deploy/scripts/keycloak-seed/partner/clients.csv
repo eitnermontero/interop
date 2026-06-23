@@ -1,0 +1,2 @@
+clientId,description,scopes,secret
+unilink-api,Unilink — Socio QR externo,https://api.sintesis.com.bo/qr.decode,unilink-api-secret

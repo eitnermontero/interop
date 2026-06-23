@@ -1,0 +1,2 @@
+clientId,description,redirectUris,webOrigins,defaultRoles
+mdqr-admin-fe,MDQR Admin SPA,http://localhost:3000/*;http://localhost:4300/*,http://localhost:3000;http://localhost:4300,OPERATOR

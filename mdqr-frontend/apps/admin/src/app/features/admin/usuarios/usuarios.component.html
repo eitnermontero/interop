@@ -1,0 +1,223 @@
+<app-page-breadcrumb pageTitle="Usuarios" />
+
+<ng-template #statusCell let-value="value">
+  <span
+    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+    [class]="value
+      ? 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500'
+      : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-white/70'">
+    {{ value ? 'Activo' : 'Inactivo' }}
+  </span>
+</ng-template>
+
+@if (error()) {
+  <div class="px-4 lg:px-8 py-4">
+    <app-alert variant="error" title="Error" [message]="error()!" />
+  </div>
+}
+
+<div class="px-4 sm:px-6 lg:px-8 py-4">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0 mb-4">
+    <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()" class="w-full sm:w-auto">Nuevo Usuario</app-button>
+  </div>
+</div>
+
+@if (loading()) {
+  <div class="px-4 lg:px-8 py-4 text-center" aria-busy="true" aria-label="Cargando usuarios...">
+    <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+  </div>
+} @else if (hayResultados()) {
+  <div class="px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <app-data-table
+      [columns]="visibleColumns()"
+      [data]="usuarios()"
+      [config]="dataTableConfig()"
+    />
+  </div>
+} @else {
+  <div class="px-4 lg:px-8 py-4 text-center">
+    <p class="text-muted mb-4">No hay usuarios</p>
+    <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()">Nuevo Usuario</app-button>
+  </div>
+}
+
+<app-modal [isOpen]="editOpen()" (close)="closeEdit()" className="max-w-xl mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-3 sm:space-y-4">
+    <h3 class="text-lg font-semibold">{{ editItem() ? 'Editar Usuario' : 'Nuevo Usuario' }}</h3>
+
+    @if (editError()) {
+      <app-alert variant="error" title="Error" [message]="editError()!" />
+    }
+
+    <div>
+      <app-label>Usuario</app-label>
+      <app-input-field [value]="editUsername()" [disabled]="!!editItem()" (valueChange)="editUsername.set($any($event))" placeholder="p.ej. jdoe" />
+    </div>
+
+    <div>
+      <app-label>Email</app-label>
+      <app-input-field type="email" [value]="editEmail()" (valueChange)="editEmail.set($any($event))" placeholder="user@example.com" />
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <app-label>Nombre</app-label>
+        <app-input-field [value]="editFirstName()" (valueChange)="editFirstName.set($any($event))" placeholder="Nombre" />
+      </div>
+      <div>
+        <app-label>Apellido</app-label>
+        <app-input-field [value]="editLastName()" (valueChange)="editLastName.set($any($event))" placeholder="Apellido" />
+      </div>
+    </div>
+
+    @if (!editItem()) {
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <app-label>Contraseña</app-label>
+          <app-input-field type="password" [value]="editPassword()" (valueChange)="editPassword.set($any($event))" placeholder="Mínimo 6 caracteres" />
+        </div>
+        <div>
+          <app-label>Confirmar Contraseña</app-label>
+          <app-input-field type="password" [value]="editPasswordConfirm()" (valueChange)="editPasswordConfirm.set($any($event))" placeholder="Confirmar contraseña" />
+        </div>
+      </div>
+    }
+
+    <div>
+      <app-label>Roles</app-label>
+      <div class="space-y-3 max-h-48 overflow-y-auto" role="list">
+        @if (roles().length > 0) {
+          @for (role of roles(); track role.id) {
+            <div
+              class="flex items-start gap-3 p-3 rounded border border-gray-200 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-brand-500 focus-within:ring-offset-1 cursor-pointer"
+              role="listitem">
+              <app-checkbox
+                [checked]="hasEditRole(role.name)"
+                (checkedChange)="toggleEditRole(role.name)"
+                [ariaLabel]="role.name"
+              ></app-checkbox>
+              <div class="flex-1 min-w-0">
+                <div class="font-medium text-sm">{{ role.name }}</div>
+                <div class="text-xs text-muted">{{ role.description || 'Sin descripción' }}</div>
+              </div>
+            </div>
+          }
+        } @else {
+          <p class="text-center text-muted py-8">No hay roles disponibles</p>
+        }
+      </div>
+    </div>
+
+    <div>
+      <app-checkbox
+        label="Activo"
+        [checked]="editEnabled()"
+        (checkedChange)="editEnabled.set($event)"
+      ></app-checkbox>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeEdit()" [disabled]="editSubmitting()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitEdit()" [disabled]="editSubmitting()">{{ editSubmitting() ? 'Guardando...' : 'Guardar' }}</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="passwordOpen()" (close)="closePassword()" className="max-w-sm mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Cambiar Contraseña</h3>
+
+    @if (passwordError()) {
+      <app-alert variant="error" title="Error" [message]="passwordError()!" />
+    }
+
+    @if (passwordItem()) {
+      <p class="text-sm text-muted">Usuario: <strong>{{ passwordItem()!.username }}</strong></p>
+    }
+
+    <div>
+      <app-label>Nueva Contraseña</app-label>
+      <app-input-field type="password" [value]="passwordNew()" (valueChange)="passwordNew.set($any($event))" placeholder="Mínimo 6 caracteres" />
+    </div>
+
+    <div>
+      <app-checkbox
+        label="Contraseña temporal (debe cambiarla en siguiente login)"
+        [checked]="passwordTemporary()"
+        (checkedChange)="passwordTemporary.set($event)"
+      ></app-checkbox>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closePassword()" [disabled]="passwordSubmitting()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitPassword()" [disabled]="passwordSubmitting()">{{ passwordSubmitting() ? 'Cambiando...' : 'Cambiar' }}</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="deleteOpen()" (close)="closeDelete()" className="max-w-sm mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Confirmar eliminación</h3>
+
+    @if (deleteError()) {
+      <app-alert variant="error" title="Error" [message]="deleteError()!" />
+    }
+
+    @if (deleteItem()) {
+      <p class="text-muted">¿Seguro de que deseas eliminar el usuario <strong>{{ deleteItem()!.username }}</strong>?</p>
+    }
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeDelete()">Cancelar</app-button>
+      <app-button variant="danger" (btnClick)="confirmDelete()">Eliminar</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="rolesOpen()" (close)="closeRoles()" className="max-w-lg mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Gestionar Roles</h3>
+
+    @if (rolesError()) {
+      <app-alert variant="error" title="Error" [message]="rolesError()!" />
+    }
+
+    @if (rolesItem()) {
+      <p class="text-sm text-muted">Usuario: <strong>{{ rolesItem()!.username }}</strong></p>
+    }
+
+    @if (rolesLoading()) {
+      <div class="text-center py-8" aria-busy="true" aria-label="Cargando roles...">
+        <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+      </div>
+    } @else {
+      <div class="space-y-3 max-h-64 overflow-y-auto" role="list">
+        @for (role of roles(); track role.id) {
+          <div class="flex items-start gap-3 p-3 rounded border border-gray-200 hover:bg-gray-50 focus-within:ring-2 focus-within:ring-brand-500 focus-within:ring-offset-1" role="listitem">
+            <app-checkbox
+              [checked]="hasRole(role.name)"
+              (checkedChange)="toggleRole(role.name)"
+              [disabled]="rolesSaving()"
+              [ariaLabel]="role.name"
+            ></app-checkbox>
+            <div class="flex-1 min-w-0">
+              <div class="font-medium text-sm">{{ role.name }}</div>
+              <div class="text-xs text-muted">{{ role.description || 'Sin descripción' }}</div>
+            </div>
+          </div>
+        }
+      </div>
+
+      @if (roles().length === 0) {
+        <p class="text-center text-muted py-8">No hay roles disponibles</p>
+      }
+    }
+
+    <div class="flex justify-end gap-2 pt-4 border-t">
+      <app-button variant="outline" (btnClick)="closeRoles()" [disabled]="rolesSaving()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitRoles()" [disabled]="rolesSaving() || rolesLoading()">
+        {{ rolesSaving() ? 'Guardando...' : 'Guardar Roles' }}
+      </app-button>
+    </div>
+  </div>
+</app-modal>

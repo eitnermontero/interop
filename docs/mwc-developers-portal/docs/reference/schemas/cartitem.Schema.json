@@ -1,0 +1,1 @@
+{"schema":{"type":"object","required":["itemNumber","localAmount"],"properties":{"itemNumber":{"type":"string","example":"0001"},"localAmount":{"type":"number","description":"Monto en moneda local (BOB). Minimo 0.01","minimum":0.01,"example":100}},"title":"CartItem"},"schemaType":"response"}

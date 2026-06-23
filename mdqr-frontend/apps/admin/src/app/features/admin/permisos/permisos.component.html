@@ -1,0 +1,113 @@
+<app-page-breadcrumb pageTitle="Permisos" />
+
+@if (error()) {
+  <div class="px-4 lg:px-8 py-4">
+    <app-alert variant="error" title="Error" [message]="error()!" />
+  </div>
+}
+
+@if (loading()) {
+  <div class="px-4 lg:px-8 py-4 text-center" aria-busy="true" aria-label="Cargando datos...">
+    <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+  </div>
+} @else {
+  <div class="px-4 sm:px-6 lg:px-8 py-4 space-y-6">
+    <div class="max-w-xs">
+      <app-label>Seleccionar Rol</app-label>
+      <app-select [options]="roleOptions()" [value]="selectedRole()" (valueChange)="selectRole($event)" />
+    </div>
+
+    @if (selectedRole()) {
+      <div class="rounded-xl border border-gray-200 dark:border-gray-800 bg-white dark:bg-white/[0.03] overflow-hidden">
+        <!-- Cabecera -->
+        <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-gray-800">
+          <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">
+            Matriz de Permisos: <span class="text-brand-500">{{ selectedRole() }}</span>
+          </h3>
+          <span class="text-xs text-gray-500 dark:text-gray-400">
+            {{ menuRows().length }} menus &times; {{ allActions().length }} acciones &middot; marca la cabecera o la fila para seleccionar todo
+          </span>
+        </div>
+
+        @if (saveError()) {
+          <div class="px-4 pt-3"><app-alert variant="error" title="Error al guardar" [message]="saveError()!" /></div>
+        }
+        @if (saveSuccess()) {
+          <div class="px-4 pt-3"><app-alert variant="success" title="Guardado" message="Permisos actualizados correctamente." /></div>
+        }
+
+        @if (permsLoading()) {
+          <div class="py-10 text-center" aria-busy="true" aria-label="Cargando permisos...">
+            <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+          </div>
+        } @else {
+          <!-- Matriz -->
+          <div class="overflow-x-auto">
+            <table class="w-full border-collapse text-sm">
+              <thead>
+                <tr class="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-white/[0.02]">
+                  <th class="sticky left-0 z-10 bg-gray-50 dark:bg-gray-900 px-4 py-3 text-left font-semibold text-gray-600 dark:text-gray-300 min-w-56">
+                    Menu
+                  </th>
+                  @for (action of allActions(); track action) {
+                    <th class="px-3 py-2 text-center font-semibold text-gray-600 dark:text-gray-300">
+                      <div class="flex flex-col items-center gap-1.5">
+                        <span class="text-[11px] uppercase tracking-wide">{{ action }}</span>
+                        <app-checkbox
+                          [checked]="columnAllChecked(action)"
+                          (checkedChange)="toggleColumn(action)"
+                          [ariaLabel]="'Asignar ' + action + ' a todos los menus'"
+                        ></app-checkbox>
+                      </div>
+                    </th>
+                  }
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of menuRows(); track row.menu.id) {
+                  <tr class="border-b border-gray-100 dark:border-white/5 hover:bg-gray-50/70 dark:hover:bg-white/[0.02]">
+                    <td class="sticky left-0 z-10 bg-white dark:bg-gray-900 px-4 py-2.5"
+                        [style.padding-left.rem]="1 + row.level * 1.25">
+                      <div class="flex items-center gap-2.5">
+                        <app-checkbox
+                          [checked]="rowAllChecked(row.menu.code)"
+                          (checkedChange)="toggleRow(row.menu.code)"
+                          [ariaLabel]="'Asignar todas las acciones a ' + row.menu.code"
+                        ></app-checkbox>
+                        <div class="min-w-0">
+                          <div class="font-medium text-gray-800 dark:text-white/90 truncate"
+                               [class.font-semibold]="row.level === 0">
+                            {{ row.menu.name | translate }}
+                          </div>
+                          <div class="text-[11px] text-gray-400 dark:text-gray-500 truncate">{{ row.menu.code }}</div>
+                        </div>
+                      </div>
+                    </td>
+                    @for (action of allActions(); track action) {
+                      <td class="px-3 py-2.5 text-center">
+                        <div class="flex justify-center">
+                          <app-checkbox
+                            [checked]="hasAction(row.menu.code, action)"
+                            (checkedChange)="toggleAction(row.menu.code, action)"
+                            [ariaLabel]="row.menu.code + ' - ' + action"
+                          ></app-checkbox>
+                        </div>
+                      </td>
+                    }
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+
+          <!-- Footer -->
+          <div class="flex justify-end gap-2 px-4 py-3 border-t border-gray-200 dark:border-gray-800">
+            <app-button variant="primary" [startIcon]="iconSave" (btnClick)="save()" [disabled]="saving()">
+              {{ saving() ? 'Guardando...' : 'Guardar Permisos' }}
+            </app-button>
+          </div>
+        }
+      </div>
+    }
+  </div>
+}

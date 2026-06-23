@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"txCode":{"type":"string","format":"uuid"},"status":{"type":"string","enum":["CONFIRMED"],"example":"CONFIRMED"},"confirmedAt":{"type":"string","format":"date-time"}},"title":"PaymentConfirmResponse"},"schemaType":"response"}

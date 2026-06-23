@@ -1,0 +1,51 @@
+{
+  "name": "mwc-developers-portal",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "docusaurus": "docusaurus",
+    "start": "bun run gen-api-docs && docusaurus start",
+    "build": "bun run gen-api-docs && docusaurus build",
+    "swizzle": "docusaurus swizzle",
+    "serve": "docusaurus serve",
+    "clear": "docusaurus clear",
+    "gen-api-docs": "docusaurus gen-api-docs middlewareCore",
+    "clean-api-docs": "docusaurus clean-api-docs middlewareCore",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "@docusaurus/core": "3.10.0",
+    "@docusaurus/faster": "3.10.0",
+    "@docusaurus/preset-classic": "3.10.0",
+    "@docusaurus/theme-mermaid": "^3.10.0",
+    "@easyops-cn/docusaurus-search-local": "^0.55.1",
+    "clsx": "^2.1.1",
+    "docusaurus-plugin-openapi-docs": "^5.0.1",
+    "docusaurus-theme-openapi-docs": "^5.0.1",
+    "prism-react-renderer": "^2.3.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@docusaurus/module-type-aliases": "3.10.0",
+    "@docusaurus/tsconfig": "3.10.0",
+    "@docusaurus/types": "3.10.0",
+    "@types/react": "^19.0.0",
+    "typescript": "~5.5.0"
+  },
+  "browserslist": {
+    "production": [
+      ">0.5%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 3 chrome version",
+      "last 3 firefox version",
+      "last 5 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=20.0"
+  }
+}

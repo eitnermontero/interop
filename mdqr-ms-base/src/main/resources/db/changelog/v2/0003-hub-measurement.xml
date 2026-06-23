@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ═══════════════════════════════════════════════════════════════════
+        Tabla: hub_measurement  (schema public)
+        Medición acumulada de unidades facturables por partner, producto y
+        periodo (mes). Actualizada incrementalmente por el servicio de
+        contabilización a medida que se registran transacciones.
+
+        El periodo se representa como el primer día del mes en timestamptz
+        (ej: '2026-06-01 00:00:00+00') para facilitar comparaciones y
+        agrupaciones sin conversión.
+
+        Locks: ACCESS EXCLUSIVE en CREATE TABLE. Objeto nuevo, seguro con
+               tráfico activo.
+        Rollback: DROP TABLE + DROP SEQUENCE.
+        ═══════════════════════════════════════════════════════════════════
+    -->
+
+    <changeSet id="v2-base-013" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="hub_measurement" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear secuencia para hub_measurement</comment>
+        <createSequence sequenceName="hub_measurement_seq"
+                        schemaName="public"
+                        startValue="1"
+                        incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="hub_measurement_seq" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-base-014" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="hub_measurement" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear tabla hub_measurement — medición y facturación por partner/producto/mes</comment>
+        <createTable tableName="hub_measurement" schemaName="public">
+
+            <column name="id" type="bigint" defaultValueSequenceNext="hub_measurement_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_hub_measurement" nullable="false"/>
+            </column>
+
+            <!--
+                partner_id: código o UUID del partner.
+                Referencia lógica (no FK física) porque la tabla partner
+                vive en la base mdqr_auth (schema admin), en un módulo diferente.
+            -->
+            <column name="partner_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Código del producto facturado (ej: "QR_DECODE") -->
+            <column name="product_code" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Periodo: primer día del mes, zona UTC, sin hora (normalizado a 00:00:00+00).
+                Ejemplo: '2026-06-01 00:00:00+00'
+            -->
+            <column name="period_start" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Unidades acumuladas en el periodo (requests exitosos, QRs decodificados, etc.).
+                El tipo numeric evita desbordamiento silencioso de integer en periodos de alto volumen.
+            -->
+            <column name="accumulated_units" type="numeric(20,0)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Unidades fallidas (requests con error HTTP 4xx/5xx).
+                Útil para reconciliación y SLAs.
+            -->
+            <column name="failed_units" type="numeric(20,0)" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamp de la última actualización incremental -->
+            <column name="last_updated" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+
+        <!--
+            UNIQUE (partner_id, product_code, period_start):
+            Solo una fila por combinación partner+producto+mes.
+            El servicio de contabilización hace UPSERT (INSERT ... ON CONFLICT DO UPDATE).
+        -->
+        <addUniqueConstraint tableName="hub_measurement"
+                             schemaName="public"
+                             columnNames="partner_id, product_code, period_start"
+                             constraintName="uk_hub_measurement_partner_product_period"/>
+
+        <!-- CHECK: acumulados no negativos -->
+        <sql>
+            ALTER TABLE public.hub_measurement
+            ADD CONSTRAINT chk_hub_measurement_units
+            CHECK (accumulated_units >= 0 AND failed_units >= 0);
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE public.hub_measurement DROP CONSTRAINT IF EXISTS chk_hub_measurement_units;</sql>
+            <dropUniqueConstraint tableName="hub_measurement"
+                                  schemaName="public"
+                                  constraintName="uk_hub_measurement_partner_product_period"/>
+            <dropTable tableName="hub_measurement" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-base-015" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="hub_measurement" schemaName="public"/>
+            <not><indexExists indexName="idx_hub_measurement_partner_period" schemaName="public"/></not>
+        </preConditions>
+        <comment>Índices para hub_measurement</comment>
+
+        <!--
+            idx_hub_measurement_partner_period: consulta de facturación mensual por partner.
+            Patrón: SELECT * FROM hub_measurement WHERE partner_id = ? ORDER BY period_start DESC.
+        -->
+        <createIndex tableName="hub_measurement"
+                     schemaName="public"
+                     indexName="idx_hub_measurement_partner_period">
+            <column name="partner_id"/>
+            <column name="period_start" descending="true"/>
+        </createIndex>
+
+        <!--
+            idx_hub_measurement_product_period: reportes de uso por producto en todos los partners.
+        -->
+        <createIndex tableName="hub_measurement"
+                     schemaName="public"
+                     indexName="idx_hub_measurement_product_period">
+            <column name="product_code"/>
+            <column name="period_start" descending="true"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="hub_measurement" schemaName="public" indexName="idx_hub_measurement_partner_period"/>
+            <dropIndex tableName="hub_measurement" schemaName="public" indexName="idx_hub_measurement_product_period"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        Dev-only seed: only runs when Liquibase context includes "dev".
+        Adds non-SUPER_ADMIN grants for local testing. Actions, menus, and
+        SUPER_ADMIN grants come from 099-prod-seed-data.xml in every environment.
+    -->
+
+    <changeSet id="100-1" author="middleware-core" context="dev">
+        <comment>Grant operational permissions to OPERADOR (read+export+print on operational menus)</comment>
+        <sql>
+            INSERT INTO admin.role_menu_action
+                (keycloak_role_name, menu_id, action_id, is_granted, created_by, created_date)
+            SELECT 'OPERADOR', m.id, a.id, TRUE, 'system', NOW()
+            FROM admin.menu m
+            JOIN admin.action a ON a.code IN ('READ', 'EXPORT', 'PRINT')
+            WHERE m.code IN (
+                'DASHBOARD',
+                'PAGOS', 'TRANSACCIONES', 'TIPO_CAMBIO',
+                'REPORTES', 'SOBOCE', 'CONCILIACION'
+            )
+            ON CONFLICT (keycloak_role_name, menu_id, action_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+    <changeSet id="100-2" author="middleware-core" context="dev">
+        <comment>Grant read-only permissions to AUDITOR (read+export across all active menus)</comment>
+        <sql>
+            INSERT INTO admin.role_menu_action
+                (keycloak_role_name, menu_id, action_id, is_granted, created_by, created_date)
+            SELECT 'AUDITOR', m.id, a.id, TRUE, 'system', NOW()
+            FROM admin.menu m
+            JOIN admin.action a ON a.code IN ('READ', 'EXPORT')
+            WHERE m.is_active = TRUE
+            ON CONFLICT (keycloak_role_name, menu_id, action_id) DO NOTHING;
+        </sql>
+    </changeSet>
+
+</databaseChangeLog>

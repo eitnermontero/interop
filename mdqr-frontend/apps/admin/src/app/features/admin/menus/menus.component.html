@@ -1,0 +1,116 @@
+<app-page-breadcrumb pageTitle="Menús" />
+
+<ng-template #statusCell let-value="value">
+  <span
+    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+    [class]="value
+      ? 'bg-success-50 text-success-600 dark:bg-success-500/15 dark:text-success-500'
+      : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-white/70'">
+    {{ value ? 'Activo' : 'Inactivo' }}
+  </span>
+</ng-template>
+
+@if (error()) {
+  <div class="px-4 lg:px-8 py-4">
+    <app-alert variant="error" title="Error" [message]="error()!" />
+  </div>
+}
+
+@if (loading()) {
+  <div class="px-4 lg:px-8 py-4 text-center" aria-busy="true" aria-label="Cargando menús...">
+    <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+  </div>
+} @else if (hayResultados()) {
+  <div class="px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <div class="flex justify-between items-center mb-4">
+      <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()">Nuevo Menú</app-button>
+    </div>
+
+    <app-data-table
+      [columns]="visibleColumns()"
+      [data]="flatMenus()"
+      [config]="dataTableConfig()"
+      
+    />
+  </div>
+} @else {
+  <div class="px-4 lg:px-8 py-4 text-center">
+    <p class="text-muted mb-4">No hay menús</p>
+    <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()">Nuevo Menú</app-button>
+  </div>
+}
+
+<app-modal [isOpen]="editOpen()" (close)="closeEdit()" className="max-w-2xl mx-4 p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">{{ editItem() ? 'Editar Menú' : 'Nuevo Menú' }}</h3>
+
+    @if (editError()) {
+      <app-alert variant="error" title="Error" [message]="editError()!" />
+    }
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <app-label>Código</app-label>
+        <app-input-field [value]="editCode()" [disabled]="!!editItem()" (valueChange)="editCode.set($any($event))" placeholder="UPPER_SNAKE" />
+      </div>
+      <div>
+        <app-label>Nombre</app-label>
+        <app-input-field [value]="editName()" (valueChange)="editName.set($any($event))" placeholder="p.ej. Usuarios" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <app-label>Icono</app-label>
+        <app-input-field [value]="editIcon()" (valueChange)="editIcon.set($any($event))" placeholder="Opcional" />
+      </div>
+      <div>
+        <app-label>Ruta</app-label>
+        <app-input-field [value]="editRoute()" (valueChange)="editRoute.set($any($event))" placeholder="/admin/usuarios" />
+      </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <app-label>Menú Padre</app-label>
+        <app-select [options]="parentOptions()" [value]="numToString(editParentId())" (valueChange)="editParentId.set(strToNum($event))" />
+      </div>
+      <div>
+        <app-label>Orden</app-label>
+        <app-input-field type="number" [value]="numToString(editOrderIndex())" (valueChange)="editOrderIndex.set(strToNum($any($event)) || 0)" />
+      </div>
+    </div>
+
+    <div>
+      <label class="flex items-center gap-2">
+        <input type="checkbox" [checked]="editIsActive()" (change)="editIsActive.set(!editIsActive())" class="w-4 h-4" />
+        <span>Activo</span>
+      </label>
+    </div>
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeEdit()" [disabled]="editSubmitting()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitEdit()" [disabled]="editSubmitting()">{{ editSubmitting() ? 'Guardando...' : 'Guardar' }}</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="deleteOpen()" (close)="closeDelete()" className="max-w-sm mx-4 p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Confirmar eliminación</h3>
+
+    @if (deleteError()) {
+      <app-alert variant="error" title="Error" [message]="deleteError()!" />
+    }
+
+    @if (deleteItem()) {
+      <p class="text-muted">¿Seguro de que deseas eliminar el menú <strong>{{ deleteItem()!.name }}</strong>?</p>
+    }
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeDelete()">Cancelar</app-button>
+      <app-button variant="danger" (btnClick)="confirmDelete()">Eliminar</app-button>
+    </div>
+  </div>
+</app-modal>
+

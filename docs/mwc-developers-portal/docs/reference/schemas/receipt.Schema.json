@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"content":{"type":"string","description":"Contenido del comprobante (Base64 encoded)"},"contentType":{"type":"string","example":"application/pdf"},"encoding":{"type":"string","example":"base64"},"description":{"type":"string","example":"Comprobante de pago"}},"title":"Receipt"},"schemaType":"response"}

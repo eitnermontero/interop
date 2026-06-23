@@ -1,0 +1,153 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Tabla: certificate
+         Certificados Digitales Públicos de Bancos (para desencriptar QRs)
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <changeSet id="001-1" author="mdqr-team">
+        <comment>Crear sequence para certificate</comment>
+        <createSequence sequenceName="certificate_seq" startValue="1" incrementBy="1"/>
+    </changeSet>
+
+    <changeSet id="001-2" author="mdqr-team">
+        <comment>Crear tabla certificate</comment>
+        <createTable tableName="certificate">
+            <!-- Primary Key -->
+            <column name="id" type="bigint" defaultValueSequenceNext="certificate_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_certificate"/>
+            </column>
+
+            <!-- Certificate Identity -->
+            <column name="serial_number" type="varchar(100)">
+                <constraints nullable="false" unique="true" uniqueConstraintName="uk_certificate_serial"/>
+            </column>
+
+            <column name="fingerprint_sha256" type="varchar(64)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Entity/Bank Identity -->
+            <column name="entity_id" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="entity_name" type="varchar(200)"/>
+
+            <!-- Certificate Content (PEM) -->
+            <column name="pem_content" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Certificate Metadata -->
+            <column name="subject_dn" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="issuer_dn" type="varchar(500)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="issuer_cn" type="varchar(200)"/>
+
+            <!-- Validity Period -->
+            <column name="valid_from" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="valid_to" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Status & Versioning -->
+            <column name="status" type="varchar(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="version_number" type="integer" defaultValueNumeric="1">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="is_current_version" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Legacy Status Flags (backward compatibility) -->
+            <column name="is_active" type="boolean" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="is_revoked" type="boolean" defaultValueBoolean="false">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="revoked_at" type="timestamptz"/>
+
+            <column name="revoked_reason" type="varchar(500)"/>
+
+            <column name="revoked_by" type="varchar(100)"/>
+
+            <!-- Additional Metadata -->
+            <column name="description" type="text"/>
+
+            <column name="tags" type="varchar[]"/>
+
+            <column name="notification_emails" type="text[]"/>
+
+            <!-- Audit Fields -->
+            <column name="created_by" type="varchar(50)">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="created_date" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <column name="last_modified_by" type="varchar(50)"/>
+
+            <column name="last_modified_date" type="timestamptz"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-3" author="mdqr-team">
+        <comment>Crear índices para certificate</comment>
+
+        <!-- Búsqueda por serial number -->
+        <createIndex tableName="certificate" indexName="idx_cert_serial">
+            <column name="serial_number"/>
+        </createIndex>
+
+        <!-- Búsqueda por entidad -->
+        <createIndex tableName="certificate" indexName="idx_cert_entity">
+            <column name="entity_id"/>
+        </createIndex>
+
+        <!-- Ordenamiento por fecha de expiración -->
+        <createIndex tableName="certificate" indexName="idx_cert_validity">
+            <column name="valid_to" descending="true"/>
+        </createIndex>
+
+        <!-- Filtro por estado legacy -->
+        <createIndex tableName="certificate" indexName="idx_cert_active">
+            <column name="is_active"/>
+            <column name="is_revoked"/>
+        </createIndex>
+
+        <!-- Filtro por status nuevo -->
+        <createIndex tableName="certificate" indexName="idx_cert_status">
+            <column name="status"/>
+        </createIndex>
+
+        <!-- Búsqueda por versión actual -->
+        <createIndex tableName="certificate" indexName="idx_cert_version">
+            <column name="is_current_version"/>
+            <column name="serial_number"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

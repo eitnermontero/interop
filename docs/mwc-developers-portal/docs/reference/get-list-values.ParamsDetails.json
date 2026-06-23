@@ -1,0 +1,1 @@
+{"parameters":[{"name":"listCode","in":"path","required":true,"schema":{"type":"string"},"description":"Codigo de la lista (obtenido del campo `listCode`)","example":"PCBListaTarifas"}]}

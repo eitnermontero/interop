@@ -1,0 +1,34 @@
+<div>
+  <app-page-breadcrumb pageTitle="SOBOCE - Reporte Pagos al Contado" />
+
+  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <app-label>Código</app-label>
+        <app-input-field type="text" [value]="codigo()" placeholder="Ej: 100001127" className="w-44" (valueChange)="codigo.set($event.toString())" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="pagos-fecha-desde" label="Fecha Desde" [defaultDate]="fechaDesde()" placeholder="dd/mm/aaaa" (dateChange)="onFechaDesdeChange($event)" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="pagos-fecha-hasta" label="Fecha Hasta" [defaultDate]="fechaHasta()" placeholder="dd/mm/aaaa" (dateChange)="onFechaHastaChange($event)" />
+      </div>
+      <div class="flex gap-2">
+        <app-button variant="primary" [startIcon]="iconSearch" [disabled]="loading()" (btnClick)="onBuscar()">Buscar</app-button>
+        <app-button variant="success" [startIcon]="iconDownload" [disabled]="!buscado() || !hayResultados()" (btnClick)="onDescargarExcel()">Descargar Excel</app-button>
+        <app-button variant="info" [startIcon]="iconRecibo" [disabled]="!buscado() || !hayResultados() || !servicio()" (btnClick)="onDescargarRecibos()">Descargar Recibos</app-button>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-white/[0.03] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">Cargando...</div>
+  }
+  @if (error()) { <div class="mb-4"><app-alert variant="error" title="Error al consultar los pagos" [message]="error() ?? ''" /></div> }
+  @if (!buscado() && !loading()) { <app-alert variant="info" title="Sin búsqueda activa" message="Ingrese un código y rango de fechas, luego presione Buscar." /> }
+  @if (buscado() && !loading() && !error() && !hayResultados()) { <app-alert variant="warning" title="Sin registros" message="No se encontraron pagos." /> }
+
+  @if (buscado() && !loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="resultados()" />
+  }
+</div>

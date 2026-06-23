@@ -1,0 +1,32 @@
+---
+id: item
+title: "Item"
+description: ""
+sidebar_label: "Item"
+hide_title: true
+hide_table_of_contents: true
+schema: true
+sample: {"itemNumber":"0001","description":"CHURRASCO CON CERVEZA","amount":100,"dependsOnItem":"0000","paymentType":"NSV","receiptType":"R"}
+custom_edit_url: null
+---
+
+import Schema from "@theme/Schema";
+import Heading from "@theme/Heading";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Item"}
+>
+</Heading>
+
+
+
+
+
+<Schema
+  {...require("./item.Schema.json")}
+>
+  
+</Schema>
+            

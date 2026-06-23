@@ -1,0 +1,71 @@
+---
+id: get-receipt
+title: "Get Receipt"
+description: "Descarga los comprobantes de pago (PDF en Base64) de una transaccion previamente confirmada."
+sidebar_label: "Get Receipt"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "get api-method"
+info_path: reference/middleware-core-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get Receipt"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"get"}
+  path={"/v1/payments/{txCode}/receipt"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Descarga los comprobantes de pago (PDF en Base64) de una transaccion previamente confirmada.
+Solo se pueden obtener comprobantes de transacciones con estado `CONFIRMED`.
+
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails
+  {...require("./get-receipt.ParamsDetails.json")}
+>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-receipt.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-receipt.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

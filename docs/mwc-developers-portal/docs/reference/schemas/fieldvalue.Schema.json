@@ -1,0 +1,1 @@
+{"schema":{"type":"object","required":["fieldId","value"],"properties":{"fieldId":{"type":"integer","example":1},"value":{"type":"string","example":"2020"}},"title":"FieldValue"},"schemaType":"response"}

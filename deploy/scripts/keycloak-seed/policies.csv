@@ -1,0 +1,5 @@
+name,description,type,roles
+catalog-policy,Requires cart:read role,role,cart:read
+cart-policy,Requires cart:write role,role,cart:write
+payment-policy,Requires cart:pay role,role,cart:pay
+admin-policy,Requires cart:admin role,role,cart:admin

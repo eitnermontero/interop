@@ -1,0 +1,49 @@
+{
+  "COMMON": {
+    "SEARCH": "Search",
+    "SAVE": "Save",
+    "CANCEL": "Cancel",
+    "CONFIRM": "Confirm",
+    "DELETE": "Delete",
+    "EDIT": "Edit",
+    "BACK": "Back",
+    "NEXT": "Next",
+    "LOADING": "Loading...",
+    "ERROR": "Error",
+    "SUCCESS": "Success",
+    "WARNING": "Warning",
+    "INFO": "Information"
+  },
+  "AUTH": {
+    "LOGOUT": "Logout",
+    "LOGIN": "Login",
+    "USERNAME": "Username",
+    "PASSWORD": "Password",
+    "EMAIL": "Email",
+    "REMEMBER_ME": "Remember me"
+  },
+  "SIDEBAR": {
+    "REPORTS": "My Reports",
+    "PENDING": "Pending",
+    "PAYMENTS": "Payments",
+    "RECEIPTS": "Receipts",
+    "COLLECTION": "Collection",
+    "RECONCILIATION": "Reconciliation",
+    "EMPTY": "No options available"
+  },
+  "DASHBOARD": {
+    "TITLE": "Reports Portal",
+    "SUBTITLE": "Access your reports and documents",
+    "PENDING_DEBTS": "Pending Debts",
+    "RECENT_PAYMENTS": "Recent Payments",
+    "AVAILABLE_RECEIPTS": "Available Receipts"
+  },
+  "REPORTS": {
+    "TITLE": "Reports",
+    "PENDING_TITLE": "Pending Reports",
+    "PAYMENTS_TITLE": "Payments",
+    "RECEIPTS_TITLE": "Receipts",
+    "COLLECTION_TITLE": "Collection",
+    "RECONCILIATION_TITLE": "Reconciliation"
+  }
+}

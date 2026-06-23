@@ -1,0 +1,22 @@
+<div>
+  <app-page-breadcrumb pageTitle="Consulta de Pendientes SOBOCE" />
+
+  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <app-label>Código Cliente</app-label>
+        <app-input-field type="text" [value]="codigoCliente()" placeholder="Ej: 284996778" className="w-52" (valueChange)="codigoCliente.set($event.toString())" />
+      </div>
+      <app-button variant="primary" [startIcon]="iconSearch" [disabled]="loading()" (btnClick)="onBuscar()">Buscar</app-button>
+    </div>
+  </div>
+
+  @if (loading()) { <div class="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-white/[0.03] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">Cargando...</div> }
+  @if (error()) { <div class="mb-4"><app-alert variant="error" title="Error al consultar los pendientes" [message]="error() ?? ''" /></div> }
+  @if (!buscado() && !loading()) { <app-alert variant="info" title="Sin búsqueda activa" message="Ingrese el código de cliente y presione Buscar." /> }
+  @if (buscado() && !loading() && !error() && !hayResultados()) { <app-alert variant="warning" title="Sin registros" message="No se encontraron deudas pendientes." /> }
+
+  @if (buscado() && !loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="resultados()" />
+  }
+</div>

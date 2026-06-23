@@ -1,0 +1,12 @@
+<div [ngClass]="containerClasses">
+  <div *ngIf="title" class="mb-4">
+    <h1 *ngIf="headingLevel === 'h1'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h1>
+    <h2 *ngIf="headingLevel === 'h2'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h2>
+    <h3 *ngIf="headingLevel === 'h3'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h3>
+    <h4 *ngIf="headingLevel === 'h4'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h4>
+    <h5 *ngIf="headingLevel === 'h5'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h5>
+    <h6 *ngIf="headingLevel === 'h6'" class="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">{{ title }}</h6>
+    <p *ngIf="subtitle" class="mt-1 text-xs sm:text-sm text-gray-600 dark:text-gray-400">{{ subtitle }}</p>
+  </div>
+  <ng-content></ng-content>
+</div>

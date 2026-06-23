@@ -1,0 +1,33 @@
+<app-auth-page-layout>
+  <div class="flex flex-col justify-center flex-1 w-full max-w-md mx-auto px-6">
+
+    <div class="mb-8 text-center">
+      <h1 class="mb-2 text-2xl font-semibold text-gray-800 dark:text-white/90">
+        Bienvenido
+      </h1>
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        Inicia sesión con tu cuenta corporativa para continuar.
+      </p>
+    </div>
+
+    @if (errorMessage()) {
+      <div class="mb-6 rounded-lg bg-error-50 border border-error-200 px-4 py-3 text-sm text-error-700 dark:bg-error-500/10 dark:border-error-500/20 dark:text-error-400">
+        {{ errorMessage() }}
+      </div>
+    }
+
+    <app-button
+      className="w-full"
+      size="sm"
+      [disabled]="isLoading()"
+      (btnClick)="onLogin()"
+    >
+      @if (isLoading()) {
+        Redirigiendo...
+      } @else {
+        Iniciar sesión
+      }
+    </app-button>
+
+  </div>
+</app-auth-page-layout>

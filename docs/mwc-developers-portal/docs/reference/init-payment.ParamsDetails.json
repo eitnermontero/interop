@@ -1,0 +1,1 @@
+{"parameters":[{"name":"X-Signature","in":"header","required":true,"schema":{"type":"string"},"description":"Firma RSA-SHA256 del body del request (Base64)"}]}

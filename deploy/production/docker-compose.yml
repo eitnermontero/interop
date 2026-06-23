@@ -1,0 +1,132 @@
+name: ${MDQR_STACK_NAME:-mdqr-prod-services}
+
+# -----------------------------------------------------------------------------
+# Multi-host deploy model:
+#   - Default: 1 nodo por host (gateway + decrypt-service). NODE_INDEX define
+#     el numero de nodo del host (server1=1, server2=2, ...). Un balanceador
+#     externo (nginx, etc) reparte trafico entre los gateways de cada host.
+#   - El service-name en Consul NO lleva el indice — los N nodos comparten
+#     el mismo servicio logico, asi el discovery + LB interno funcionan.
+#   - Nodos extra en el mismo host (escala vertical): activar profiles
+#     gateway-extra / decrypt-extra y setear NODE_INDEX_*_EXTRA.
+#
+#   Multi-tenant: TENANT_ID se propaga a container_name, hostname, Consul,
+#   realm Keycloak, namespace Vault, DB y logs (ver deploy/development/README.md).
+# -----------------------------------------------------------------------------
+
+networks:
+  mdqr_net:
+    name: ${MDQR_NETWORK_NAME:-mdqr-prod-net}
+    driver: bridge
+    driver_opts:
+      com.docker.network.driver.mtu: "${MDQR_NETWORK_MTU:-1500}"
+
+services:
+  gateway:
+    extends:
+      file: ../services/001-gateway.yml
+      service: mdqr-gateway
+    container_name: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_GATEWAY_PORT:-0.0.0.0:8080}:8080"
+    environment:
+      LOG_FILE: gateway-${NODE_INDEX:-1}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrgateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+
+  decrypt-service:
+    extends:
+      file: ../services/002-decrypt-service.yml
+      service: mdqr-decode-service
+    container_name: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_DECRYPT_PORT:-0.0.0.0:8084}:8081"
+    environment:
+      LOG_FILE: decrypt-service-${NODE_INDEX:-1}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrdecryptservice${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+
+  # ---------------------------------------------------------------------------
+  # Nodos extra en el mismo host (opt-in via COMPOSE_PROFILES).
+  # Setear NODE_INDEX_*_EXTRA al numero correspondiente para no chocar con
+  # NODE_INDEX de otros hosts (ej: server1 usa 1, server2 usa 2, extras 3+).
+  # ---------------------------------------------------------------------------
+
+  gateway-extra:
+    extends:
+      file: ../services/001-gateway.yml
+      service: mdqr-gateway
+    container_name: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_GATEWAY_EXTRA:-99}
+    profiles: ["gateway-extra"]
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_GATEWAY_PORT_EXTRA:-0.0.0.0:8086}:8080"
+    environment:
+      LOG_FILE: gateway-${NODE_INDEX_GATEWAY_EXTRA:-99}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrgateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_GATEWAY_EXTRA:-99}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-gateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_GATEWAY_EXTRA:-99}
+
+  decrypt-service-extra:
+    extends:
+      file: ../services/002-decrypt-service.yml
+      service: mdqr-decode-service
+    container_name: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_DECRYPT_EXTRA:-99}
+    profiles: ["decrypt-extra"]
+    networks:
+      - mdqr_net
+    environment:
+      LOG_FILE: decrypt-service-${NODE_INDEX_DECRYPT_EXTRA:-99}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrdecryptservice${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_DECRYPT_EXTRA:-99}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-decode-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_DECRYPT_EXTRA:-99}
+
+  admin-service:
+    extends:
+      file: ../services/003-admin-service.yml
+      service: mdqr-admin-service
+    container_name: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_ADMIN_PORT:-0.0.0.0:8083}:8083"
+    environment:
+      LOG_FILE: admin-service-${NODE_INDEX:-1}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqradminservice${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
+
+  admin-service-extra:
+    extends:
+      file: ../services/003-admin-service.yml
+      service: mdqr-admin-service
+    container_name: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_ADMIN_EXTRA:-99}
+    profiles: ["admin-extra"]
+    networks:
+      - mdqr_net
+    environment:
+      LOG_FILE: admin-service-${NODE_INDEX_ADMIN_EXTRA:-99}.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqradminservice${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_ADMIN_EXTRA:-99}
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: mdqr-admin-service${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_ADMIN_EXTRA:-99}
+
+  admin-fe:
+    extends:
+      file: ../services/100-admin-fe.yml
+      service: mdqr-admin-fe
+    container_name: mdqr-admin-fe${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_ADMIN_FE_PORT:-0.0.0.0:8081}:80"
+
+  public-fe:
+    extends:
+      file: ../services/101-public-fe.yml
+      service: mdqr-public-fe
+    container_name: mdqr-public-fe${TENANT_ID:+-}${TENANT_ID}
+    networks:
+      - mdqr_net
+    ports:
+      - "${MDQR_PUBLIC_FE_PORT:-0.0.0.0:8082}:80"

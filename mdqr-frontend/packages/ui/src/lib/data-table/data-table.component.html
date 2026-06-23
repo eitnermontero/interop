@@ -1,0 +1,314 @@
+<div class="flex flex-col overflow-hidden rounded-xl border border-gray-200 bg-white dark:border-white/[0.05] dark:bg-white/[0.03]">
+
+  <!-- Backdrop para cerrar el menú de columnas -->
+  @if (showColMenu()) {
+    <div class="fixed inset-0 z-40" (click)="showColMenu.set(false)"></div>
+  }
+
+  <!-- Barra de búsqueda (si searchable) -->
+  @if (config().searchable) {
+    <div class="border-b border-gray-100 px-4 py-3 dark:border-white/[0.05]">
+      <input
+        type="text"
+        [placeholder]="config().searchPlaceholder || 'Buscar…'"
+        [value]="searchTerm()"
+        (input)="onSearchChange($event.target.value)"
+        class="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500/20 dark:border-gray-700 dark:bg-gray-800 dark:text-white"
+      />
+    </div>
+  }
+
+  <!-- Barra de herramientas -->
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 dark:border-white/[0.05]">
+    <span class="text-xs text-gray-500 dark:text-gray-400">
+      @if (totalItems() > 0) {
+        Mostrando {{ startRecord() }} – {{ endRecord() }} de {{ totalItems() }} registros
+      } @else {
+        Sin registros
+      }
+    </span>
+
+    <div class="flex items-center gap-2">
+      <!-- Botones de exportación -->
+      @if (config().exportable) {
+        <div class="flex items-center gap-1 border-r border-gray-200 pr-2 dark:border-gray-700">
+          @for (fmt of config().exportFormats || []; track fmt) {
+            <button
+              type="button"
+              (click)="exportData(fmt)"
+              [title]="'Exportar a ' + fmt.toUpperCase()"
+              class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs font-medium text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+            >
+              {{ fmt.toUpperCase() }}
+            </button>
+          }
+        </div>
+      }
+
+      <!-- Selector de tamaño de página -->
+      <select
+        class="rounded-lg border border-gray-200 bg-white px-2 py-1.5 text-xs text-gray-600 focus:outline-none focus:ring-1 focus:ring-brand-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300"
+        [value]="pageSizeVal()"
+        (change)="onPageSizeChange(+$any($event.target).value)"
+      >
+        @for (opt of pageSizeOptions(); track opt) {
+          <option [value]="opt">{{ opt }} por pág.</option>
+        }
+      </select>
+
+      <!-- Botón de visibilidad de columnas -->
+      <div class="relative z-50">
+        <button
+          type="button"
+          class="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-300 dark:hover:bg-gray-700"
+          (click)="showColMenu.update(v => !v)"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2"/>
+          </svg>
+          Columnas
+          <svg class="h-3 w-3 transition-transform" [class.rotate-180]="showColMenu()"
+            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+
+        @if (showColMenu()) {
+          <div class="absolute right-0 top-full z-50 mt-1.5 w-52 overflow-hidden rounded-xl border border-gray-200 bg-white shadow-xl dark:border-gray-700 dark:bg-gray-800">
+            <div class="border-b border-gray-100 px-3 py-2.5 dark:border-gray-700">
+              <p class="text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">
+                Columnas visibles
+              </p>
+            </div>
+            <div class="max-h-60 overflow-y-auto py-1">
+              @for (col of columns(); track col.key) {
+                <label class="flex cursor-pointer items-center gap-2.5 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700">
+                  <input
+                    type="checkbox"
+                    class="h-4 w-4 rounded border-gray-300 accent-brand-500 dark:border-gray-600"
+                    [checked]="columnVisibility()[col.key]"
+                    (change)="toggleColumn(col.key)"
+                    (click)="$event.stopPropagation()"
+                  />
+                  <span class="text-sm text-gray-700 dark:text-gray-300">{{ col.label }}</span>
+                </label>
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  </div>
+
+  <!-- Tabla -->
+  <div class="max-w-full overflow-x-auto">
+    <table class="min-w-full">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50/80 dark:border-white/[0.05] dark:bg-white/[0.02]">
+          <!-- Columna del indicador de expansión -->
+          <th class="w-10 px-3 py-3"></th>
+
+          @for (col of visibleColumns(); track col.key) {
+            <th
+              [class]="thClass(col, dragOverKey() === col.key)"
+              [ngClass]="col.headerClass"
+              draggable="true"
+              (dragstart)="onDragStart($event, col.key)"
+              (dragover)="onDragOver($event, col.key)"
+              (drop)="onDrop($event, col.key)"
+              (dragend)="onDragEnd()"
+            >
+              <div
+                class="flex items-center gap-1.5"
+                [class.justify-end]="col.align === 'right'"
+                [class.justify-center]="col.align === 'center'"
+              >
+                <!-- Asa de arrastre -->
+                <span
+                  class="shrink-0 cursor-grab text-gray-300 hover:text-gray-400 dark:text-gray-600 dark:hover:text-gray-500"
+                  title="Arrastrá para reordenar"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M7 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 2zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 7 14zm6-8a2 2 0 1 0-.001-4.001A2 2 0 0 0 13 6zm0 2a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 8zm0 6a2 2 0 1 0 .001 4.001A2 2 0 0 0 13 14z"/>
+                  </svg>
+                </span>
+
+                @if (col.sortable !== false && col.key !== 'actions') {
+                  <button
+                    type="button"
+                    class="flex items-center gap-1 text-xs font-medium uppercase text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                    (click)="onSort(col.key)"
+                  >
+                    {{ col.label }}
+                    <span class="ml-0.5 shrink-0">
+                      @if (sortKey() === col.key && sortDir() === 'asc') {
+                        <svg class="h-3.5 w-3.5 text-brand-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M14.707 12.707a1 1 0 01-1.414 0L10 9.414l-3.293 3.293a1 1 0 01-1.414-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 010 1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      } @else if (sortKey() === col.key && sortDir() === 'desc') {
+                        <svg class="h-3.5 w-3.5 text-brand-500" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                        </svg>
+                      } @else {
+                        <svg class="h-3.5 w-3.5 text-gray-300 dark:text-gray-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M10 3a1 1 0 01.707.293l3 3a1 1 0 01-1.414 1.414L10 5.414 7.707 7.707a1 1 0 01-1.414-1.414l3-3A1 1 0 0110 3zm-3.707 9.293a1 1 0 000 1.414l3 3a1 1 0 001.414 0l3-3a1 1 0 00-1.414-1.414L10 14.586l-2.293-2.293a1 1 0 00-1.414 0z" clip-rule="evenodd"/>
+                        </svg>
+                      }
+                    </span>
+                  </button>
+                } @else {
+                  <span class="text-xs font-medium uppercase text-gray-500 dark:text-gray-400">
+                    {{ col.label }}
+                  </span>
+                }
+              </div>
+            </th>
+          }
+        </tr>
+      </thead>
+
+      <tbody class="divide-y divide-gray-100 dark:divide-white/[0.05]">
+        @for (row of pagedData(); track $index; let i = $index) {
+          @let rk = rowKey(row, (currentPage() - 1) * pageSizeVal() + i);
+          @let isExpanded = expandedKey() === rk;
+
+          <!-- Fila de datos -->
+          <tr
+            [class.cursor-pointer]="isMobile()"
+            class="transition-colors hover:bg-gray-50 dark:hover:bg-white/[0.02]"
+            (click)="toggleRow(rk, row)"
+          >
+            <td class="w-10 px-3 py-4 text-center text-gray-400 dark:text-gray-500">
+              @if (isMobile()) {
+                <svg
+                  class="inline h-4 w-4 transition-transform duration-200"
+                  [class.rotate-90]="isExpanded"
+                  fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                >
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                </svg>
+              }
+            </td>
+
+            @for (col of visibleColumns(); track col.key) {
+              <td [class]="tdClass(col)" [ngClass]="col.cellClass">
+                @if (col.cellTemplate) {
+                  <ng-container
+                    [ngTemplateOutlet]="col.cellTemplate"
+                    [ngTemplateOutletContext]="{ $implicit: row, value: row[col.key] }"
+                  ></ng-container>
+                } @else if (col.actions) {
+                  <div class="flex items-center gap-2">
+                    @for (action of col.actions; track action.id) {
+                      @if (!(action.hidden?.(row))) {
+                        <button
+                          type="button"
+                          [disabled]="action.disabled?.(row)"
+                          (click)="action.onClick(row, $event)"
+                          [title]="action.label"
+                          [ngClass]="getActionButtonClass(action.variant || 'default')"
+                        >
+                          @if (action.text) {
+                            <span class="text-xs font-medium">{{ action.text }}</span>
+                          } @else if (action.icon) {
+                            <div class="h-4 w-4" [innerHTML]="sanitizeIcon(action.icon)"></div>
+                          } @else {
+                            <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2m0 7a1 1 0 110-2 1 1 0 010 2m0 7a1 1 0 110-2 1 1 0 010 2"/>
+                            </svg>
+                          }
+                        </button>
+                      }
+                    }
+                  </div>
+                } @else {
+                  {{ cellValue(row, col) }}
+                }
+              </td>
+            }
+          </tr>
+
+          <!-- Fila expandida -->
+          @if (isExpanded) {
+            <tr class="bg-gray-50/60 dark:bg-white/[0.01]">
+              <td [attr.colspan]="visibleColumns().length + 1" class="px-6 py-5">
+                <div class="grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-3 lg:grid-cols-4">
+                  @for (col of columns(); track col.key) {
+                    <div class="flex flex-col gap-0.5">
+                      <span class="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                        {{ col.label }}
+                      </span>
+                      <span class="text-sm text-gray-800 dark:text-white/90 break-words">
+                        {{ cellValue(row, col) }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              </td>
+            </tr>
+          }
+        } @empty {
+          <tr>
+            <td
+              [attr.colspan]="visibleColumns().length + 1"
+              class="px-5 py-12 text-center text-sm text-gray-400 dark:text-gray-500"
+            >
+              Sin registros para mostrar
+            </td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Paginación -->
+  @if (totalPages() > 1 || totalItems() > pageSizeVal()) {
+    <div class="flex flex-wrap items-center justify-between gap-3 border-t border-gray-100 px-4 py-3 dark:border-white/[0.05]">
+      <span class="text-xs text-gray-500 dark:text-gray-400">
+        Página {{ currentPage() }} de {{ totalPages() }}
+      </span>
+
+      <div class="flex items-center gap-1">
+        <!-- Anterior -->
+        <button
+          type="button"
+          (click)="goToPage(currentPage() - 1)"
+          [disabled]="currentPage() === 1"
+          class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+          </svg>
+        </button>
+
+        @for (p of pageNumbers(); track $index) {
+          @if (p === null) {
+            <span class="flex h-8 w-5 items-center justify-center text-xs text-gray-400 dark:text-gray-500">…</span>
+          } @else {
+            <button
+              type="button"
+              (click)="goToPage(p)"
+              [class]="p === currentPage()
+                ? 'flex h-8 w-8 items-center justify-center rounded-lg bg-brand-500 text-xs font-semibold text-white shadow-sm'
+                : 'flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-xs text-gray-600 hover:bg-gray-50 dark:border-gray-700 dark:text-gray-300 dark:hover:bg-gray-800'"
+            >{{ p }}</button>
+          }
+        }
+
+        <!-- Siguiente -->
+        <button
+          type="button"
+          (click)="goToPage(currentPage() + 1)"
+          [disabled]="currentPage() === totalPages()"
+          class="flex h-8 w-8 items-center justify-center rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-gray-700 dark:text-gray-400 dark:hover:bg-gray-800"
+        >
+          <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+  }
+
+</div>

@@ -1,0 +1,30 @@
+FROM ghcr.io/graalvm/graalvm-community:25 AS build
+
+ARG NEXUS_USERNAME
+ARG NEXUS_PASSWORD
+
+WORKDIR /workspace
+
+COPY gradle/ gradle/
+COPY gradlew settings.gradle build.gradle gradle.properties ./
+COPY mwc-gateway/ mwc-gateway/
+COPY mwc-cart-service/build.gradle mwc-cart-service/build.gradle
+
+RUN --mount=type=cache,target=/root/.gradle \
+    ./gradlew :mwc-gateway:nativeCompile -x test --no-daemon \
+    -PnexusUsername="${NEXUS_USERNAME}" -PnexusPassword="${NEXUS_PASSWORD}"
+
+FROM alpine:3.21 AS runtime
+
+WORKDIR /app
+
+RUN apk add --no-cache libc6-compat
+
+COPY --from=build /workspace/mwc-gateway/build/native/nativeCompile/mwc-gateway app
+
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+EXPOSE 8080
+
+ENTRYPOINT ["./app"]

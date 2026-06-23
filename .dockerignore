@@ -1,0 +1,14 @@
+.git
+.github
+.gradle
+.idea
+.vscode
+.env
+.env.*
+.atl
+docs
+scripts
+*.md
+**/build
+**/out
+**/src/test

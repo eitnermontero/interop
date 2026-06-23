@@ -1,0 +1,45 @@
+spring:
+  config:
+    import: ""
+
+  cloud:
+    vault:
+      enabled: false
+      config:
+        lifecycle:
+          enabled: false
+    consul:
+      enabled: true
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        enabled: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  session:
+    store-type: redis
+    redis:
+      namespace: mdqr-gateway:session
+
+application:
+  keycloak:
+    auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    external-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    realm: mdqr-admin
+    resource: mdqradminservice
+    credentials:
+      secret: mdqradminservice-secret
+  partner-keycloak:
+    auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    external-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    realm: mdqr-partner
+    resource: unilink-api
+    credentials:
+      secret: unilink-api-secret

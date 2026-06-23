@@ -1,0 +1,138 @@
+<app-page-breadcrumb pageTitle="Roles" />
+
+<ng-template #compositeCell let-value="value">
+  <span
+    class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium"
+    [class]="value
+      ? 'bg-blue-light-50 text-blue-light-500 dark:bg-blue-light-500/15 dark:text-blue-light-500'
+      : 'bg-gray-100 text-gray-600 dark:bg-white/5 dark:text-white/70'">
+    {{ value ? 'Sí' : 'No' }}
+  </span>
+</ng-template>
+
+@if (error()) {
+  <div class="px-4 lg:px-8 py-4">
+    <app-alert variant="error" title="Error" [message]="error()!" />
+  </div>
+}
+
+@if (loading()) {
+  <div class="px-4 lg:px-8 py-4 text-center" aria-busy="true" aria-label="Cargando roles...">
+    <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+  </div>
+} @else if (hayResultados()) {
+  <div class="px-4 sm:px-6 lg:px-8 py-4 space-y-4">
+    <div class="flex flex-col sm:flex-row justify-between items-end sm:items-center gap-3 sm:gap-0 mb-4">
+      <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()" class="w-full sm:w-auto">Nuevo Rol</app-button>
+    </div>
+    <app-data-table
+      [columns]="visibleColumns()"
+      [data]="roles()"
+      [config]="dataTableConfig()"
+    />
+  </div>
+} @else {
+  <div class="px-4 lg:px-8 py-4 text-center">
+    <p class="text-muted mb-4">No hay roles</p>
+    <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openCreate()">Nuevo Rol</app-button>
+  </div>
+}
+
+<app-modal [isOpen]="editOpen()" (close)="closeEdit()" className="max-w-xl mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">{{ editItem() ? 'Editar Rol' : 'Nuevo Rol' }}</h3>
+
+    @if (editError()) {
+      <app-alert variant="error" title="Error" [message]="editError()!" />
+    }
+
+    <div>
+      <app-label>Nombre</app-label>
+      <app-input-field [value]="editName()" [disabled]="!!editItem()" (valueChange)="editName.set($any($event))" placeholder="UPPER_SNAKE_CASE" />
+      @if (!editItem()) {
+        <p class="text-xs text-muted mt-1">Ej: OPERADOR, AUDITOR. No se puede cambiar después.</p>
+      }
+    </div>
+
+    <div>
+      <app-label>Descripción</app-label>
+      <app-input-field [value]="editDescription()" (valueChange)="editDescription.set($any($event))" placeholder="Opcional" />
+    </div>
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeEdit()" [disabled]="editSubmitting()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitEdit()" [disabled]="editSubmitting()">{{ editSubmitting() ? 'Guardando...' : 'Guardar' }}</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="deleteOpen()" (close)="closeDelete()" className="max-w-sm mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Confirmar eliminación</h3>
+
+    @if (deleteError()) {
+      <app-alert variant="error" title="Error" [message]="deleteError()!" />
+    }
+
+    @if (deleteItem()) {
+      <p class="text-muted">¿Seguro de que deseas eliminar el rol <strong>{{ deleteItem()!.name }}</strong>?</p>
+      @if (deleteItem()!.composite) {
+        <p class="text-xs text-warning">Nota: Este es un rol compuesto. Asegúrate de que no esté asignado a ningún usuario.</p>
+      }
+    }
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeDelete()">Cancelar</app-button>
+      <app-button variant="danger" (btnClick)="confirmDelete()">Eliminar</app-button>
+    </div>
+  </div>
+</app-modal>
+
+<app-modal [isOpen]="menusOpen()" (close)="closeMenus()" className="max-w-lg mx-4 p-4 sm:p-6 lg:p-8">
+  <div class="space-y-4">
+    <h3 class="text-lg font-semibold">Gestionar Menús</h3>
+
+    @if (menusError()) {
+      <app-alert variant="error" title="Error" [message]="menusError()!" />
+    }
+
+    @if (menusItem()) {
+      <p class="text-sm text-muted">Rol: <strong>{{ menusItem()!.name }}</strong></p>
+    }
+
+    @if (menusLoading()) {
+      <div class="text-center py-8" aria-busy="true" aria-label="Cargando menús...">
+        <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+      </div>
+    } @else {
+      <div class="space-y-1 max-h-96 overflow-y-auto">
+        @for (item of flatMenuItems(); track item.menu.id) {
+          <div
+            class="flex items-start gap-3 p-2 rounded hover:bg-gray-50 focus-within:ring-2 focus-within:ring-brand-500 focus-within:ring-offset-1"
+            [class.border-l]="item.level > 0"
+            [class.border-gray-200]="item.level > 0"
+            [class.dark:border-white/10]="item.level > 0"
+            [style.margin-left.rem]="item.level * 1.25">
+            <app-checkbox
+              [checked]="hasMenu(item.menu.code)"
+              (checkedChange)="toggleMenu(item.menu.code)"
+              [disabled]="menusSaving()"
+              [ariaLabel]="item.menu.name | translate"
+            ></app-checkbox>
+            <div class="flex-1">
+              <div class="font-medium text-sm">{{ item.menu.name | translate }}</div>
+              <div class="text-xs text-muted">{{ item.menu.code }}</div>
+            </div>
+          </div>
+        }
+      </div>
+    }
+
+    <div class="flex justify-end gap-2 pt-4">
+      <app-button variant="outline" (btnClick)="closeMenus()" [disabled]="menusSaving()">Cancelar</app-button>
+      <app-button variant="primary" (btnClick)="submitMenus()" [disabled]="menusSaving() || menusLoading()">
+        {{ menusSaving() ? 'Guardando...' : 'Guardar Menús' }}
+      </app-button>
+    </div>
+  </div>
+</app-modal>

@@ -1,0 +1,93 @@
+---
+id: get-account-items
+title: "Get Account Items"
+description: "Obtiene los items (deudas) disponibles para pagar de una cuenta."
+sidebar_label: "Get Account Items"
+hide_title: true
+hide_table_of_contents: true
+api: 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
+sidebar_class_name: "post api-method"
+info_path: reference/middleware-core-api
+custom_edit_url: null
+---
+
+import MethodEndpoint from "@theme/ApiExplorer/MethodEndpoint";
+import ParamsDetails from "@theme/ParamsDetails";
+import RequestSchema from "@theme/RequestSchema";
+import StatusCodes from "@theme/StatusCodes";
+import OperationTabs from "@theme/OperationTabs";
+import TabItem from "@theme/TabItem";
+import Heading from "@theme/Heading";
+import Translate from "@docusaurus/Translate";
+
+<Heading
+  as={"h1"}
+  className={"openapi__heading"}
+  children={"Get Account Items"}
+>
+</Heading>
+
+<MethodEndpoint
+  method={"post"}
+  path={"/v1/accounts/items"}
+  context={"endpoint"}
+>
+  
+</MethodEndpoint>
+
+
+
+Obtiene los items (deudas) disponibles para pagar de una cuenta.
+
+Cada item tiene un `paymentType` que define las reglas de seleccion. Los items
+con `paymentType` que contiene la letra central `D` (NDU/NDV/ODU/ODV) requieren
+llamar al endpoint `Generate Item Subitems` antes de pagar.
+
+#### Formato de `paymentType`
+
+El valor sigue el formato **`[Prefijo][Letra Central][Sufijo]`**:
+
+| Componente | Valor | Descripcion |
+|---|---|---|
+| **Prefijo** | `N` | Normal (opcional) |
+| | `O` | Obligatorio |
+| **Letra Central** | `S` | Monto fijo |
+| | `V` | Monto por cantidad |
+| | `D` | Requiere subitems |
+| | `M` | Monto libre |
+| | `C` | Cantidad libre |
+| **Sufijo** | `U` | Uno solo |
+| | `V` | Varios |
+| **Especial** | `REF` | Referencial, no pagable |
+
+**Valores posibles:** `NSU` `NSV` `NVU` `NVV` `NDU` `NDV` `NMU` `NMV` `NCU` `OSU` `OSV` `OVU` `OVV` `ODU` `ODV` `OMU` `OMV` `OCU` `REF`
+
+**Ejemplo:** `NSV` → Normal, monto fijo, varios items seleccionables.
+
+
+<Heading
+  id={"request"}
+  as={"h2"}
+  className={"openapi-tabs__heading"}
+>
+  <Translate id="theme.openapi.request.title">Request</Translate>
+</Heading>
+
+<ParamsDetails>
+  
+</ParamsDetails>
+
+<RequestSchema
+  {...require("./get-account-items.RequestSchema.json")}
+>
+  
+</RequestSchema>
+
+<StatusCodes
+  {...require("./get-account-items.StatusCodes.json")}
+>
+  
+</StatusCodes>
+
+
+      

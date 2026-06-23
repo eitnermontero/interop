@@ -1,0 +1,27 @@
+services:
+  mdqr-public-fe:
+    image: ${MDQR_PUBLIC_FE_IMAGE:-cr.sintesis.com.bo/mdqr-dev/mdqr-public-fe}:${MDQR_PUBLIC_FE_VERSION:-latest}
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: ${MDQR_PUBLIC_FE_MEM_LIMIT:-128M}
+        reservations:
+          memory: ${MDQR_PUBLIC_FE_MEM_RESERVATION:-32M}
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+    environment:
+      TZ: America/La_Paz
+      APP_API_URL: ${APP_API_URL:-}
+      APP_KEYCLOAK_URL: ${APP_KEYCLOAK_URL:-}
+      APP_KEYCLOAK_REALM: ${APP_KEYCLOAK_REALM:-}
+      APP_KEYCLOAK_CLIENT_ID: ${APP_KEYCLOAK_CLIENT_ID:-mdqr-public-fe}
+      # Context-path runtime (sin rebuild): '/' = raiz, '/mdqrpublic/' = bajo subpath.
+      APP_BASE_PATH: ${MDQR_PUBLIC_FE_BASE_PATH:-/}
+      APP_NAME: ${APP_NAME:-MDQR Portal}
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost/health || exit 1"]
+      interval: ${MDQR_HC_WEB_INTERVAL:-30s}
+      timeout: ${MDQR_HC_WEB_TIMEOUT:-5s}
+      retries: ${MDQR_HC_WEB_RETRIES:-3}
+      start_period: ${MDQR_HC_WEB_START_PERIOD:-10s}

@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"accountNumber":{"type":"string"},"holderName":{"type":"string"},"detail":{"type":"string"},"serviceCode":{"type":"integer"},"serviceName":{"type":"string"},"currency":{"type":"string","description":"Codigo ISO de la moneda (`BOB` o `USD`)","enum":["BOB","USD"],"example":"BOB"}},"title":"AccountInfo"},"schemaType":"response"}

@@ -1,0 +1,1263 @@
+openapi: 3.1.0
+info:
+  title: Middleware Core API
+  version: 1.0.0
+  description: |
+    API REST para integrar el servicio de cobros de Genesis a traves de Middleware Core.
+
+    Todos los endpoints (excepto `POST /v1/auth/token`) requieren un token JWT en el header `Authorization: Bearer <token>`.
+
+    Los errores siguen el estandar [RFC 7807 (Problem Details)](https://www.rfc-editor.org/rfc/rfc7807).
+  contact:
+    name: Sintesis SA
+    url: https://sintesis.com.bo
+servers:
+  - url: https://stage-api.sintesis.com.bo/middleware-core
+    description: Stage
+  - url: https://api.sintesis.com.bo/middleware-core
+    description: Produccion
+tags:
+  - name: Auth
+    description: Autenticacion de partners
+  - name: Catalog
+    description: Catalogo de departamentos, categorias, proveedores, grupos, criterios y campos
+  - name: Accounts
+    description: Busqueda de cuentas y obtencion de items
+  - name: Payments
+    description: Flujo de pago (inicio, confirmacion y comprobante)
+security:
+  - BearerAuth: []
+
+paths:
+  /v1/auth/token:
+    post:
+      tags: [Auth]
+      summary: Authenticate Partner
+      description: |
+        Intercambia las credenciales del partner (`clientId` / `clientSecret`) por un token JWT.
+        Este token se usa como `Authorization: Bearer <token>` en todos los demas endpoints.
+      operationId: authenticatePartner
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenRequest'
+            examples:
+              default:
+                summary: Credenciales del partner
+                value:
+                  clientId: cartcore_stage_demo01
+                  clientSecret: cartcore_stage_demo01
+      responses:
+        '200':
+          description: Token emitido correctamente
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenResponse'
+              examples:
+                default:
+                  value:
+                    access_token: eyJhbGciOiJSUzI1NiIs...
+                    token_type: Bearer
+                    expires_in: 3600
+        '400':
+          $ref: '#/components/responses/ValidationError'
+        '401':
+          description: Credenciales invalidas o API key expirada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                invalidCredentials:
+                  summary: API key invalida o inactiva
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/unauthorized
+                    title: Unauthorized
+                    status: 401
+                    detail: Invalid, inactive or expired API key
+                    errorCode: UNAUTHORIZED
+                    timestamp: '2026-04-10T13:28:39.450Z'
+        '503':
+          description: Servicio de autenticacion no disponible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/service-unavailable
+                    title: Service Unavailable
+                    status: 503
+                    detail: Authentication service unavailable
+                    errorCode: SERVICE_UNAVAILABLE
+                    timestamp: '2026-04-10T13:28:39.450Z'
+
+  /v1/catalog/departments:
+    get:
+      tags: [Catalog]
+      summary: Get Departments
+      description: Retorna la lista de departamentos disponibles en el catalogo.
+      operationId: getDepartments
+      responses:
+        '200':
+          description: Lista de departamentos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+              examples:
+                default:
+                  value:
+                    - { id: 1, name: La Paz, code: LP }
+                    - { id: 2, name: Cochabamba, code: CB }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/categories:
+    get:
+      tags: [Catalog]
+      summary: Get Categories
+      description: Retorna las categorias de servicios disponibles.
+      operationId: getCategories
+      responses:
+        '200':
+          description: Lista de categorias
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Category'
+              examples:
+                default:
+                  value:
+                    - { id: 1, name: Servicios Basicos, iconUrl: 'https://...' }
+                    - { id: 2, name: Telecomunicaciones, iconUrl: 'https://...' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/providers:
+    get:
+      tags: [Catalog]
+      summary: Get Providers
+      description: Retorna la lista de proveedores. Opcionalmente filtrable por departamento y/o categoria.
+      operationId: getProviders
+      parameters:
+        - name: departmentId
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Filtrar por departamento
+        - name: categoryId
+          in: query
+          required: false
+          schema: { type: integer }
+          description: Filtrar por categoria
+      responses:
+        '200':
+          description: Lista de proveedores
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Provider'
+              examples:
+                default:
+                  value:
+                    - id: 66
+                      name: EMPRESA DEMO
+                      icon: 'https://...'
+                      groups:
+                        - { id: 1, name: Grupo Principal, type: DEFAULT, icon: 'https://...' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/providers/{providerId}/groups:
+    get:
+      tags: [Catalog]
+      summary: Get Provider Groups
+      description: Retorna los grupos de un proveedor especifico.
+      operationId: getProviderGroups
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema: { type: integer }
+          description: ID del proveedor
+      responses:
+        '200':
+          description: Lista de grupos del proveedor
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Group'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/providers/{providerId}/groups/{groupId}/criteria:
+    get:
+      tags: [Catalog]
+      summary: Get Group Criteria
+      description: Retorna los criterios de busqueda disponibles para un grupo de un proveedor.
+      operationId: getGroupCriteria
+      parameters:
+        - name: providerId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: groupId
+          in: path
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista de criterios
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Criteria'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/criteria/{criteriaId}/fields:
+    get:
+      tags: [Catalog]
+      summary: Get Criteria Fields
+      description: |
+        Retorna los campos que el usuario debe completar para buscar con un criterio especifico.
+
+        Si un campo tiene `listCode` no vacio, se debe llamar al endpoint `Get List Values`
+        para obtener las opciones del dropdown.
+      operationId: getCriteriaFields
+      parameters:
+        - name: criteriaId
+          in: path
+          required: true
+          schema: { type: integer }
+        - name: providerId
+          in: query
+          required: true
+          schema: { type: integer }
+      responses:
+        '200':
+          description: Lista de campos
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Field'
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/catalog/lists/{listCode}:
+    get:
+      tags: [Catalog]
+      summary: Get List Values
+      description: |
+        Retorna los valores posibles de una lista predefinida. Se llama cuando un campo de
+        `Get Criteria Fields` tiene `listCode` con un valor no vacio.
+
+        `listCode` puede venir como `null`, cadena vacia `""` o con espacios `" "`
+        (todos significan "sin lista"). Al evaluar si llamar este endpoint, usar una
+        comparacion tipo `listCode?.trim()` para cubrir los 3 casos.
+      operationId: getListValues
+      parameters:
+        - name: listCode
+          in: path
+          required: true
+          schema: { type: string }
+          description: Codigo de la lista (obtenido del campo `listCode`)
+          example: PCBListaTarifas
+      responses:
+        '200':
+          description: Valores de la lista
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ListValue'
+              examples:
+                default:
+                  value:
+                    - { code: '000001', description: '30 Min - 1 Bs' }
+                    - { code: '000002', description: '1 Hora - 2 Bs' }
+                    - { code: '000003', description: '1.5 Horas - 3 Bs' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/accounts/search:
+    post:
+      tags: [Accounts]
+      summary: Search Account
+      description: Busca una cuenta en un proveedor usando un criterio y los campos completados por el usuario.
+      operationId: searchAccount
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountSearchRequest'
+      responses:
+        '200':
+          description: Cuentas encontradas
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountSearchResponse'
+              examples:
+                default:
+                  value:
+                    operationNumber: 574
+                    operationDate: '20260409'
+                    accounts:
+                      - accountNumber: '0004203432020'
+                        holderName: JOSUE CRISTOFER CHAMBI ANGOLA
+                        detail: Juan Luis De La Cruz Contreras Blacut - FIN DE SEMANA EN CAS
+                        serviceCode: 1
+                        serviceName: PAGOS EFECTIVO en BS
+                        currency: BOB
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/accounts/items:
+    post:
+      tags: [Accounts]
+      summary: Get Account Items
+      description: |
+        Obtiene los items (deudas) disponibles para pagar de una cuenta.
+
+        Cada item tiene un `paymentType` que define las reglas de seleccion. Los items
+        con `paymentType` que contiene la letra central `D` (NDU/NDV/ODU/ODV) requieren
+        llamar al endpoint `Generate Item Subitems` antes de pagar.
+
+        #### Formato de `paymentType`
+
+        El valor sigue el formato **`[Prefijo][Letra Central][Sufijo]`**:
+
+        | Componente | Valor | Descripcion |
+        |---|---|---|
+        | **Prefijo** | `N` | Normal (opcional) |
+        | | `O` | Obligatorio |
+        | **Letra Central** | `S` | Monto fijo |
+        | | `V` | Monto por cantidad |
+        | | `D` | Requiere subitems |
+        | | `M` | Monto libre |
+        | | `C` | Cantidad libre |
+        | **Sufijo** | `U` | Uno solo |
+        | | `V` | Varios |
+        | **Especial** | `REF` | Referencial, no pagable |
+
+        **Valores posibles:** `NSU` `NSV` `NVU` `NVV` `NDU` `NDV` `NMU` `NMV` `NCU` `OSU` `OSV` `OVU` `OVV` `ODU` `ODV` `OMU` `OMV` `OCU` `REF`
+
+        **Ejemplo:** `NSV` → Normal, monto fijo, varios items seleccionables.
+      operationId: getAccountItems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccountItemsRequest'
+      responses:
+        '200':
+          description: Items de la cuenta
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountItemsResponse'
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/accounts/items/subitems:
+    post:
+      tags: [Accounts]
+      summary: Generate Item Subitems
+      description: |
+        Genera los subitems de un item cuando el usuario quiere pagar un monto especifico.
+
+        **Solo** se debe llamar para items cuyo `paymentType` contiene la letra central `D`
+        (`NDU`, `NDV`, `ODU`, `ODV`). Estos items generalmente vienen con `amount: 0`
+        en `Get Account Items`.
+      operationId: generateItemSubitems
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubitemsRequest'
+      responses:
+        '200':
+          description: Subitems generados
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SubitemsResponse'
+              examples:
+                default:
+                  value:
+                    totalAmount: 33
+                    subitems:
+                      - { description: 'ID.PAGO:3272421         PERIODO:2022/12', amount: 22 }
+                      - { description: 'ID.PAGO:MULTA           PERIODO:0000/00', amount: 11 }
+        '400': { $ref: '#/components/responses/ValidationError' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/payments/init:
+    post:
+      tags: [Payments]
+      summary: Init Payment
+      description: |
+        Inicializa un pago con los items seleccionados.
+        Retorna un `txCode` y el tipo de cambio fijado. La transaccion tiene un tiempo de vida limitado.
+
+        **Requiere** el header `X-Signature` con la firma RSA-SHA256 del body del request.
+        La respuesta tambien incluye el header `X-Signature`.
+      operationId: initPayment
+      parameters:
+        - name: X-Signature
+          in: header
+          required: true
+          schema: { type: string }
+          description: Firma RSA-SHA256 del body del request (Base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/InitCartRequest'
+      responses:
+        '201':
+          description: Carrito inicializado
+          headers:
+            X-Signature:
+              schema: { type: string }
+              description: Firma RSA-SHA256 del body de la respuesta (Base64)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentInitResponse'
+              examples:
+                default:
+                  value:
+                    txCode: d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1
+                    status: PENDING
+                    userCurrency: USDT
+                    exchangeRate: '9.28'
+                    userTotalAmount: '10.78'
+                    localTotalAmount: '100.00'
+                    expiresAt: '2026-04-10T17:10:00Z'
+        '400':
+          description: Validacion o firma ausente
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                validation:
+                  summary: Campos requeridos faltantes
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/bad-request
+                    title: Bad Request
+                    status: 400
+                    detail: 'Validation failed: items size must be between 1 and 2147483647'
+                    errorCode: VALIDATION_ERROR
+                    timestamp: '2026-04-10T13:28:39.450Z'
+                missingSignature:
+                  summary: Header X-Signature ausente
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/missing-signature
+                    title: Missing Signature
+                    status: 400
+                    detail: Missing X-Signature
+                    errorCode: MISSING_SIGNATURE
+                    timestamp: '2026-04-10T13:28:39.450Z'
+        '401': { $ref: '#/components/responses/InvalidSignature' }
+        '403':
+          description: Partner no activo
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                partnerInactive:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: 'Partner not active: partner-001'
+                    errorCode: PARTNER_INACTIVE
+                    timestamp: '2026-04-10T13:28:39.450Z'
+        '409':
+          description: Idempotency conflict (misma idempotencyKey con diferente payload)
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/idempotency-conflict
+                    title: Idempotency Conflict
+                    status: 409
+                    detail: "Idempotency key '550e8400-e29b-41d4-a716-446655440000' already used with a different request payload"
+                    errorCode: IDEMPOTENCY_CONFLICT
+                    timestamp: '2026-04-10T13:28:39.450Z'
+        '422': { $ref: '#/components/responses/GenesisError' }
+        '503':
+          description: Genesis o Currency Engine no disponible
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                exchangeRate:
+                  summary: Currency Engine no disponible
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/exchange-rate-unavailable
+                    title: Exchange Rate Unavailable
+                    status: 503
+                    detail: 'Currency Engine is not available: Connection refused'
+                    errorCode: EXCHANGE_RATE_UNAVAILABLE
+                    timestamp: '2026-04-10T13:28:39.450Z'
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/payments/confirm:
+    post:
+      tags: [Payments]
+      summary: Confirm Payment
+      description: |
+        Confirma y ejecuta el pago de una transaccion previamente inicializada con `Init Payment`.
+
+        **Requiere** el header `X-Signature` con la firma RSA-SHA256 del body del request.
+        La respuesta tambien incluye el header `X-Signature`.
+      operationId: confirmPayment
+      parameters:
+        - name: X-Signature
+          in: header
+          required: true
+          schema: { type: string }
+          description: Firma RSA-SHA256 del body del request (Base64)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmPaymentRequest'
+      responses:
+        '200':
+          description: Pago confirmado
+          headers:
+            X-Signature:
+              schema: { type: string }
+              description: Firma RSA-SHA256 del body de la respuesta (Base64)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaymentConfirmResponse'
+              examples:
+                default:
+                  value:
+                    txCode: d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1
+                    status: CONFIRMED
+                    confirmedAt: '2026-04-10T17:04:02.582070924Z'
+        '400':
+          description: Validacion o firma ausente
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '401': { $ref: '#/components/responses/InvalidSignature' }
+        '403':
+          description: Transaccion pertenece a otro partner
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/forbidden
+                    title: Forbidden
+                    status: 403
+                    detail: Transaction does not belong to this partner
+                    errorCode: TRANSACTION_FORBIDDEN
+                    timestamp: '2026-04-10T13:30:37.248Z'
+        '404':
+          description: Transaccion no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/not-found
+                    title: Not Found
+                    status: 404
+                    detail: 'Transaction not found: d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1'
+                    errorCode: TRANSACTION_NOT_FOUND
+                    timestamp: '2026-04-10T13:30:37.248Z'
+        '408':
+          description: Transaccion expirada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/transaction-expired
+                    title: Transaction Expired
+                    status: 408
+                    detail: 'Transaction d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1 has expired due to exchange rate volatility'
+                    errorCode: TRANSACTION_EXPIRED
+                    timestamp: '2026-04-10T13:30:37.248Z'
+        '422':
+          description: Estado de transaccion invalido o error de Genesis
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                invalidState:
+                  summary: Transaccion ya confirmada
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/invalid-transaction-state
+                    title: Invalid Transaction State
+                    status: 422
+                    detail: 'Transaction d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1 is in state CONFIRMED and cannot be confirmed again'
+                    errorCode: INVALID_TRANSACTION_STATE
+                    timestamp: '2026-04-10T13:30:37.248Z'
+                genesisError:
+                  summary: Error de negocio de Genesis
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/genesis-error
+                    title: Genesis Error
+                    status: 422
+                    detail: 'Backend service error: Genesis error [XX] ...'
+                    errorCode: GENESIS_ERROR
+                    genesisCode: 92
+                    timestamp: '2026-04-10T13:30:37.248Z'
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+  /v1/payments/{txCode}/receipt:
+    get:
+      tags: [Payments]
+      summary: Get Receipt
+      description: |
+        Descarga los comprobantes de pago (PDF en Base64) de una transaccion previamente confirmada.
+        Solo se pueden obtener comprobantes de transacciones con estado `CONFIRMED`.
+      operationId: getReceipt
+      parameters:
+        - name: txCode
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+          description: UUID de la transaccion confirmada
+      responses:
+        '200':
+          description: Comprobantes de pago
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Receipt'
+              examples:
+                default:
+                  value:
+                    - content: JVBERi0xLjQK...
+                      contentType: application/pdf
+                      encoding: base64
+                      description: Comprobante de pago
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403':
+          description: Transaccion pertenece a otro partner
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '404':
+          description: Transaccion no encontrada
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+        '422':
+          description: Transaccion no esta en estado CONFIRMED
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              examples:
+                default:
+                  value:
+                    type: https://middleware-core.sintesis.com.bo/problems/invalid-transaction-state
+                    title: Invalid Transaction State
+                    status: 422
+                    detail: 'Transaction d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1 is in state INITIATED and cannot be confirmed again'
+                    errorCode: INVALID_TRANSACTION_STATE
+                    timestamp: '2026-04-10T13:30:37.248Z'
+        '503': { $ref: '#/components/responses/GenesisUnavailable' }
+        '504': { $ref: '#/components/responses/GenesisTimeout' }
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        Token JWT obtenido de `POST /v1/auth/token`.
+        Incluir en el header: `Authorization: Bearer <access_token>`
+
+  schemas:
+    # --- Common ---
+    ProblemDetail:
+      type: object
+      description: Estructura de error segun RFC 7807 (Problem Details)
+      required: [type, title, status, detail]
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI que identifica el tipo de error
+          example: https://middleware-core.sintesis.com.bo/problems/unauthorized
+        title:
+          type: string
+          description: Titulo legible del error
+          example: Unauthorized
+        status:
+          type: integer
+          description: Codigo HTTP
+          example: 401
+        detail:
+          type: string
+          description: Descripcion detallada del error
+        instance:
+          type: string
+          description: Path del request que origino el error
+        errorCode:
+          type: string
+          description: Codigo de error constante para uso programatico
+          example: UNAUTHORIZED
+        timestamp:
+          type: string
+          format: date-time
+          description: Timestamp ISO 8601 del error
+        genesisCode:
+          type: integer
+          description: Codigo de error interno de Genesis (solo en errores `GENESIS_ERROR`)
+
+    # --- Auth ---
+    TokenRequest:
+      type: object
+      required: [clientId, clientSecret]
+      properties:
+        clientId:
+          type: string
+          description: Identificador del partner
+          example: cartcore_stage_demo01
+        clientSecret:
+          type: string
+          description: Secreto del partner
+          example: cartcore_stage_demo01
+
+    TokenResponse:
+      type: object
+      required: [access_token, token_type, expires_in]
+      properties:
+        access_token:
+          type: string
+          description: Token JWT para autenticar requests subsiguientes
+        token_type:
+          type: string
+          description: Siempre "Bearer"
+          example: Bearer
+        expires_in:
+          type: integer
+          format: int64
+          description: Tiempo de expiracion en segundos
+          example: 3600
+
+    # --- Catalog ---
+    Department:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: La Paz }
+        code: { type: string, example: LP }
+
+    Category:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: Servicios Basicos }
+        iconUrl: { type: string, example: 'https://...' }
+
+    Provider:
+      type: object
+      properties:
+        id: { type: integer, example: 66 }
+        name: { type: string, example: EMPRESA DEMO }
+        icon: { type: string, example: 'https://...' }
+        groups:
+          type: array
+          items:
+            $ref: '#/components/schemas/Group'
+
+    Group:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: Grupo Principal }
+        type: { type: string, example: DEFAULT }
+        icon: { type: string, example: 'https://...' }
+
+    Criteria:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        name: { type: string, example: Busqueda por codigo }
+
+    Field:
+      type: object
+      properties:
+        id: { type: integer, example: 1 }
+        label: { type: string, example: Codigo de cliente }
+        type:
+          type: string
+          description: Tipo del campo (ej `TEXT`, `NUMBER`)
+          example: TEXT
+        required: { type: boolean, example: true }
+        maxLength:
+          type: integer
+          nullable: true
+          example: 20
+        validation:
+          type: string
+          nullable: true
+          description: Regex de validacion
+        listCode:
+          type: string
+          nullable: true
+          description: |
+            Codigo de lista para campos tipo select. Puede venir como `null`, `""`
+            o `" "` (con espacios) - todos significan "sin lista".
+          example: PCBListaTarifas
+        dependency:
+          type: string
+          nullable: true
+          description: Campo del que depende
+
+    ListValue:
+      type: object
+      properties:
+        code:
+          type: string
+          description: Codigo del valor (enviar en Search Account)
+          example: '000001'
+        description:
+          type: string
+          description: Descripcion del valor (mostrar al usuario)
+          example: '30 Min - 1 Bs'
+
+    # --- Accounts ---
+    AccountSearchRequest:
+      type: object
+      required: [providerId, criteriaId, fields]
+      properties:
+        providerId: { type: integer, example: 68 }
+        criteriaId: { type: integer, example: 1 }
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldValue'
+
+    FieldValue:
+      type: object
+      required: [fieldId, value]
+      properties:
+        fieldId: { type: integer, example: 1 }
+        value: { type: string, example: '2020' }
+
+    AccountSearchResponse:
+      type: object
+      properties:
+        operationNumber:
+          type: integer
+          description: Numero de operacion (usar en requests subsiguientes)
+        operationDate:
+          type: string
+          description: Fecha de operacion formato `YYYYMMDD`
+        accounts:
+          type: array
+          items:
+            $ref: '#/components/schemas/AccountInfo'
+
+    AccountInfo:
+      type: object
+      properties:
+        accountNumber: { type: string }
+        holderName: { type: string }
+        detail: { type: string }
+        serviceCode: { type: integer }
+        serviceName: { type: string }
+        currency:
+          type: string
+          description: Codigo ISO de la moneda (`BOB` o `USD`)
+          enum: [BOB, USD]
+          example: BOB
+
+    AccountItemsRequest:
+      type: object
+      required: [providerId, accountNumber, operationDate, operationNumber, serviceCode, userCurrency]
+      properties:
+        providerId: { type: integer, example: 68 }
+        accountNumber: { type: string, example: '0004203432020' }
+        operationDate: { type: string, example: '20260409' }
+        operationNumber: { type: integer, example: 574 }
+        serviceCode: { type: integer, example: 1 }
+        userCurrency:
+          type: string
+          description: Moneda del usuario (`BOB` o `USDT`)
+          enum: [BOB, USDT]
+          example: BOB
+
+    AccountItemsResponse:
+      type: object
+      properties:
+        invoiceTaxId: { type: string, example: '6797009' }
+        invoiceName: { type: string, example: TUPAK1 }
+        canEditInvoice: { type: boolean, example: true }
+        indicativeRate:
+          $ref: '#/components/schemas/IndicativeRate'
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Item'
+
+    IndicativeRate:
+      type: object
+      properties:
+        userCurrency: { type: string, example: BOB }
+        exchangeRate: { type: number, example: 9.28 }
+        quotedAt: { type: string, format: date-time }
+        disclaimer:
+          type: string
+          example: Exchange rate is indicative and may change before final payment confirmation
+
+    Item:
+      type: object
+      properties:
+        itemNumber: { type: string, example: '0001' }
+        description: { type: string, example: CHURRASCO CON CERVEZA }
+        amount: { type: number, example: 100 }
+        dependsOnItem:
+          type: string
+          description: Numero de item padre (pagos secuenciales)
+          example: '0000'
+        paymentType:
+          type: string
+          description: |
+            Tipo de pago. Formato `[Prefijo][Letra Central][Sufijo]`:
+            - Prefijo: `N` (Normal / opcional) o `O` (Obligatorio)
+            - Letra central: `S` (monto fijo), `V` (monto x cantidad), `D` (requiere subitems), `M` (monto libre), `C` (cantidad libre)
+            - Sufijo: `U` (uno solo) o `V` (varios)
+            - `REF`: referencial, no pagable
+          enum: [NSU, NSV, NVU, NVV, NDU, NDV, NMU, NMV, NCU, OSU, OSV, OVU, OVV, ODU, ODV, OMU, OMV, OCU, REF]
+          example: NSV
+        receiptType:
+          type: string
+          description: "Tipo de comprobante: `R` (Recibo), `F` (Factura) o `NA` (Sin comprobante)"
+          enum: [R, F, NA]
+          example: R
+
+    SubitemsRequest:
+      type: object
+      required: [providerId, accountNumber, operationDate, operationNumber, serviceCode, itemNumber, amount]
+      properties:
+        providerId: { type: integer, example: 184 }
+        accountNumber: { type: string, example: A1234 }
+        operationDate: { type: string, example: '20260409' }
+        operationNumber: { type: integer, example: 237 }
+        serviceCode: { type: integer, example: 1 }
+        itemNumber: { type: string, example: '1' }
+        amount:
+          type: number
+          description: Monto que se desea pagar
+          example: 1
+
+    SubitemsResponse:
+      type: object
+      properties:
+        totalAmount:
+          type: number
+          description: Monto total a pagar (suma de todos los subitems)
+          example: 33
+        subitems:
+          type: array
+          items:
+            $ref: '#/components/schemas/Subitem'
+
+    Subitem:
+      type: object
+      properties:
+        description: { type: string, example: 'ID.PAGO:3272421         PERIODO:2022/12' }
+        amount: { type: number, example: 22 }
+
+    # --- Payments ---
+    InitCartRequest:
+      type: object
+      required: [idempotencyKey, providerId, accountNumber, operationDate, operationNumber, serviceCode, items]
+      properties:
+        idempotencyKey:
+          type: string
+          description: Clave de idempotencia unica (UUID recomendado)
+          example: 550e8400-e29b-41d4-a716-446655440000
+        providerId: { type: integer, example: 68 }
+        accountNumber: { type: string, example: '0004203432020' }
+        operationDate: { type: string, example: '20260409' }
+        operationNumber: { type: integer, example: 574 }
+        serviceCode: { type: integer, example: 1 }
+        userCurrency:
+          type: string
+          enum: [BOB, USDT]
+          description: Moneda del usuario. Default `BOB`
+          default: BOB
+          example: USDT
+        items:
+          type: array
+          minItems: 1
+          items:
+            $ref: '#/components/schemas/CartItem'
+        invoiceName: { type: string, nullable: true, example: John Doe }
+        invoiceTaxId: { type: string, nullable: true, example: '12345678' }
+        documentType: { type: string, nullable: true, example: CI }
+        documentComplement: { type: string, nullable: true }
+        email: { type: string, format: email, nullable: true, example: john@example.com }
+        deliveryAddress: { type: string, nullable: true }
+
+    CartItem:
+      type: object
+      required: [itemNumber, localAmount]
+      properties:
+        itemNumber: { type: string, example: '0001' }
+        localAmount:
+          type: number
+          description: Monto en moneda local (BOB). Minimo 0.01
+          minimum: 0.01
+          example: 100
+
+    PaymentInitResponse:
+      type: object
+      properties:
+        txCode:
+          type: string
+          format: uuid
+          description: UUID de la transaccion (usar para confirmar)
+        status: { type: string, example: PENDING }
+        userCurrency: { type: string, example: USDT }
+        exchangeRate: { type: string, example: '9.28' }
+        userTotalAmount: { type: string, example: '10.78' }
+        localTotalAmount: { type: string, example: '100.00' }
+        expiresAt:
+          type: string
+          format: date-time
+          description: Timestamp ISO 8601 de expiracion
+
+    ConfirmPaymentRequest:
+      type: object
+      required: [txCode]
+      properties:
+        txCode:
+          type: string
+          format: uuid
+          example: d7b7a4ae-f275-46b3-9db0-6b92c3ce25f1
+
+    PaymentConfirmResponse:
+      type: object
+      properties:
+        txCode: { type: string, format: uuid }
+        status:
+          type: string
+          enum: [CONFIRMED]
+          example: CONFIRMED
+        confirmedAt: { type: string, format: date-time }
+
+    Receipt:
+      type: object
+      properties:
+        content:
+          type: string
+          description: Contenido del comprobante (Base64 encoded)
+        contentType:
+          type: string
+          example: application/pdf
+        encoding:
+          type: string
+          example: base64
+        description:
+          type: string
+          example: Comprobante de pago
+
+  responses:
+    ValidationError:
+      description: Validacion de request fallida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/bad-request
+                title: Bad Request
+                status: 400
+                detail: 'Validation failed: field must not be blank'
+                errorCode: VALIDATION_ERROR
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    Unauthorized:
+      description: Token JWT ausente, expirado o invalido
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/unauthorized
+                title: Unauthorized
+                status: 401
+                detail: No authenticated client
+                errorCode: UNAUTHORIZED
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    Forbidden:
+      description: Client no registrado como API key
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/forbidden
+                title: Forbidden
+                status: 403
+                detail: "Client 'my-client' is not registered as an API key - business endpoints require an API key token"
+                errorCode: FORBIDDEN
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    InvalidSignature:
+      description: Firma RSA-SHA256 invalida
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/invalid-signature
+                title: Invalid Signature
+                status: 401
+                detail: Request signature is invalid
+                errorCode: INVALID_SIGNATURE
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    GenesisError:
+      description: Genesis rechazo la operacion por regla de negocio
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/genesis-error
+                title: Genesis Error
+                status: 422
+                detail: 'Backend service error: Genesis error [92] en /api/add-carrito: No se puede agregar operacion ya registrada en un carrito.'
+                errorCode: GENESIS_ERROR
+                genesisCode: 92
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    GenesisUnavailable:
+      description: Servicio Genesis no disponible
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/genesis-error
+                title: Genesis Unavailable
+                status: 503
+                detail: Genesis service unavailable
+                errorCode: GENESIS_UNAVAILABLE
+                timestamp: '2026-04-10T13:28:39.450Z'
+
+    GenesisTimeout:
+      description: Genesis no respondio a tiempo
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          examples:
+            default:
+              value:
+                type: https://middleware-core.sintesis.com.bo/problems/genesis-error
+                title: Genesis Timeout
+                status: 504
+                detail: Genesis service timeout
+                errorCode: GENESIS_TIMEOUT
+                timestamp: '2026-04-10T13:28:39.450Z'

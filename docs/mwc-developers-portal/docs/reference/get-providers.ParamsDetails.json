@@ -1,0 +1,1 @@
+{"parameters":[{"name":"departmentId","in":"query","required":false,"schema":{"type":"integer"},"description":"Filtrar por departamento"},{"name":"categoryId","in":"query","required":false,"schema":{"type":"integer"},"description":"Filtrar por categoria"}]}

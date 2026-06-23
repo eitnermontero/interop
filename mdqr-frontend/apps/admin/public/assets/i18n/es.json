@@ -1,0 +1,83 @@
+{
+  "COMMON": {
+    "SEARCH": "Buscar",
+    "SAVE": "Guardar",
+    "CANCEL": "Cancelar",
+    "CONFIRM": "Confirmar",
+    "DELETE": "Eliminar",
+    "EDIT": "Editar",
+    "BACK": "Atrás",
+    "NEXT": "Siguiente",
+    "LOADING": "Cargando...",
+    "ERROR": "Error",
+    "SUCCESS": "Éxito",
+    "WARNING": "Advertencia",
+    "INFO": "Información",
+    "HEALTHY": "Saludable",
+    "NO_CHANGE": "Sin cambios",
+    "ON_TRACK": "En curso",
+    "ACTIVE": "Activo",
+    "VS_LAST_WEEK": "vs semana pasada",
+    "VS_YESTERDAY": "vs ayer"
+  },
+  "AUTH": {
+    "LOGOUT": "Cerrar sesión",
+    "LOGIN": "Iniciar sesión",
+    "USERNAME": "Usuario",
+    "PASSWORD": "Contraseña",
+    "EMAIL": "Correo electrónico",
+    "REMEMBER_ME": "Recuérdame"
+  },
+  "SIDEBAR": {
+    "DASHBOARD": "Dashboard",
+    "TRANSACTIONS": "Transacciones",
+    "SOBOCE": "Reportes Soboce",
+    "REPORT_COLLECTION": "Reporte de Cobranza",
+    "REPORT_PAYMENTS": "Reporte de Pagos",
+    "REPORT_PENDING": "Reportes Pendientes",
+    "REPORT_RECEIPTS": "Reimpresión de Comprobantes",
+    "PENDING": "Reportes Pendientes",
+    "PAYMENTS": "Reporte de Pagos",
+    "RECEIPTS": "Reimpresión de Comprobantes",
+    "COLLECTION": "Reporte de Cobranza",
+    "RECONCILIATION": "Conciliación",
+    "ADMIN": "Administración",
+    "USERS": "Usuarios",
+    "ROLES": "Roles",
+    "MENUS": "Menús",
+    "ACTIONS": "Acciones",
+    "PERMISSIONS": "Permisos",
+    "REPORTS": "Reportes",
+    "AUDIT": "Auditoría",
+    "SETTINGS": "Configuración",
+    "EMPTY": "No tienes opciones disponibles"
+  },
+  "DASHBOARD": {
+    "TITLE": "Dashboard",
+    "ACTIVE_USERS": "Usuarios Activos",
+    "TOTAL_ROLES": "Total de Roles",
+    "REPORTS_GENERATED": "Reportes Generados",
+    "TODAYS_AUDITS": "Auditorías del Día",
+    "ACTIVITY": "Actividad",
+    "LAST_7_DAYS": "Últimos 7 días",
+    "AUDIT_LOGS": "Registros de Auditoría",
+    "QUICK_ACCESS": "Acceso Rápido"
+  },
+  "TRANSACTIONS": {
+    "TITLE": "Transacciones",
+    "LIST": "Lista de Transacciones",
+    "DETAILS": "Detalles de Transacción",
+    "DATE": "Fecha",
+    "AMOUNT": "Monto",
+    "STATUS": "Estado",
+    "REFERENCE": "Referencia",
+    "CUSTOMER": "Cliente"
+  },
+  "ADMIN": {
+    "TITLE": "Administración",
+    "MANAGE_USERS": "Gestionar Usuarios",
+    "MANAGE_ROLES": "Gestionar Roles",
+    "MANAGE_PERMISSIONS": "Gestionar Permisos",
+    "SYSTEM_CONFIGURATION": "Configuración del Sistema"
+  }
+}

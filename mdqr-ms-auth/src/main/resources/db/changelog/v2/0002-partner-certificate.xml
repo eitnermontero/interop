@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ═══════════════════════════════════════════════════════════════════
+        Tabla: partner_certificate  (schema admin)
+        Certificados PKI (mTLS / firma) asociados a un partner.
+        Referencia a Vault PKI para obtener el cert: vault_pki_path.
+        El PEM real NO se almacena aquí; reside en Vault.
+        ═══════════════════════════════════════════════════════════════════
+        Prerequisito: 0001-partner.xml (FK a admin.partner.id).
+        Locks: ACCESS EXCLUSIVE en CREATE TABLE. Tabla nueva, seguro con
+               tráfico activo.
+        Rollback: DROP TABLE + DROP SEQUENCE + DROP INDEX.
+        ═══════════════════════════════════════════════════════════════════
+    -->
+
+    <changeSet id="v2-auth-004" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="partner_certificate" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Crear secuencia para partner_certificate</comment>
+        <createSequence sequenceName="partner_certificate_seq"
+                        schemaName="admin"
+                        startValue="1"
+                        incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="partner_certificate_seq" schemaName="admin"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-auth-005" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="partner_certificate" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Crear tabla partner_certificate — certs PKI de partners</comment>
+        <createTable tableName="partner_certificate" schemaName="admin">
+
+            <column name="id" type="bigint" defaultValueSequenceNext="partner_certificate_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_partner_certificate" nullable="false"/>
+            </column>
+
+            <!-- FK al partner propietario -->
+            <column name="partner_id" type="bigint">
+                <constraints nullable="false"
+                             foreignKeyName="fk_partner_cert_partner"
+                             references="admin.partner(id)"/>
+            </column>
+
+            <!--
+                Número de serie del certificado X.509 en hex.
+                Unique por partner: un partner no puede registrar dos veces
+                el mismo serial.
+            -->
+            <column name="serial_number" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Thumbprint SHA-256 (x5t#S256) del certificado en hex (64 chars).
+                Usado para lookup rápido en validación de mTLS.
+            -->
+            <column name="x5t_s256" type="varchar(64)">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uk_partner_cert_x5t"/>
+            </column>
+
+            <!-- Ventana de validez del certificado -->
+            <column name="not_before" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+            <column name="not_after" type="timestamptz">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Estado: ACTIVE / REVOKED / EXPIRED -->
+            <column name="status" type="varchar(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Ruta en Vault PKI secrets engine donde se almacena el PEM
+                real del certificado. Ejemplo: pki/cert/12ab34cd
+            -->
+            <column name="vault_pki_path" type="text"/>
+
+            <!-- Razón de revocación (solo si status = REVOKED) -->
+            <column name="revoked_reason" type="text"/>
+            <column name="revoked_at" type="timestamptz"/>
+            <column name="revoked_by" type="varchar(100)"/>
+
+            <!-- Campos de auditoría -->
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_date" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_modified_by" type="varchar(100)"/>
+            <column name="last_modified_date" type="timestamptz"/>
+        </createTable>
+
+        <!-- UNIQUE compuesto (partner_id, serial_number) -->
+        <addUniqueConstraint tableName="partner_certificate"
+                             schemaName="admin"
+                             columnNames="partner_id, serial_number"
+                             constraintName="uk_partner_cert_partner_serial"/>
+
+        <!-- CHECK de status -->
+        <sql>
+            ALTER TABLE admin.partner_certificate
+            ADD CONSTRAINT chk_partner_cert_status
+            CHECK (status IN ('ACTIVE', 'REVOKED', 'EXPIRED'));
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE admin.partner_certificate DROP CONSTRAINT IF EXISTS chk_partner_cert_status;</sql>
+            <dropUniqueConstraint tableName="partner_certificate"
+                                  schemaName="admin"
+                                  constraintName="uk_partner_cert_partner_serial"/>
+            <dropTable tableName="partner_certificate" schemaName="admin"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-auth-006" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="partner_certificate" schemaName="admin"/>
+            <not><indexExists indexName="idx_partner_cert_partner_id" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Índices para partner_certificate</comment>
+
+        <!--
+            idx_partner_cert_partner_id: listar todos los certs de un partner.
+            Cardinalidad: pocos registros por partner, pero se consulta mucho.
+        -->
+        <createIndex tableName="partner_certificate"
+                     schemaName="admin"
+                     indexName="idx_partner_cert_partner_id">
+            <column name="partner_id"/>
+        </createIndex>
+
+        <!--
+            idx_partner_cert_x5t: lookup por thumbprint en validación mTLS.
+            Patrón hot-path: cada request de partner valida su cert.
+            La restricción UNIQUE ya crea un índice B-tree; este es redundante
+            salvo que se quiera un nombre explícito. Se omite porque el UNIQUE ya lo crea.
+        -->
+
+        <!--
+            idx_partner_cert_status_not_after: consulta de certs activos próximos a expirar.
+            Patrón: job de alerta de expiración filtra status='ACTIVE' AND not_after < NOW() + interval.
+        -->
+        <createIndex tableName="partner_certificate"
+                     schemaName="admin"
+                     indexName="idx_partner_cert_status_not_after">
+            <column name="status"/>
+            <column name="not_after"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="partner_certificate" schemaName="admin" indexName="idx_partner_cert_partner_id"/>
+            <dropIndex tableName="partner_certificate" schemaName="admin" indexName="idx_partner_cert_status_not_after"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

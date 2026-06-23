@@ -1,0 +1,61 @@
+spring:
+  config:
+    import: ""
+  cloud:
+    vault:
+      enabled: false
+    consul:
+      config:
+        enabled: false
+      discovery:
+        enabled: false
+  datasource:
+    url: jdbc:tc:postgresql:15://localhost/mdqr_decode_test
+    username: test
+    password: test
+    driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 2000ms
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8080/realms/test
+          jwk-set-uri: http://localhost:8080/realms/test/protocol/openid-connect/certs
+
+payment:
+  transaction:
+    timeout-seconds: 5
+
+exchange-rate:
+  base-url: http://localhost:${wiremock.server.port:9090}
+  product-code: CARRITO_SUS
+  timeout-ms: 3000
+  max-stale-minutes: 5
+
+# ─── Hub mTLS — modo test ────────────────────────────────────────────────────
+# Activa la lectura del thumbprint simulado desde el header X-Client-Cert-Thumbprint
+# en MtlsCertBindingFilter (gateway). En ms-base se usa para indicar al interceptor
+# que está en modo test y que el header X-Partner-Id puede llegar simulado.
+hub:
+  mtls:
+    test-mode: true
+
+# ─── Auditoría hub — activada en tests ──────────────────────────────────────
+audit:
+  enabled: true
+  integrity:
+    vault-enabled: false   # NoOpAuditSigner en tests; sin Vault

@@ -1,0 +1,112 @@
+plugins {
+    id 'java'
+    id 'org.springframework.boot' version "${springBootVersion}" apply false
+    id 'io.spring.dependency-management' version "${dependencyManagementVersion}" apply false
+    id 'com.google.cloud.tools.jib' version "${jibVersion}" apply false
+    id 'org.graalvm.buildtools.native' version "${nativeBuildToolsVersion}" apply false
+}
+
+allprojects {
+    group = 'bo.com.sintesis.mdqr'
+
+    repositories {
+        mavenLocal()
+        mavenCentral()
+        maven {
+            name = 'nexus-releases'
+            url = 'https://nexus.sintesis.com.bo/repository/maven-releases/'
+            credentials {
+                username = findProperty('nexusUsername') ?: System.getenv('NEXUS_USERNAME')
+                password = findProperty('nexusPassword') ?: System.getenv('NEXUS_PASSWORD')
+            }
+        }
+        maven {
+            name = 'nexus-snapshots'
+            url = 'https://nexus.sintesis.com.bo/repository/maven-snapshots/'
+            credentials {
+                username = findProperty('nexusUsername') ?: System.getenv('NEXUS_USERNAME')
+                password = findProperty('nexusPassword') ?: System.getenv('NEXUS_PASSWORD')
+            }
+            mavenContent {
+                snapshotsOnly()
+            }
+        }
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+    apply plugin: 'org.springframework.boot'
+    apply plugin: 'io.spring.dependency-management'
+    apply plugin: 'com.google.cloud.tools.jib'
+    apply plugin: 'org.graalvm.buildtools.native'
+
+    java {
+        toolchain {
+            languageVersion = JavaLanguageVersion.of(25)
+        }
+        sourceCompatibility = JavaVersion.VERSION_25
+        targetCompatibility = JavaVersion.VERSION_25
+    }
+
+    ext {
+        set('dockerRegistry', findProperty('dockerRegistry') ?: 'cr.sintesis.com.bo/mdqr-dev')
+    }
+
+    dependencyManagement {
+        imports {
+            mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
+            mavenBom "org.testcontainers:testcontainers-bom:1.20.4"
+        }
+    }
+
+    jib {
+        from {
+            image = 'eclipse-temurin:25-jre-alpine'
+        }
+        to {
+            image = "${dockerRegistry}/${project.name}"
+            tags = [project.version, 'latest']
+        }
+        container {
+            jvmFlags = [
+                '--enable-native-access=ALL-UNNAMED',
+                '-XX:+UseG1GC',
+                '-XX:MaxRAMPercentage=75.0',
+                '-Djava.security.egd=file:/dev/./urandom'
+            ]
+            ports = [project.name == 'mdqr-gateway' ? '8080' : project.name == 'mdqr-report-service' ? '8082' : '8081']
+            user = '1000:1000'
+            creationTime = 'USE_CURRENT_TIMESTAMP'
+            format = 'OCI'
+        }
+    }
+
+    graalvmNative {
+        binaries {
+            main {
+                imageName = project.name
+                buildArgs.addAll([
+                    '-H:+ReportExceptionStackTraces',
+                    '--initialize-at-build-time=org.slf4j',
+                    '--initialize-at-build-time=ch.qos.logback',
+                    '-H:IncludeResources=db/changelog/.*',
+                    '-H:IncludeResources=logback-spring.xml'
+                ])
+            }
+        }
+    }
+
+    tasks.withType(org.springframework.boot.gradle.tasks.aot.ProcessAot).configureEach {
+        jvmArgs(
+            '-Dspring.cloud.vault.enabled=false',
+            '-Dspring.cloud.consul.config.enabled=false',
+            '-Dspring.cloud.consul.discovery.enabled=false',
+            '-Dspring.config.import='
+        )
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+}

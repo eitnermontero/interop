@@ -1,0 +1,9 @@
+id;code;name;description;created_by;created_date
+1;READ;Consultar;Permite consultar/visualizar el recurso;system;2026-01-01 00:00:00
+2;CREATE;Crear;Permite crear nuevos registros;system;2026-01-01 00:00:00
+3;UPDATE;Editar;Permite modificar registros existentes;system;2026-01-01 00:00:00
+4;DELETE;Eliminar;Permite eliminar registros;system;2026-01-01 00:00:00
+5;APPROVE;Aprobar;Permite aprobar operaciones;system;2026-01-01 00:00:00
+6;EXPORT;Exportar;Permite exportar datos (Excel/CSV/PDF);system;2026-01-01 00:00:00
+7;PRINT;Imprimir;Permite imprimir o generar comprobantes;system;2026-01-01 00:00:00
+8;VOID;Anular;Permite anular operaciones;system;2026-01-01 00:00:00

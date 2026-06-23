@@ -1,0 +1,124 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         Migración 009: Refactoring de nombres de tablas y relaciones FK
+         ─────────────────────────────────────────────────────────────────
+         Cambios:
+           1. trx_entity_code → entity   (nombre genérico sin prefijo trx_)
+           2. decryption_log  → decode_log (claridad semántica)
+           3. FK certificate.entity_id → entity.code  (integridad referencial)
+         ═══════════════════════════════════════════════════════════════════ -->
+
+    <!-- ─────────────────────────────────────────────────
+         1. Renombrar trx_entity_code → entity
+         ───────────────────────────────────────────────── -->
+
+    <changeSet id="009-1" author="mdqr-team">
+        <comment>Renombrar tabla trx_entity_code a entity</comment>
+        <renameTable oldTableName="trx_entity_code" newTableName="entity"/>
+        <rollback>
+            <renameTable oldTableName="entity" newTableName="trx_entity_code"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="009-2" author="mdqr-team">
+        <comment>Actualizar índice de entity_group en tabla entity</comment>
+        <dropIndex tableName="entity" indexName="idx_trx_entity_code_group"/>
+        <createIndex tableName="entity" indexName="idx_entity_group">
+            <column name="entity_group"/>
+        </createIndex>
+        <rollback>
+            <dropIndex tableName="entity" indexName="idx_entity_group"/>
+            <createIndex tableName="entity" indexName="idx_trx_entity_code_group">
+                <column name="entity_group"/>
+            </createIndex>
+        </rollback>
+    </changeSet>
+
+    <!-- ─────────────────────────────────────────────────
+         2. Renombrar decryption_log → decode_log
+         ───────────────────────────────────────────────── -->
+
+    <changeSet id="009-3" author="mdqr-team">
+        <comment>Renombrar tabla decryption_log a decode_log</comment>
+        <renameTable oldTableName="decryption_log" newTableName="decode_log"/>
+        <rollback>
+            <renameTable oldTableName="decode_log" newTableName="decryption_log"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="009-4" author="mdqr-team">
+        <comment>Renombrar secuencia decryption_log_seq a decode_log_seq</comment>
+        <renameSequence oldSequenceName="decryption_log_seq" newSequenceName="decode_log_seq"/>
+        <rollback>
+            <renameSequence oldSequenceName="decode_log_seq" newSequenceName="decryption_log_seq"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="009-5" author="mdqr-team">
+        <comment>Renombrar índices de decode_log</comment>
+        <dropIndex tableName="decode_log" indexName="idx_log_client"/>
+        <dropIndex tableName="decode_log" indexName="idx_log_cert"/>
+        <dropIndex tableName="decode_log" indexName="idx_log_created"/>
+        <dropIndex tableName="decode_log" indexName="idx_log_status"/>
+
+        <createIndex tableName="decode_log" indexName="idx_decode_log_client">
+            <column name="keycloak_client_id"/>
+        </createIndex>
+        <createIndex tableName="decode_log" indexName="idx_decode_log_cert">
+            <column name="certificate_id"/>
+        </createIndex>
+        <createIndex tableName="decode_log" indexName="idx_decode_log_created">
+            <column name="created_date" descending="true"/>
+        </createIndex>
+        <createIndex tableName="decode_log" indexName="idx_decode_log_status">
+            <column name="status"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="decode_log" indexName="idx_decode_log_client"/>
+            <dropIndex tableName="decode_log" indexName="idx_decode_log_cert"/>
+            <dropIndex tableName="decode_log" indexName="idx_decode_log_created"/>
+            <dropIndex tableName="decode_log" indexName="idx_decode_log_status"/>
+            <createIndex tableName="decode_log" indexName="idx_log_client">
+                <column name="keycloak_client_id"/>
+            </createIndex>
+            <createIndex tableName="decode_log" indexName="idx_log_cert">
+                <column name="certificate_id"/>
+            </createIndex>
+            <createIndex tableName="decode_log" indexName="idx_log_created">
+                <column name="created_date" descending="true"/>
+            </createIndex>
+            <createIndex tableName="decode_log" indexName="idx_log_status">
+                <column name="status"/>
+            </createIndex>
+        </rollback>
+    </changeSet>
+
+    <!-- ─────────────────────────────────────────────────
+         3. FK certificate.entity_id → entity.code
+         Usar NOT VALID para no validar filas existentes
+         (datos previos con entity_id libre como "BANCO_UNION")
+         ───────────────────────────────────────────────── -->
+
+    <changeSet id="009-6" author="mdqr-team">
+        <comment>Agregar FK certificate.entity_id → entity.code (NOT VALID — no valida filas existentes)</comment>
+        <sql>
+            ALTER TABLE certificate
+            ADD CONSTRAINT fk_certificate_entity
+            FOREIGN KEY (entity_id) REFERENCES entity(code)
+            NOT VALID;
+        </sql>
+        <rollback>
+            <sql>ALTER TABLE certificate DROP CONSTRAINT IF EXISTS fk_certificate_entity;</sql>
+        </rollback>
+    </changeSet>
+
+    <!-- Índice para búsquedas por entity_id en certificate (ya existía idx_cert_entity, se deja igual) -->
+
+</databaseChangeLog>

@@ -1,0 +1,6 @@
+name,description,resource,policy,scopes
+catalog-permission,Allow catalog read,catalogs,catalog-policy,read
+account-permission,Allow account read,accounts,catalog-policy,read
+payment-init-permission,Allow payment init,payments,cart-policy,execute
+payment-confirm-permission,Allow payment confirm,payments,payment-policy,execute
+receipt-permission,Allow receipt read,receipts,catalog-policy,read

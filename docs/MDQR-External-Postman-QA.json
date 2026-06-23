@@ -1,0 +1,103 @@
+{
+  "info": {
+    "_postman_id": "mdqr-partner-qa-v1",
+    "name": "MDQR API – Partner / Externo (QA)",
+    "description": "Colección para integración de partners externos con la API MDQR.\n\nAcceso mediante el gateway (puerto 8080):\n- Token:       POST http://199.3.0.63:8080/oauth2/token\n- QR Decode:   POST http://199.3.0.63:8080/partner/v1/qr/decode\n- QR File:     POST http://199.3.0.63:8080/partner/v1/qr/decode/file\n\nFlujo:\n1. Ejecutar 'Obtener token' — guarda PARTNER_TOKEN automáticamente.\n2. Ejecutar los requests de desencriptación con ese token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "PARTNER_TOKEN", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{PARTNER_TOKEN}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "1. Autenticación",
+      "item": [
+        {
+          "name": "Obtener token de acceso",
+          "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+            "var resp = pm.response.json();",
+            "if (resp.access_token) {",
+            "    pm.collectionVariables.set('PARTNER_TOKEN', resp.access_token);",
+            "    console.log('✅ PARTNER_TOKEN guardado. Expira en: ' + resp.expires_in + 's');",
+            "} else {",
+            "    console.error('❌ Error al obtener token:', JSON.stringify(resp));",
+            "}"
+          ]}}],
+          "request": {
+            "auth": { "type": "noauth" },
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "body": { "mode": "urlencoded", "urlencoded": [
+              { "key": "client_id",     "value": "unilink-api" },
+              { "key": "client_secret", "value": "unilink-api-secret" },
+              { "key": "grant_type",    "value": "client_credentials" }
+            ]},
+            "url": {
+              "raw": "http://199.3.0.63:8080/oauth2/token",
+              "protocol": "http", "host": ["199.3.0.63"], "port": "8080",
+              "path": ["oauth2", "token"]
+            },
+            "description": "Obtiene un JWT de corta duración (5 min) para el realm mdqr-partner.\nCredenciales provistas por Sintesis al momento de la integración."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Desencriptación QR",
+      "item": [
+        {
+          "name": "Desencriptar QR – texto (DECODED_DATA)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"inputType\": \"DECODED_DATA\",\n  \"content\": \"Bxd77WrOkqC58dbUPLK1vlkjOJiNaTLZ8Q9pbylZP3rfvt3ii1140Vyb54SMeecRzng042UQQRwwzLiGFPFltM6ISRf1jf9zkY5aYPxcxsKbG9Cdd/LiGDzAhNHzaO+xu3XofclBWF8n6wk+jozuv3PJTUYtlb6sz32x+fNv5jV5Fg64bgyzwBr2veBH4oKuQtw7NRLsC1VmsJkSN49zsBH3BvpRXW4hRPqBd3XBsBm28xO7/fq4wgO5dubSXjqy/FSwjTI9m9OKHgUCAlBXGBPkw54ff8BU6i8ybF6JXafRP7ur3RH2jhcC0XazGUsipx4+lpnjyn+IXORjQBe33g==|7A90F76300030004B78A\",\n  \"entityIdRequest\": \"UNILINK\",\n  \"externalReference\": \"TRX-TEST-001\"\n}" },
+            "url": {
+              "raw": "http://199.3.0.63:8080/partner/v1/qr/decode",
+              "protocol": "http", "host": ["199.3.0.63"], "port": "8080",
+              "path": ["partner", "v1", "qr", "decode"]
+            },
+            "description": "QR real de Banco Solidario (certCode: 7A90F76300030004B78A).\n\nFormato del campo 'content': {datos_base64}|{codigo_certificado}\n\nCampos opcionales recomendados:\n- entityIdRequest: su identificador de entidad (para auditoría)\n- externalReference: referencia interna de la transacción"
+          }
+        },
+        {
+          "name": "Desencriptar QR – imagen Base64 (BASE64_IMAGE)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": { "mode": "raw", "options": { "raw": { "language": "json" } },
+              "raw": "{\n  \"inputType\": \"BASE64_IMAGE\",\n  \"content\": \"iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAAA1BMVEX///+nxBvIAAAAH0lEQVR42mNk...\",\n  \"entityIdRequest\": \"MI_ENTIDAD\",\n  \"externalReference\": \"IMG-2026-001\"\n}" },
+            "url": {
+              "raw": "http://199.3.0.63:8080/partner/v1/qr/decode",
+              "protocol": "http", "host": ["199.3.0.63"], "port": "8080",
+              "path": ["partner", "v1", "qr", "decode"]
+            },
+            "description": "Desencripta un QR enviando la imagen en Base64.\nEl servicio detecta y decodifica el código QR automáticamente.\n\nFormatos de imagen aceptados: JPG, PNG, GIF\nMáximo recomendado: 2MB"
+          }
+        },
+        {
+          "name": "Desencriptar QR – archivo de imagen",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": { "mode": "formdata", "formdata": [
+              { "key": "file",              "type": "file", "src": "",              "description": "Imagen del QR (JPG, PNG, GIF)" },
+              { "key": "entityIdRequest",   "type": "text", "value": "MI_ENTIDAD"  },
+              { "key": "externalReference", "type": "text", "value": "FILE-2026-001" }
+            ]},
+            "url": {
+              "raw": "http://199.3.0.63:8080/partner/v1/qr/decode/file",
+              "protocol": "http", "host": ["199.3.0.63"], "port": "8080",
+              "path": ["partner", "v1", "qr", "decode", "file"]
+            },
+            "description": "Sube directamente el archivo de imagen con el código QR.\nNo requiere convertir la imagen a Base64."
+          }
+        }
+      ]
+    }
+  ]
+}

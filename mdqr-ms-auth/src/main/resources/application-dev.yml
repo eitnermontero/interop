@@ -1,0 +1,7 @@
+spring:
+  liquibase:
+    contexts: dev
+
+springdoc:
+  swagger-ui:
+    enabled: true

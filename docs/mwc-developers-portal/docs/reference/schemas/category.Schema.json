@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"id":{"type":"integer","example":1},"name":{"type":"string","example":"Servicios Basicos"},"iconUrl":{"type":"string","example":"https://..."}},"title":"Category"},"schemaType":"response"}

@@ -1,0 +1,69 @@
+version = "${projectVersion}.${mdqrMsBasePatchVersion}"
+
+dependencies {
+    // Librería de auditoría del hub (HubAuditService, PayloadHasher, ChainHashCalculator)
+    implementation project(':mdqr-audit-commons')
+
+    // Spring Boot MVC
+    implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-security'
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-resource-server'
+    implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+    implementation 'org.apache.commons:commons-pool2'
+    implementation 'org.springframework.boot:spring-boot-starter-validation'
+    implementation 'org.springframework.boot:spring-boot-starter-actuator'
+
+    // Spring Cloud
+    implementation 'org.springframework.cloud:spring-cloud-starter-consul-config'
+    implementation 'org.springframework.cloud:spring-cloud-starter-consul-discovery'
+    implementation 'org.springframework.cloud:spring-cloud-starter-vault-config'
+
+    // Database
+    implementation 'org.springframework.boot:spring-boot-starter-jdbc'
+    runtimeOnly 'org.postgresql:postgresql'
+    implementation 'org.liquibase:liquibase-core'
+
+    // Jackson
+    implementation 'com.fasterxml.jackson.core:jackson-databind'
+    implementation 'com.fasterxml.jackson.datatype:jackson-datatype-jsr310'
+
+    // Genesis SDK (comentado temporalmente para desarrollo)
+    // implementation 'bo.com.sintesis.sdk:sdk-intraplatinum:1.1.0-SNAPSHOT'
+
+    // OpenAPI / Swagger
+    implementation "org.springdoc:springdoc-openapi-starter-webmvc-ui:${springdocVersion}"
+
+    // Lombok
+    compileOnly 'org.projectlombok:lombok'
+    annotationProcessor 'org.projectlombok:lombok'
+
+    // Mongo ID generator
+    implementation 'org.mongodb:bson:5.6.0'
+
+    // BouncyCastle for RSA encryption/decryption
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.78'
+    implementation 'org.bouncycastle:bcpkix-jdk18on:1.78'
+
+    // ZXing for QR code image decoding
+    implementation 'com.google.zxing:core:3.5.3'
+    implementation 'com.google.zxing:javase:3.5.3'
+
+    // Resilience4j — pipeline outbound del hub (CB, Retry, Bulkhead, TimeLimiter)
+    implementation 'io.github.resilience4j:resilience4j-spring-boot3:2.2.0'
+    implementation 'io.github.resilience4j:resilience4j-all:2.2.0'
+
+    // Test
+    testImplementation 'org.springframework.boot:spring-boot-starter-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
+    testImplementation 'com.redis.testcontainers:testcontainers-redis:1.6.4'
+    testImplementation 'org.wiremock:wiremock-standalone:3.3.1'
+    testImplementation 'org.awaitility:awaitility:4.2.2'
+}
+
+compileTestJava {
+    exclude '**/LiquibaseMigrationTest.java'
+    exclude '**/CurrencyEngineClientTest.java'
+    exclude '**/TransactionTimerServiceIT.java'
+}

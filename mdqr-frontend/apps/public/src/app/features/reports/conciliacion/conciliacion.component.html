@@ -1,0 +1,39 @@
+<div>
+  <app-page-breadcrumb pageTitle="Reporte de Conciliación Diaria y Mensual - SOBOCE" />
+
+  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="conc-fecha-desde" label="Fecha Desde" [defaultDate]="fechaDesde()" placeholder="dd/mm/aaaa" (dateChange)="onFechaDesdeChange($event)" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="conc-fecha-hasta" label="Fecha Hasta" [defaultDate]="fechaHasta()" placeholder="dd/mm/aaaa" (dateChange)="onFechaHastaChange($event)" />
+      </div>
+      <app-button variant="success" [startIcon]="iconDownload" [disabled]="loading() || !fechaDesde() || !fechaHasta()" (btnClick)="onGenerarExcel()">Generar Excel</app-button>
+    </div>
+  </div>
+
+  @if (loading()) { <div class="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-white/[0.03] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">Cargando...</div> }
+  @if (error()) { <div class="mb-4"><app-alert variant="error" title="Error al consultar la conciliación" [message]="error() ?? ''" /></div> }
+  @if (!generado() && !loading()) { <app-alert variant="info" title="Sin datos cargados" message="Seleccione un rango de fechas y presione Generar Excel." /> }
+  @if (generado() && !loading() && !error() && !hayResultados()) { <app-alert variant="warning" title="Sin registros" message="No se encontraron registros para el rango." /> }
+
+  @if (generado() && !loading() && hayResultados()) {
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-3 mb-6">
+      <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03]">
+        <p class="text-xs text-gray-500 dark:text-gray-400 uppercase font-medium mb-1">Total Registros</p>
+        <p class="text-2xl font-bold text-gray-800 dark:text-white/90">{{ resultados().length }}</p>
+      </div>
+      <div class="rounded-2xl border border-success-100 bg-success-50 p-5 dark:border-success-500/20 dark:bg-success-500/10">
+        <p class="text-xs text-success-600 dark:text-success-400 uppercase font-medium mb-1">Total Monto</p>
+        <p class="text-2xl font-bold text-success-700 dark:text-success-400">{{ totalMonto() | number:'1.2-2' }} Bs.</p>
+      </div>
+      <div class="rounded-2xl border border-blue-100 bg-blue-50 p-5 dark:border-blue-500/20 dark:bg-blue-500/10">
+        <p class="text-xs text-blue-600 dark:text-blue-400 uppercase font-medium mb-1">Pagados</p>
+        <p class="text-2xl font-bold text-blue-700 dark:text-blue-400">{{ totalPagado() }}</p>
+      </div>
+    </div>
+
+    
+  }
+</div>

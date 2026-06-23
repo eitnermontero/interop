@@ -1,0 +1,312 @@
+/**
+ * Sintesis theme for the OpenAPI docs palette switcher.
+ *
+ * Colors extracted from https://sintesis.com.bo:
+ *   - Primary blue  #0089f7 (button theme bg)
+ *   - Hover         #007cc3
+ *   - Deep ink      #00032a
+ *   - Success       #5acb65
+ *   - Shop accent   #0095eb
+ *
+ * Matches the corporate fintech tone of the Sintesis site.
+ */
+
+/* ============================================================
+ * Fonts — Plus Jakarta Sans (body) + Fira Code (code)
+ * ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&display=swap");
+
+/* ============================================================
+ * Light mode
+ * ============================================================ */
+
+:root {
+  /* Primary — Sintesis brand blue */
+  --ifm-color-primary: #0089f7;
+  --ifm-color-primary-dark: #007cc3;
+  --ifm-color-primary-darker: #0070ab;
+  --ifm-color-primary-darkest: #005a87;
+  --ifm-color-primary-light: #1e96f8;
+  --ifm-color-primary-lighter: #3ba5f9;
+  --ifm-color-primary-lightest: #5eb4fa;
+
+  /* Content */
+  --ifm-color-content: #07070a;
+  --ifm-heading-color: #00032a;
+  --ifm-color-content-secondary: #525860;
+
+  /* Semantic */
+  --ifm-color-success: #5acb65;
+  --ifm-color-warning: #d97706;
+  --ifm-color-danger: #dc2626;
+  --ifm-color-info: #0095eb;
+
+  /* Typography */
+  --ifm-font-size-base: 95%;
+  --ifm-code-font-size: 85%;
+  --ifm-font-family-base:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ifm-heading-font-family:
+    "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system,
+    BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --ifm-font-family-monospace:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Courier New", monospace;
+  --font-mono:
+    "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+    "Courier New", monospace;
+  --ifm-font-weight-base: 400;
+  --ifm-font-weight-semibold: 600;
+  --ifm-heading-font-weight: 700;
+
+  /* Heading scale */
+  --ifm-h1-font-size: 2rem;
+  --ifm-h2-font-size: 1.6rem;
+  --ifm-h3-font-size: 1.3rem;
+  --ifm-h4-font-size: 1.1rem;
+  --ifm-h5-font-size: 1rem;
+  --ifm-h6-font-size: 0.9rem;
+
+  /* Theme hooks */
+  --theme-primary-rgb: 0, 137, 247;
+  --site-primary-hue-saturation: 208 97%;
+  --theme-border-radius-sm: 4px;
+  --theme-border-radius-md: 8px;
+  --theme-border-radius-lg: 12px;
+  --theme-border-radius-xl: 16px;
+  --theme-border-radius-2xl: 24px;
+
+  /* Shadow scale */
+  --theme-shadow-sm:
+    0 1px 3px 0 rgba(0, 3, 42, 0.1), 0 1px 2px -1px rgba(0, 3, 42, 0.06);
+  --theme-shadow-md:
+    0 4px 6px -1px rgba(0, 3, 42, 0.1), 0 2px 4px -2px rgba(0, 3, 42, 0.06);
+  --theme-shadow-lg:
+    0 10px 15px -3px rgba(0, 3, 42, 0.1), 0 4px 6px -4px rgba(0, 3, 42, 0.06);
+
+  --ifm-hr-background-color: var(--ifm-color-emphasis-200);
+  --docusaurus-highlighted-code-line-bg: rgba(0, 137, 247, 0.1);
+
+  --openapi-explorer-font-size-code: 13px;
+}
+
+/* ============================================================
+ * Dark mode — deep navy background derived from #00032a
+ * ============================================================ */
+
+[data-theme="dark"] {
+  /* Lighter blue that reads on the navy surface */
+  --ifm-color-primary: #3ba5f9;
+  --ifm-color-primary-dark: #1e96f8;
+  --ifm-color-primary-darker: #0089f7;
+  --ifm-color-primary-darkest: #007cc3;
+  --ifm-color-primary-light: #5eb4fa;
+  --ifm-color-primary-lighter: #7fc3fb;
+  --ifm-color-primary-lightest: #a8d5fc;
+
+  --ifm-color-content: #dadde1;
+  --ifm-color-content-secondary: #9ba1aa;
+  --ifm-heading-color: #f5f6f7;
+
+  /* Deep navy background pulled from the Sintesis deep ink */
+  --ifm-background-color: #0a0d1f !important;
+  --ifm-navbar-background-color: #0a0d1f;
+
+  /* Cool-navy dark gray scale */
+  --ifm-color-emphasis-100: #141728;
+  --ifm-color-emphasis-200: #252a3f;
+  --ifm-color-emphasis-300: #3a3f57;
+  --ifm-color-emphasis-400: #565c76;
+  --ifm-color-emphasis-500: #7a8098;
+  --ifm-color-emphasis-600: #a0a6bd;
+  --ifm-color-emphasis-700: #c2c7da;
+  --ifm-color-emphasis-800: #dee2ee;
+  --ifm-color-emphasis-900: #f0f2f8;
+
+  --ifm-link-color: #3ba5f9;
+  --ifm-link-hover-color: #7fc3fb;
+
+  --docusaurus-highlighted-code-line-bg: rgba(59, 165, 249, 0.12);
+  --theme-primary-rgb: 59, 165, 249;
+}
+
+/* ============================================================
+ * Method badge colors — sidebar pills
+ * ============================================================ */
+
+.get > .menu__link::before {
+  background-color: rgba(0, 137, 247, 0.12);
+  color: #007cc3;
+}
+.get > .menu__link--active::before {
+  background-color: #0089f7;
+  color: #ffffff;
+}
+
+.post > .menu__link::before {
+  background-color: rgba(90, 203, 101, 0.15);
+  color: #2f9e3c;
+}
+.post > .menu__link--active::before {
+  background-color: #5acb65;
+  color: #ffffff;
+}
+
+.delete > .menu__link::before {
+  background-color: rgba(220, 38, 38, 0.12);
+  color: #dc2626;
+}
+.delete > .menu__link--active::before {
+  background-color: #dc2626;
+  color: #ffffff;
+}
+
+.put > .menu__link::before {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+}
+.put > .menu__link--active::before {
+  background-color: #d97706;
+  color: #ffffff;
+}
+
+.patch > .menu__link::before {
+  background-color: rgba(217, 119, 6, 0.15);
+  color: #b45309;
+}
+.patch > .menu__link--active::before {
+  background-color: #d97706;
+  color: #ffffff;
+}
+
+/* Dark mode */
+[data-theme="dark"] .get > .menu__link::before {
+  background-color: rgba(59, 165, 249, 0.15);
+  color: #3ba5f9;
+}
+[data-theme="dark"] .get > .menu__link--active::before {
+  background-color: #3ba5f9;
+  color: #0a0d1f;
+}
+
+[data-theme="dark"] .post > .menu__link::before {
+  background-color: rgba(90, 203, 101, 0.14);
+  color: #7ee088;
+}
+[data-theme="dark"] .post > .menu__link--active::before {
+  background-color: #5acb65;
+  color: #0a0d1f;
+}
+
+[data-theme="dark"] .delete > .menu__link::before {
+  background-color: rgba(239, 68, 68, 0.12);
+  color: #f87171;
+}
+[data-theme="dark"] .delete > .menu__link--active::before {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .put > .menu__link::before {
+  background-color: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+[data-theme="dark"] .put > .menu__link--active::before {
+  background-color: #f59e0b;
+  color: #0a0d1f;
+}
+
+[data-theme="dark"] .patch > .menu__link::before {
+  background-color: rgba(251, 191, 36, 0.12);
+  color: #fbbf24;
+}
+[data-theme="dark"] .patch > .menu__link--active::before {
+  background-color: #f59e0b;
+  color: #0a0d1f;
+}
+
+/* ============================================================
+ * API page method badges (.badge--*)
+ * ============================================================ */
+
+.badge--primary {
+  /* GET */
+  background-color: #0089f7;
+  color: #ffffff;
+  --ifm-badge-border-color: transparent;
+}
+
+.badge--success {
+  /* POST */
+  background-color: #5acb65;
+  color: #ffffff;
+  --ifm-badge-border-color: transparent;
+}
+
+.badge--danger {
+  /* DELETE */
+  background-color: #dc2626;
+  color: #ffffff;
+  --ifm-badge-border-color: transparent;
+}
+
+.badge--info {
+  /* PUT */
+  background-color: #d97706;
+  color: #ffffff;
+  --ifm-badge-border-color: transparent;
+}
+
+.badge--warning {
+  /* PATCH */
+  background-color: #d97706;
+  color: #ffffff;
+  --ifm-badge-border-color: transparent;
+}
+
+[data-theme="dark"] .badge--primary {
+  background-color: #3ba5f9;
+  color: #0a0d1f;
+}
+[data-theme="dark"] .badge--success {
+  background-color: #5acb65;
+  color: #0a0d1f;
+}
+[data-theme="dark"] .badge--danger {
+  background-color: #ef4444;
+  color: #ffffff;
+}
+[data-theme="dark"] .badge--info {
+  background-color: #f59e0b;
+  color: #0a0d1f;
+}
+[data-theme="dark"] .badge--warning {
+  background-color: #f59e0b;
+  color: #0a0d1f;
+}
+
+/* ============================================================
+ * API Explorer — request body editor font size
+ * ============================================================ */
+
+.openapi-explorer__playground-editor,
+.openapi-explorer__playground-editor textarea,
+.openapi-explorer__playground-editor pre {
+  font-size: var(--openapi-explorer-font-size-code) !important;
+}
+
+/* ============================================================
+ * API Explorer — Send button dark mode
+ * ============================================================ */
+
+[data-theme="dark"] .openapi-explorer__request-btn {
+  background-color: #0089f7;
+  color: #ffffff;
+}
+
+[data-theme="dark"] .openapi-explorer__request-btn:hover {
+  background-color: #3ba5f9;
+}

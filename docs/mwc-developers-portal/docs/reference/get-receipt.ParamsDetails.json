@@ -1,0 +1,1 @@
+{"parameters":[{"name":"txCode","in":"path","required":true,"schema":{"type":"string","format":"uuid"},"description":"UUID de la transaccion confirmada"}]}

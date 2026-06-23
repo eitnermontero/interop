@@ -1,0 +1,5 @@
+clientId,projectType,description,environment
+mwc-public-fe,public,SOBOCE public SPA,development
+mwc-public-fe,public,SOBOCE public SPA,production
+mwc-admin-fe,admin,Admin SPA,development
+mwc-admin-fe,admin,Admin SPA,production

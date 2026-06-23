@@ -1,0 +1,36 @@
+<div>
+  <app-page-breadcrumb pageTitle="Reimpresión de Otras Fechas SOBOCE" />
+
+  <app-card padding="md" class="mb-6">
+    <div class="flex flex-wrap gap-4 items-end">
+      <div class="flex flex-col gap-1.5">
+        <app-label>Código Cliente</app-label>
+        <app-input-field type="text" [value]="codigoCliente()" placeholder="Ej: 100001127" className="w-44" (valueChange)="codigoCliente.set($event.toString())" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-label>Servicio</app-label>
+        <app-input-field type="text" [value]="servicio()" placeholder="Ej: 2" className="w-24" (valueChange)="servicio.set($event.toString())" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="reimp-fecha-desde" label="Fecha Desde" [defaultDate]="fechaDesde()" placeholder="dd/mm/aaaa" (dateChange)="onFechaDesdeChange($event)" />
+      </div>
+      <div class="flex flex-col gap-1.5">
+        <app-date-masck-picker id="reimp-fecha-hasta" label="Fecha Hasta" [defaultDate]="fechaHasta()" placeholder="dd/mm/aaaa" (dateChange)="onFechaHastaChange($event)" />
+      </div>
+      <app-button variant="primary" [startIcon]="iconSearch" [disabled]="loading()" (btnClick)="onBuscar()">Buscar</app-button>
+    </div>
+  </app-card>
+
+  @if (loading()) {
+    <app-card class="flex items-center justify-center py-8" [attr.aria-busy]="true" [attr.aria-label]="'Cargando comprobantes...'">
+      <app-spinner size="md" color="brand" [ariaHidden]="true"></app-spinner>
+    </app-card>
+  }
+  @if (error()) { <div class="mb-4"><app-alert variant="error" title="Error al consultar los comprobantes" [message]="error() ?? ''" /></div> }
+  @if (!buscado() && !loading()) { <app-alert variant="info" title="Sin búsqueda activa" message="Complete los filtros y presione Buscar." /> }
+  @if (buscado() && !loading() && !error() && !hayResultados()) { <app-alert variant="warning" title="Sin registros" message="No se encontraron comprobantes." /> }
+
+  @if (buscado() && !loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="resultados()" />
+  }
+</div>

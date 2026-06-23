@@ -1,0 +1,178 @@
+<div>
+  <app-page-breadcrumb pageTitle="Administración de Reportes" />
+
+  <div class="rounded-2xl border border-gray-200 bg-white p-5 dark:border-gray-800 dark:bg-white/[0.03] mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-3">
+      <div>
+        <h3 class="text-base font-semibold text-gray-800 dark:text-white/90">Reportes generados</h3>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          {{ totalElements() }} reporte(s) en total
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <app-button variant="outline" [startIcon]="iconRefresh" [disabled]="loading()" (btnClick)="loadReports()">
+          Refrescar
+        </app-button>
+        <app-button variant="primary" [startIcon]="iconPlus" (btnClick)="openNew()">
+          Nuevo reporte
+        </app-button>
+      </div>
+    </div>
+  </div>
+
+  @if (loading()) {
+    <div class="rounded-2xl border border-gray-200 bg-white p-10 dark:border-gray-800 dark:bg-white/[0.03] flex items-center justify-center text-sm text-gray-400 dark:text-gray-500">
+      Cargando...
+    </div>
+  }
+  @if (error()) {
+    <div class="mb-4">
+      <app-alert variant="error" title="Error al cargar reportes" [message]="error() ?? ''" />
+    </div>
+  }
+  @if (!loading() && !error() && !hayResultados()) {
+    <app-alert
+      variant="info"
+      title="Sin reportes"
+      message="No hay reportes registrados. Crea uno nuevo con el botón superior."
+    />
+  }
+
+  @if (!loading() && hayResultados()) {
+    <app-data-table [columns]="columns" [data]="reports()" />
+
+    <div class="mt-4 flex flex-wrap items-center justify-between gap-3">
+      <p class="text-sm text-gray-500 dark:text-gray-400">
+        Página {{ pageDisplay() }} de {{ totalPages() }}
+      </p>
+      <div class="flex gap-2">
+        <app-button variant="outline" [disabled]="page() === 0 || loading()" (btnClick)="onPrev()">
+          Anterior
+        </app-button>
+        <app-button variant="outline" [disabled]="isLast() || loading()" (btnClick)="onNext()">
+          Siguiente
+        </app-button>
+      </div>
+    </div>
+  }
+</div>
+
+<!-- Modal: Nuevo Reporte -->
+<app-modal [isOpen]="newOpen()" (close)="closeNew()" className="max-w-xl mx-4 p-6 lg:p-8">
+  <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">Nuevo Reporte</h4>
+  <p class="text-sm text-gray-500 dark:text-gray-400 mb-5">
+    Crea una nueva solicitud de reporte. El procesamiento se hace de forma asíncrona.
+  </p>
+
+  @if (newError()) {
+    <div class="mb-4">
+      <app-alert variant="error" title="No se pudo crear el reporte" [message]="newError() ?? ''" />
+    </div>
+  }
+
+  <div class="flex flex-col gap-4">
+    <div class="flex flex-col gap-1.5">
+      <app-label>Título</app-label>
+      <app-input-field
+        type="text"
+        [value]="newTitle()"
+        placeholder="Ej: Reporte mensual de transacciones"
+        (valueChange)="newTitle.set($event.toString())"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <app-label>Tipo</app-label>
+      <app-select
+        [options]="typeOptions"
+        [value]="newType()"
+        (valueChange)="newType.set($any($event))"
+      />
+    </div>
+
+    <div class="flex flex-col gap-1.5">
+      <app-label>Parámetros (JSON opcional)</app-label>
+      <textarea
+        rows="4"
+        [value]="newParameters()"
+        (input)="newParameters.set($any($event.target).value)"
+        placeholder='{"month": "2026-04"}'
+        class="w-full rounded-lg border border-gray-300 bg-transparent px-3 py-2 text-sm text-gray-700 placeholder:text-gray-400 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-gray-700 dark:text-gray-300 dark:placeholder:text-gray-500"
+      ></textarea>
+    </div>
+  </div>
+
+  <div class="mt-6 flex justify-end gap-2">
+    <app-button variant="outline" [disabled]="newSubmitting()" (btnClick)="closeNew()">
+      Cancelar
+    </app-button>
+    <app-button variant="primary" [disabled]="newSubmitting()" (btnClick)="submitNew()">
+      {{ newSubmitting() ? 'Creando...' : 'Crear reporte' }}
+    </app-button>
+  </div>
+</app-modal>
+
+<!-- Modal: Detalle -->
+<app-modal [isOpen]="detailOpen()" (close)="closeDetail()" className="max-w-2xl mx-4 p-6 lg:p-8">
+  @if (detail(); as r) {
+    <h4 class="text-lg font-semibold text-gray-800 dark:text-white/90 mb-1">Detalle del reporte</h4>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mb-5 font-mono">{{ r.code }}</p>
+
+    <dl class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Título</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ r.title }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Tipo</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ r.type }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Estado</dt>
+        <dd><app-badge [color]="badgeColor(r.status)">{{ r.status }}</app-badge></dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Solicitado por</dt>
+        <dd class="text-gray-800 dark:text-white/90 font-mono text-xs">{{ r.requestedBy }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Creado</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ formatDate(r.createdDate) }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Modificado</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ formatDate(r.lastModifiedDate) }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Inicio procesamiento</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ formatDate(r.startedAt) }}</dd>
+      </div>
+      <div>
+        <dt class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Fin procesamiento</dt>
+        <dd class="text-gray-800 dark:text-white/90">{{ formatDate(r.completedAt) }}</dd>
+      </div>
+    </dl>
+
+    @if (r.parameters) {
+      <div class="mt-5">
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Parámetros</p>
+        <pre class="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-3 text-xs text-gray-700 dark:text-gray-300 overflow-x-auto">{{ r.parameters }}</pre>
+      </div>
+    }
+    @if (r.result) {
+      <div class="mt-5">
+        <p class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Resultado</p>
+        <pre class="rounded-lg bg-gray-50 dark:bg-white/[0.03] p-3 text-xs text-gray-700 dark:text-gray-300 overflow-x-auto max-h-60">{{ r.result }}</pre>
+      </div>
+    }
+    @if (r.errorMessage) {
+      <div class="mt-5">
+        <app-alert variant="error" title="Error en el procesamiento" [message]="r.errorMessage" />
+      </div>
+    }
+
+    <div class="mt-6 flex justify-end">
+      <app-button variant="outline" (btnClick)="closeDetail()">Cerrar</app-button>
+    </div>
+  }
+</app-modal>

@@ -1,0 +1,1 @@
+{"parameters":[{"name":"providerId","in":"path","required":true,"schema":{"type":"integer"}},{"name":"groupId","in":"path","required":true,"schema":{"type":"integer"}}]}

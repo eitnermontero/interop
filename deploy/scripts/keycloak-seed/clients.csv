@@ -1,0 +1,3 @@
+clientId,description,roles,secret
+cartcore_stage_demo01,Demo Partner - Full Access,cart:read;cart:write;cart:pay,cartcore_stage_demo01
+mwc-admin-service,Admin Service - Keycloak Admin facade,,mwc-admin-service-secret

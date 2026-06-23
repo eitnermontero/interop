@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="001-1" author="middleware-core">
+        <createSequence sequenceName="menu_seq" startValue="1000" incrementBy="1"/>
+        <createTable tableName="menu">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="code" type="VARCHAR(100)">
+                <constraints nullable="false" unique="true"/>
+            </column>
+            <column name="name" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="icon" type="VARCHAR(100)"/>
+            <column name="route" type="VARCHAR(255)"/>
+            <column name="parent_id" type="bigint">
+                <constraints foreignKeyName="fk_menu_parent"
+                             references="menu(id)"/>
+            </column>
+            <column name="order_index" type="INT" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+            <column name="is_active" type="BOOLEAN" defaultValueBoolean="true">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_by" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_date" type="TIMESTAMP"/>
+            <column name="last_modified_by" type="VARCHAR(50)"/>
+            <column name="last_modified_date" type="TIMESTAMP"/>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="001-2" author="middleware-core">
+        <createIndex tableName="menu" indexName="idx_menu_parent">
+            <column name="parent_id"/>
+        </createIndex>
+        <createIndex tableName="menu" indexName="idx_menu_active_order">
+            <column name="is_active"/>
+            <column name="order_index"/>
+        </createIndex>
+    </changeSet>
+
+</databaseChangeLog>

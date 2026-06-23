@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"userCurrency":{"type":"string","example":"BOB"},"exchangeRate":{"type":"number","example":9.28},"quotedAt":{"type":"string","format":"date-time"},"disclaimer":{"type":"string","example":"Exchange rate is indicative and may change before final payment confirmation"}},"title":"IndicativeRate"},"schemaType":"response"}

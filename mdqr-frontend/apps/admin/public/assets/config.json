@@ -1,0 +1,10 @@
+{
+  "apiUrl": "http://localhost:8080",
+  "appName": "MDQR Admin",
+  "basePath": "/",
+  "keycloak": {
+    "url": "http://127.0.0.1:8180",
+    "realm": "mdqr-admin",
+    "clientId": "mdqr-admin-fe"
+  }
+}

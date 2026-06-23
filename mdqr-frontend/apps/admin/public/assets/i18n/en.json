@@ -1,0 +1,83 @@
+{
+  "COMMON": {
+    "SEARCH": "Search",
+    "SAVE": "Save",
+    "CANCEL": "Cancel",
+    "CONFIRM": "Confirm",
+    "DELETE": "Delete",
+    "EDIT": "Edit",
+    "BACK": "Back",
+    "NEXT": "Next",
+    "LOADING": "Loading...",
+    "ERROR": "Error",
+    "SUCCESS": "Success",
+    "WARNING": "Warning",
+    "INFO": "Information",
+    "HEALTHY": "Healthy",
+    "NO_CHANGE": "No Change",
+    "ON_TRACK": "On Track",
+    "ACTIVE": "Active",
+    "VS_LAST_WEEK": "vs last week",
+    "VS_YESTERDAY": "vs yesterday"
+  },
+  "AUTH": {
+    "LOGOUT": "Logout",
+    "LOGIN": "Login",
+    "USERNAME": "Username",
+    "PASSWORD": "Password",
+    "EMAIL": "Email",
+    "REMEMBER_ME": "Remember me"
+  },
+  "SIDEBAR": {
+    "DASHBOARD": "Dashboard",
+    "TRANSACTIONS": "Transactions",
+    "SOBOCE": "Soboce Reports",
+    "REPORT_COLLECTION": "Collection Report",
+    "REPORT_PAYMENTS": "Payment Report",
+    "REPORT_PENDING": "Pending Reports",
+    "REPORT_RECEIPTS": "Receipt Reprint",
+    "PENDING": "Pending Reports",
+    "PAYMENTS": "Payment Report",
+    "RECEIPTS": "Receipt Reprint",
+    "COLLECTION": "Collection Report",
+    "RECONCILIATION": "Reconciliation",
+    "ADMIN": "Administration",
+    "USERS": "Users",
+    "ROLES": "Roles",
+    "MENUS": "Menus",
+    "ACTIONS": "Actions",
+    "PERMISSIONS": "Permissions",
+    "REPORTS": "Reports",
+    "AUDIT": "Audit",
+    "SETTINGS": "Settings",
+    "EMPTY": "No options available"
+  },
+  "DASHBOARD": {
+    "TITLE": "Dashboard",
+    "ACTIVE_USERS": "Active Users",
+    "TOTAL_ROLES": "Total Roles",
+    "REPORTS_GENERATED": "Reports Generated",
+    "TODAYS_AUDITS": "Today's Audits",
+    "ACTIVITY": "Activity",
+    "LAST_7_DAYS": "Last 7 days",
+    "AUDIT_LOGS": "Audit Logs",
+    "QUICK_ACCESS": "Quick Access"
+  },
+  "TRANSACTIONS": {
+    "TITLE": "Transactions",
+    "LIST": "Transaction List",
+    "DETAILS": "Transaction Details",
+    "DATE": "Date",
+    "AMOUNT": "Amount",
+    "STATUS": "Status",
+    "REFERENCE": "Reference",
+    "CUSTOMER": "Customer"
+  },
+  "ADMIN": {
+    "TITLE": "Administration",
+    "MANAGE_USERS": "Manage Users",
+    "MANAGE_ROLES": "Manage Roles",
+    "MANAGE_PERMISSIONS": "Manage Permissions",
+    "SYSTEM_CONFIGURATION": "System Configuration"
+  }
+}

@@ -1,0 +1,11 @@
+name,description
+cart:read,Read catalogs and account queries
+cart:write,Initiate payment transactions
+cart:pay,Confirm payments and get receipts
+cart:admin,Full administrative access
+soboce:cliente,SOBOCE customer (public app — own payments and receipts)
+soboce:operador,SOBOCE staff (internal app — collections and reconciliation)
+SUPER_ADMIN,Admin panel — full access to users/roles/menus/permissions
+OPERADOR,Admin panel — operational read+export on payments and reports
+AUDITOR,Admin panel — read-only across all admin menus
+ADMIN_PARTNERS,Admin panel — manage partners and API keys

@@ -1,0 +1,1 @@
+{"schema":{"type":"object","properties":{"code":{"type":"string","description":"Codigo del valor (enviar en Search Account)","example":"000001"},"description":{"type":"string","description":"Descripcion del valor (mostrar al usuario)","example":"30 Min - 1 Bs"}},"title":"ListValue"},"schemaType":"response"}
