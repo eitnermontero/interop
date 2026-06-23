@@ -84,7 +84,7 @@ public class HubWebMvcConfig implements WebMvcConfigurer {
                                         @SuppressWarnings("NullableProblems") FilterChain filterChain)
                 throws ServletException, IOException {
 
-            ContentCachingRequestWrapper  cachedRequest  = new ContentCachingRequestWrapper(request);
+            ContentCachingRequestWrapper  cachedRequest  = new ContentCachingRequestWrapper(request, 10 * 1024 * 1024);
             ContentCachingResponseWrapper cachedResponse = new ContentCachingResponseWrapper(response);
 
             try {

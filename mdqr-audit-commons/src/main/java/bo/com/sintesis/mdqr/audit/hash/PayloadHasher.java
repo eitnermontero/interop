@@ -73,7 +73,7 @@ public final class PayloadHasher {
         return toHex(sha256(value.getBytes(StandardCharsets.UTF_8)));
     }
 
-    static byte[] sha256(byte[] input) {
+    public static byte[] sha256(byte[] input) {
         try {
             MessageDigest digest = MessageDigest.getInstance(SHA_256);
             return digest.digest(input);
@@ -83,7 +83,7 @@ public final class PayloadHasher {
         }
     }
 
-    static String toHex(byte[] bytes) {
+    public static String toHex(byte[] bytes) {
         StringBuilder sb = new StringBuilder(64);
         for (byte b : bytes) {
             sb.append(String.format("%02x", b));

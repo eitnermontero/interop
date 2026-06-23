@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  * <p>Las tablas se crean antes de cada test usando DDL directo para no
  * depender de Liquibase en el modulo de libreria.
  */
-@SpringBootTest(classes = TestApplication.class)
+@SpringBootTest
 @Testcontainers
 class HubAuditServiceIT {
 
@@ -73,6 +73,7 @@ class HubAuditServiceIT {
 
         /** Bean principal con signer funcional (NoOp). */
         @Bean
+        @org.springframework.context.annotation.Primary
         public HubAuditService hubAuditService(JdbcTemplate jdbc) {
             return new HubAuditService(jdbc, new ChainHashCalculator(), new NoOpAuditSigner());
         }
@@ -91,6 +92,7 @@ class HubAuditServiceIT {
     }
 
     @Autowired
+    @org.springframework.beans.factory.annotation.Qualifier("hubAuditService")
     private HubAuditService service;
 
     /** Bean con signer defectuoso para el test de rollback. */
