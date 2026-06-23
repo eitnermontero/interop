@@ -6,22 +6,6 @@
         https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         MDQR (QR Decrypt System) - Database Schema
-         ═══════════════════════════════════════════════════════════════════ -->
-
-    <!-- Core Tables -->
-    <include file="changes/001-create-certificate.xml" relativeToChangelogFile="true"/>
-    <include file="changes/002-create-decryption-log.xml" relativeToChangelogFile="true"/>
-    <include file="changes/003-create-admin-audit-log.xml" relativeToChangelogFile="true"/>
-    <include file="changes/006-create-certificate-version.xml" relativeToChangelogFile="true"/>
-    <include file="changes/007-create-certificate-audit-log.xml" relativeToChangelogFile="true"/>
-    <include file="changes/008-create-trx-entity-code.xml" relativeToChangelogFile="true"/>
-    <include file="changes/009-schema-refactoring.xml"    relativeToChangelogFile="true"/>
-
-    <!-- Dev seed data (only runs with context=dev) -->
-    <!-- <include file="changes/100-dev-seed-data.xml" relativeToChangelogFile="true"/> -->
-
-    <!-- ═══════════════════════════════════════════════════════════════════
          v2 — Hub Interoperabilidad: auditoría con cadena de hashes,
          outbox transaccional, medición/facturación y catálogo de proveedores.
          Orden obligatorio por FK:

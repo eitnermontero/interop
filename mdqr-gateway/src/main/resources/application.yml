@@ -146,10 +146,10 @@ spring:
                     regexp: /oauth2/token
                     replacement: /realms/mdqr-partner/protocol/openid-connect/token
 
-            # ─── Partner QR decode API ──────────────────────────────────────
+            # ─── Partner interop API ─────────────────────────────────────────
             # /partner/v1/** → lb://mdqrbaseservice/api/**
             # Las rutas de partner son validadas por el chain partnerSecurityChain (Order=1).
-            - id: partner-qr-api
+            - id: partner-interop-api
               uri: lb://mdqrbaseservice
               predicates:
                 - Path=/partner/v1/**

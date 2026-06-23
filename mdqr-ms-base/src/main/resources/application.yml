@@ -148,25 +148,11 @@ application:
     credentials:
       secret: ${keycloak.service-client.client-secret:mdqradminservice-secret}
 
-  # ─── Tuxedo Certificate API (Go) ───────────────────────────────────────
+  # ─── Tuxedo API Key — conservado como fallback local para EfxRateClient ──
   tuxedo:
     api-url: ${TUXEDO_API_URL:http://localhost:5050}
     api-key: ${TUXEDO_API_KEY:}
     timeout-ms: ${TUXEDO_API_TIMEOUT:30000}
-
-  # ─── Certificate Sync Configuration ────────────────────────────────────
-  certificate:
-    sync:
-      enabled: ${CERTIFICATE_SYNC_ENABLED:true}
-      cron: ${CERTIFICATE_SYNC_CRON:0 0 * * * *}  # Every 1 hour (at minute 0)
-      on-startup: ${CERTIFICATE_SYNC_ON_STARTUP:false}
-
-  # ─── QR Decryption Configuration ───────────────────────────────────────
-  qr:
-    decryption:
-      cache-enabled: true
-      cache-ttl-minutes: 1440  # 24 hours (as per plan)
-      audit-enabled: true
 
 # ─── Hub de interoperabilidad (adaptadores outbound) ─────────────────────────
 hub:

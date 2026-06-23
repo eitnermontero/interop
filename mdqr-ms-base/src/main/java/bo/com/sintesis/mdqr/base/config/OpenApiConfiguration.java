@@ -44,30 +44,24 @@ public class OpenApiConfiguration {
      */
     private Info apiInfo() {
         return new Info()
-            .title("MDQR - QR Decryption Service")
+            .title("MDQR — Hub de Interoperabilidad")
             .version("1.0.0")
             .description("""
-                API para desencriptación de códigos QR interoperables.
+                Hub de interoperabilidad de casos penales (POL/FELCN ↔ MP).
 
                 ## Características
 
-                - **Desencriptación RSA**: Desencripta códigos QR usando certificados públicos
-                - **Gestión de Certificados**: Importar, listar y revocar certificados digitales
-                - **Auditoría Completa**: Registro de todas las operaciones con filtros avanzados
-                - **Caché Inteligente**: Redis cache con TTL configurable (24h default)
-                - **Seguridad OAuth2**: Autenticación JWT con Keycloak y RBAC
+                - **Inbound**: Exposición de APIs internas a partners con mTLS + RFC 8705
+                - **Outbound**: Llamadas a proveedores externos a través de adaptadores ACL
+                - **Auditoría con cadena de hashes**: SHA-256 encadenado + firma Vault Transit
+                - **Outbox transaccional**: Garantía at-least-once para eventos facturables
+                - **Seguridad OAuth2**: JWT Bearer con Keycloak, mTLS partner, RBAC
 
                 ## Roles
 
-                - **API_CLIENT**: Puede desencriptar QR
-                - **ADMIN**: Gestión completa de certificados y auditorías
+                - **API_CLIENT**: Acceso a endpoints de negocio (partners)
+                - **ADMIN**: Administración del hub
                 - **AUDITOR**: Consulta de auditorías (solo lectura)
-
-                ## Formato QR
-
-                Los códigos QR deben tener el formato: `{encrypted_base64}|{certificate_code}`
-
-                Ejemplo: `qERbt4N7AL96...==|1C302639F6F0...`
 
                 ## Autenticación
 

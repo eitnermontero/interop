@@ -1,6 +1,6 @@
 # ADR-0004: Eliminación del módulo de desencriptación QR
 
-**Estado**: Propuesto
+**Estado**: Implementado
 **Fecha**: 2026-06-22
 **Autores**: Hub Interop Team
 

@@ -66,21 +66,11 @@ spring:
 
 # Configuración de la aplicación
 application:
+  # Fallback local para EfxRateClient (token de desarrollo genérico)
   tuxedo:
     api-url: http://${TUXEDO_HOST:127.0.0.1}:${TUXEDO_PORT:5050}
     api-key: ${TUXEDO_API_KEY:dev-token-123456}
-    timeout-ms: 60000  # 60 segundos para keystore grande
-
-  certificate:
-    sync:
-      enabled: false  # Deshabilitar sincronización automática en desarrollo
-      cron: "0 0 * * * *"
-
-  qr:
-    decryption:
-      cache-enabled: true
-      cache-ttl-minutes: 1440
-      audit-enabled: true
+    timeout-ms: 60000
 
 # ─── Hub outbound — override local ──────────────────────────────────────────
 # En local, el WireMock arranca en 8089 durante los tests de integración.

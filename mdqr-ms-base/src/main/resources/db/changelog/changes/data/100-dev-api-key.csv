@@ -1,2 +1,0 @@
-id;partner_id;client_id;environment;description;is_active;rate_limit;created_by;created_date;last_modified_by;last_modified_date
-1;1;cartcore_stage_demo01;STAGE;Demo API Key - Full Access;true;100;system;2026-01-01 00:00:00;system;2026-01-01 00:00:00
