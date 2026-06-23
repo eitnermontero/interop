@@ -1,13 +1,8 @@
 package bo.com.sintesis.mdqr.base.hub;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.core.Ordered;
 import org.springframework.web.filter.OncePerRequestFilter;
-import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 import org.springframework.web.util.ContentCachingRequestWrapper;
 import org.springframework.web.util.ContentCachingResponseWrapper;
@@ -21,55 +16,20 @@ import java.io.IOException;
 /**
  * Configuración WebMVC para el pipeline de auditoría del hub.
  *
- * <p>Registra:
- * <ol>
- *   <li>Un filtro de servlet ({@link ContentCachingFilter}) que envuelve el request
- *       y el response en {@link ContentCachingRequestWrapper}/
- *       {@link ContentCachingResponseWrapper} solo para las rutas de QR decode.
- *       Esto permite que {@link HubAuditInterceptor} lea el body sin consumir el
- *       stream original de servlet.</li>
- *   <li>El interceptor {@link HubAuditInterceptor} limitado a
- *       {@code POST /api/qr/decode}.</li>
- * </ol>
+ * <p><b>Estado (ADR-0004 paso 2)</b>: interceptor y filtro NEUTRALIZADOS temporalmente.
+ * El endpoint de negocio aún no existe; se re-activarán contra {@code /api/caso/**}
+ * cuando esté implementado. {@link HubAuditInterceptor} sigue siendo un {@code @Component}
+ * y está instanciado — simplemente no está registrado en ninguna ruta.
  *
- * <p>El filtro corre con orden {@link Ordered#HIGHEST_PRECEDENCE + 1} para que
- * los wrappers estén disponibles antes de que Spring Security procese el request.
- * La llamada a {@code copyBodyToResponse()} en el filtro garantiza que el cuerpo
- * del response llegue al cliente aunque el interceptor lo haya leído primero.
+ * <p>Para re-activar: inyectar {@link HubAuditInterceptor}, sobreescribir
+ * {@code addInterceptors} con el nuevo path, y registrar {@link ContentCachingFilter}
+ * con el mismo path como {@code FilterRegistrationBean}.
  */
 @Slf4j
 @Configuration
-@RequiredArgsConstructor
 public class HubWebMvcConfig implements WebMvcConfigurer {
 
-    private final HubAuditInterceptor hubAuditInterceptor;
-
-    // ─── Interceptor ─────────────────────────────────────────────────────────
-
-    @Override
-    public void addInterceptors(InterceptorRegistry registry) {
-        registry.addInterceptor(hubAuditInterceptor)
-                // Solo /api/qr/decode — no /api/qr/decode/file (multipart, diferente pipeline)
-                .addPathPatterns("/api/qr/decode");
-        log.info("HubAuditInterceptor registrado para /api/qr/decode");
-    }
-
-    // ─── Filtro de caching de bodies ─────────────────────────────────────────
-
-    /**
-     * Filtro que envuelve el request y el response en wrappers de caching de contenido.
-     * Solo actúa sobre las rutas de negocio del hub para minimizar la sobrecarga
-     * de copiar el body en memoria.
-     */
-    @Bean
-    public FilterRegistrationBean<ContentCachingFilter> cachingFilter() {
-        FilterRegistrationBean<ContentCachingFilter> registration =
-                new FilterRegistrationBean<>(new ContentCachingFilter());
-        registration.addUrlPatterns("/api/qr/decode");
-        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 1);
-        registration.setName("hubContentCachingFilter");
-        return registration;
-    }
+    // Interceptor y filtro de caching desregistrados — ver javadoc de clase (ADR-0004 paso 2).
 
     /**
      * Filtro de servlet que aplica {@link ContentCachingRequestWrapper} y

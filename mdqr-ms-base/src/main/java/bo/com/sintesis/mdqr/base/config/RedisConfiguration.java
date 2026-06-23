@@ -4,7 +4,6 @@ import com.fasterxml.jackson.annotation.JsonTypeInfo;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.jsontype.BasicPolymorphicTypeValidator;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.cache.CacheManager;
 import org.springframework.cache.annotation.EnableCaching;
@@ -21,31 +20,31 @@ import org.springframework.data.redis.serializer.StringRedisSerializer;
 import java.time.Duration;
 
 /**
- * Configuración de Redis para caché de certificados.
+ * Configuración de Redis para caché del hub.
  * <p>
  * Configura:
- * - CacheManager con TTL de 24 horas
+ * - CacheManager con TTL de 24 horas (constante; ver ADR-0004)
  * - RedisTemplate con serialización JSON
  * - StringRedisSerializer para las keys
  * </p>
  */
 @Configuration
 @EnableCaching
-@RequiredArgsConstructor
 @Slf4j
 public class RedisConfiguration {
 
-    private final ApplicationProperties applicationProperties;
+    // TTL por defecto 24 h. Desacoplado de ApplicationProperties.Qr (ADR-0004 paso 1).
+    private static final int DEFAULT_CACHE_TTL_MINUTES = 1440;
 
     /**
-     * Configura el CacheManager de Redis con TTL de 24 horas (configurable).
+     * Configura el CacheManager de Redis con TTL de 24 horas.
      *
      * @param connectionFactory Factory de conexión a Redis
      * @return CacheManager configurado
      */
     @Bean
     public CacheManager cacheManager(RedisConnectionFactory connectionFactory) {
-        int ttlMinutes = applicationProperties.getQr().getDecryption().getCacheTtlMinutes();
+        int ttlMinutes = DEFAULT_CACHE_TTL_MINUTES;
 
         log.info("Configurando Redis CacheManager con TTL de {} minutos", ttlMinutes);
 
