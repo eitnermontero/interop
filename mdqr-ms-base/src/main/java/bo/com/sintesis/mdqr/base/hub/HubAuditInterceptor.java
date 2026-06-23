@@ -52,17 +52,22 @@ public class HubAuditInterceptor implements HandlerInterceptor {
 
     /** Header puesto por el gateway con el identificador del partner. */
     private static final String HEADER_PARTNER_ID     = "X-Partner-Id";
-    /** Header puesto por RequestIdFilter del gateway para correlación distribuida. */
-    private static final String HEADER_CORRELATION_ID = "X-Request-Id";
-    /** Header de idempotencia enviado por el caller. */
-    private static final String HEADER_IDEMPOTENCY    = "Idempotency-Key";
+    /** Header puesto por RequestIdFilter del gateway para correlación distribuida (ADR-0005). */
+    private static final String HEADER_CORRELATION_ID = "X-Correlation-ID";
+    /** Header de idempotencia enviado por el caller (ADR-0005). */
+    private static final String HEADER_IDEMPOTENCY    = "X-Idempotency-Key";
 
     /** Valor por defecto cuando el gateway no propagó el partner_id. */
     private static final String ANONYMOUS_PARTNER = "anonymous";
 
-    private static final String PRODUCT      = "QR_DECODE";
+    /**
+     * Atributo de request que pone {@link bo.com.sintesis.mdqr.base.hub.inbound.DispatcherController}
+     * con el código del producto (ej. {@code "CASO_PENAL"}).
+     * Si no está presente se usa {@code "UNKNOWN"} como fallback.
+     */
+    private static final String ATTR_AUDIT_PRODUCT = "hub.audit.product";
+
     private static final String DIRECTION    = "IN";
-    private static final String ENDPOINT     = "/api/qr/decode";
     private static final String AGGREGATE    = "HUB_TRANSACTION";
 
     private final HubAuditService hubAuditService;
@@ -128,13 +133,19 @@ public class HubAuditInterceptor implements HandlerInterceptor {
         String correlationId = obtenerHeader(request, HEADER_CORRELATION_ID, null);
         String idempotencyKey = obtenerHeader(request, HEADER_IDEMPOTENCY, null);
 
+        // Producto dinámico: lo pone DispatcherController como atributo del request.
+        // Fallback a "UNKNOWN" si el interceptor se activa fuera del dispatcher genérico.
+        Object productAttr = request.getAttribute(ATTR_AUDIT_PRODUCT);
+        String product = (productAttr instanceof String s && !s.isBlank()) ? s : "UNKNOWN";
+        String endpoint = request.getRequestURI();
+
         // Hashes del cuerpo — usa ContentCachingWrapper puesto por HubWebMvcConfig
         String requestHash  = calcularHashRequest(request);
         String responseHash = calcularHashResponse(response);
 
         Map<String, Object> outboxPayload = Map.of(
                 "partner",   partnerId,
-                "product",   PRODUCT,
+                "product",   product,
                 "units",     1,
                 "status",    httpStatus,
                 "ts",        Instant.now().toString()
@@ -144,14 +155,14 @@ public class HubAuditInterceptor implements HandlerInterceptor {
                 auditId,
                 DIRECTION,
                 partnerId,
-                PRODUCT,
-                ENDPOINT,
+                product,
+                endpoint,
                 request.getMethod(),
                 httpStatus,
                 requestHash,
                 responseHash,
                 latencyMs,
-                1,                // billableUnits: 1 por operación QR_DECODE
+                1,                // billableUnits: 1 por operación inbound
                 idempotencyKey,
                 correlationId,
                 Instant.now(),

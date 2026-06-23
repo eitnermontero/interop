@@ -67,7 +67,7 @@ spring:
         prefer-ip-address: true
 
   datasource:
-    url: jdbc:postgresql://${system.database.host:localhost}:${system.database.port:5432}/${system.database.name:mdqr_decode}
+    url: jdbc:postgresql://${system.database.host:localhost}:${system.database.port:5432}/${system.database.name:hub_interop}
     username: ${system.database.username:postgres}
     password: ${system.database.password:postgres}
     hikari:

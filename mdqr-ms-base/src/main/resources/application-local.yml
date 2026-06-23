@@ -22,7 +22,7 @@ spring:
 
   # Configuración de base de datos local
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/mdqr_decode
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/hub_interop
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
@@ -77,6 +77,10 @@ application:
 # Para desarrollo manual sin WireMock, dejar la URL de ejemplo (fallará con connection refused,
 # que es el comportamiento esperado sin el proveedor real).
 hub:
+  inbound:
+    # Activa el StubInboundAdapter para CASO_PENAL/v1 en lugar del adaptador real.
+    # NUNCA poner true en producción.
+    stub-mode: true
   outbound:
     efxrate:
       url: http://localhost:8089

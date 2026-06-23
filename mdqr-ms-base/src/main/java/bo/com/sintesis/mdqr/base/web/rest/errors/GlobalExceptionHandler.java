@@ -1,8 +1,13 @@
 package bo.com.sintesis.mdqr.base.web.rest.errors;
 
+import bo.com.sintesis.mdqr.audit.hub.IdempotencyKeyConflictException;
+import bo.com.sintesis.mdqr.base.hub.inbound.contract.ProductNotFoundException;
+import bo.com.sintesis.mdqr.base.web.rest.ApiError;
+import bo.com.sintesis.mdqr.base.web.rest.ApiResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
@@ -16,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.net.URI;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
@@ -71,6 +77,44 @@ public class GlobalExceptionHandler {
 
         return problemDetail;
     }
+
+    // ─── Handlers del motor inbound del hub (ADR-0005) ───────────────────────
+
+    /**
+     * Maneja {@link ProductNotFoundException}: producto no registrado o no autorizado.
+     * Retorna 403 con {@code error.code=PRODUCT_NOT_AUTHORIZED} en formato {@link ApiResponse}.
+     */
+    @ExceptionHandler(ProductNotFoundException.class)
+    public ResponseEntity<ApiResponse<Void>> handleProductNotFound(
+            ProductNotFoundException ex, WebRequest request) {
+        log.warn("Producto no autorizado: {}/{}", ex.getProduct(), ex.getVersion());
+        ApiError apiError = new ApiError(
+                "PRODUCT_NOT_AUTHORIZED",
+                ex.getMessage(),
+                List.of()
+        );
+        return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(ApiResponse.error(403, "Producto no autorizado", apiError, null));
+    }
+
+    /**
+     * Maneja {@link IdempotencyKeyConflictException}: clave de idempotencia duplicada.
+     * Retorna 409 con {@code error.code=IDEMPOTENCY_CONFLICT} en formato {@link ApiResponse}.
+     */
+    @ExceptionHandler(IdempotencyKeyConflictException.class)
+    public ResponseEntity<ApiResponse<Void>> handleIdempotencyConflict(
+            IdempotencyKeyConflictException ex, WebRequest request) {
+        log.warn("Clave de idempotencia duplicada: {}", ex.getIdempotencyKey());
+        ApiError apiError = new ApiError(
+                "IDEMPOTENCY_CONFLICT",
+                ex.getMessage(),
+                List.of()
+        );
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(ApiResponse.error(409, "Clave de idempotencia ya procesada", apiError, null));
+    }
+
+    // ─── Handlers existentes (ProblemDetail) ─────────────────────────────────
 
     /**
      * Maneja AccessDeniedException (403 FORBIDDEN).

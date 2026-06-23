@@ -1,0 +1,315 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ═══════════════════════════════════════════════════════════════════
+        Tabla: caso  (schema public)
+
+        Almacena los casos penales recibidos desde el Ministerio Público (MP)
+        y enviados a la Fuerza Especial de Lucha Contra el Crimen (FELCN) /
+        Policía Boliviana (POL). Representa la entidad central del flujo
+        inbound MP → hub → POL.
+
+        DISEÑO DE CAMPOS:
+          • Campos de dominio en snake_case español, homologados con la ficha
+            técnica §3.1 MP→POL. Los nombres entre paréntesis son los
+            identificadores del contrato del proveedor MP.
+          • Campos técnicos del hub (id, correlation_id, created_at, updated_at)
+            en inglés por convención ADR-0005.
+          • `relato` es text plano (hechoRelato en ficha §3.1). Si en el futuro
+            se requiere estructura interna, agregar `relato_estructurado jsonb`
+            en un changeset separado; no convertir esta columna.
+          • `tags` es un array nativo PostgreSQL (text[]). El ORM mapea con
+            @Type(PostgreSQLEnumType) o via jdbc Array.
+
+        ENLACE CON hub_audit_log:
+          La columna `correlation_id` referencia lógicamente a
+          hub_audit_log.correlation_id para trazar la transacción de auditoría
+          que originó la inserción del caso. NO se crea FK física porque
+          hub_audit_log es una tabla particionada y PostgreSQL no soporta FK
+          a tablas particionadas desde tablas no particionadas en PG < 16.
+          El enlace se mantiene y verifica en capa de aplicación.
+
+        LOCKS:
+          • v2-caso-001 (CREATE SEQUENCE): ACCESS EXCLUSIVE — objeto nuevo,
+            seguro con tráfico activo (no hay tabla que bloquear).
+          • v2-caso-002 (CREATE TABLE): ACCESS EXCLUSIVE — tabla nueva, sin
+            tráfico existente sobre ella.
+          • v2-caso-003 (CREATE INDEX ... IF NOT EXISTS via <sql>): los índices
+            se crean con la sintaxis SQL directa. En producción se recomienda
+            ejecutar los DDL de índice fuera de Liquibase con
+            CREATE INDEX CONCURRENTLY para evitar bloqueos si la tabla ya
+            tiene datos. Ver sección de rollback.
+
+        ROLLBACK STRATEGY:
+          • v2-caso-001: DROP SEQUENCE caso_seq.
+          • v2-caso-002: DROP TABLE public.caso (elimina constraints y la
+            secuencia queda huérfana hasta que se limpie con v2-caso-001 rollback).
+          • v2-caso-003: DROP INDEX para cada índice en orden inverso.
+          El rollback completo requiere ejecutar los tres changesets en orden
+          inverso: 003 → 002 → 001.
+        ═══════════════════════════════════════════════════════════════════
+    -->
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         1. Secuencia PK
+         ───────────────────────────────────────────────────────────────── -->
+
+    <changeSet id="v2-caso-001" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="caso" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear secuencia para caso</comment>
+        <createSequence sequenceName="caso_seq"
+                        schemaName="public"
+                        startValue="1"
+                        incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="caso_seq" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         2. Tabla caso
+         ───────────────────────────────────────────────────────────────── -->
+
+    <changeSet id="v2-caso-002" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="caso" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear tabla caso — entidad central del flujo MP → POL</comment>
+        <createTable tableName="caso" schemaName="public">
+
+            <!-- ── PK técnico del hub ────────────────────────────────── -->
+            <column name="id" type="bigint" defaultValueSequenceNext="caso_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_caso" nullable="false"/>
+            </column>
+
+            <!-- ── Identificadores de dominio ────────────────────────── -->
+
+            <!--
+                CUD: Código Único de Denuncia. Identificador de negocio principal.
+                Es el campo de búsqueda más frecuente desde el panel y desde APIs
+                externas. El UNIQUE constraint materializa el índice idx_caso_cud.
+            -->
+            <column name="cud" type="varchar(50)">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uk_caso_cud"/>
+            </column>
+
+            <!--
+                id_externo_caso: PK del caso en el sistema origen (mpCasoId en ficha §3.1).
+                Permite correlacionar hacia el sistema MP sin depender del CUD.
+            -->
+            <column name="id_externo_caso" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                id_externo_caso_referencia: caso padre en el sistema origen (mpCasoPadreId).
+                Nullable: no todos los casos tienen caso de referencia.
+            -->
+            <column name="id_externo_caso_referencia" type="integer"/>
+
+            <!-- ── Catálogos MP ───────────────────────────────────────── -->
+
+            <!-- Catálogo de tipos de denuncia del MP -->
+            <column name="id_tipo_denuncia" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Estado actual del caso en el ciclo de vida MP (casoEstadoId) -->
+            <column name="id_estado" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Etapa procesal del caso (casoEtapaId) -->
+            <column name="id_etapa" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- ── Datos de la oficina ────────────────────────────────── -->
+
+            <!-- Identificador de la oficina MP que registró el caso (oficinaComunId) -->
+            <column name="id_oficina" type="integer">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- ── Datos del hecho ────────────────────────────────────── -->
+
+            <!-- Municipio donde ocurrió el hecho (hechoMunicipioId). Nullable. -->
+            <column name="id_municipio" type="integer"/>
+
+            <!-- Zona del hecho (hechoZona). Texto libre. -->
+            <column name="zona" type="varchar(255)"/>
+
+            <!-- Dirección del hecho (hechoDireccion). Texto libre, puede ser largo. -->
+            <column name="direccion" type="text"/>
+
+            <!--
+                Coordenadas geográficas como strings decimales (hechoLatitud, hechoLongitud).
+                Se almacenan como texto para preservar la representación exacta del proveedor.
+                Si se requieren operaciones geoespaciales, agregar columna geometry en
+                changeset separado.
+            -->
+            <column name="latitud" type="varchar(30)"/>
+            <column name="longitud" type="varchar(30)"/>
+
+            <!-- Referencia del lugar del hecho (hechoReferenciaLugar). Texto libre. -->
+            <column name="referencia" type="text"/>
+
+            <!--
+                Relato del hecho (hechoRelato en ficha §3.1).
+                TEXT plano — no jsonb. El contrato del MP define este campo como
+                cadena de texto libre. Si en el futuro se requiere estructura interna,
+                agregar `relato_estructurado jsonb` en un changeset separado.
+            -->
+            <column name="relato" type="text"/>
+
+            <!-- Fecha y hora del hecho (hechoFechaHora). Siempre timestamptz. -->
+            <column name="fecha_caso" type="timestamptz"/>
+
+            <!-- Fecha y hora de fin del hecho (hechoFechaHoraFin). Nullable. -->
+            <column name="fecha_fin" type="timestamptz"/>
+
+            <!--
+                Descripción textual de fecha aproximada cuando el hecho no tiene
+                hora precisa (hechoFechaHoraAproximada). Texto libre, p.ej. "tarde del jueves".
+            -->
+            <column name="fecha_aproximada" type="varchar(255)"/>
+
+            <!-- ── Indicadores ─────────────────────────────────────────── -->
+
+            <!--
+                Indica si el caso es reservado (estaReservado).
+                Default false: la mayoría de los casos no son reservados.
+            -->
+            <column name="es_reservado" type="boolean" defaultValueBoolean="false"/>
+
+            <!-- ── Campos de presentación ─────────────────────────────── -->
+
+            <!--
+                Denominación mediática del caso. Solo presente en casos de alto
+                perfil público. Nullable.
+            -->
+            <column name="denominacion_caso" type="varchar(500)"/>
+
+            <!--
+                Tags: etiquetas clasificatorias del caso. Array nativo PostgreSQL (text[]).
+                El ORM mapea via JDBC Array o con anotación @Type de Hypersistence.
+                Ejemplos: {"NARCOTRAFICO", "FLAGRANTE"}.
+            -->
+            <column name="tags" type="text[]"/>
+
+            <!-- ── Campos técnicos del hub (ADR-0005) ────────────────── -->
+
+            <!--
+                correlation_id: enlace lógico con hub_audit_log.correlation_id.
+                Permite trazar qué transacción de auditoría originó este caso.
+                SIN FK física: hub_audit_log es particionada; PostgreSQL no
+                soporta FK a tablas particionadas desde tablas no particionadas en PG < 16.
+            -->
+            <column name="correlation_id" type="varchar(128)"/>
+
+            <!-- Timestamp técnico de inserción. Inmutable tras el INSERT. -->
+            <column name="created_at" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Timestamp de última actualización. Se establece en PATCH. Nullable. -->
+            <column name="updated_at" type="timestamptz"/>
+
+        </createTable>
+
+        <!-- CHECKs de integridad de catálogos (IDs siempre positivos) -->
+        <sql>
+            ALTER TABLE public.caso
+            ADD CONSTRAINT chk_caso_id_tipo_denuncia
+            CHECK (id_tipo_denuncia &gt; 0);
+        </sql>
+
+        <sql>
+            ALTER TABLE public.caso
+            ADD CONSTRAINT chk_caso_id_estado
+            CHECK (id_estado &gt; 0);
+        </sql>
+
+        <sql>
+            ALTER TABLE public.caso
+            ADD CONSTRAINT chk_caso_id_etapa
+            CHECK (id_etapa &gt; 0);
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE public.caso DROP CONSTRAINT IF EXISTS chk_caso_id_tipo_denuncia;</sql>
+            <sql>ALTER TABLE public.caso DROP CONSTRAINT IF EXISTS chk_caso_id_estado;</sql>
+            <sql>ALTER TABLE public.caso DROP CONSTRAINT IF EXISTS chk_caso_id_etapa;</sql>
+            <dropTable tableName="caso" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <!-- ─────────────────────────────────────────────────────────────────
+         3. Índices
+         Patrones de acceso:
+           1. PK id              → cubierto por pk_caso (B-tree).
+           2. cud                → uk_caso_cud ya materializa el índice UNIQUE.
+           3. id_externo_caso    → el partner MP consulta por su propio PK.
+           4. created_at DESC    → listado cronológico en panel admin.
+           5. correlation_id     → debugging/trazabilidad, índice parcial.
+
+         NOTA DE PRODUCCIÓN: en una tabla con datos existentes, ejecutar los
+         CREATE INDEX con CONCURRENTLY manualmente fuera de esta migración para
+         evitar ACCESS EXCLUSIVE. Los preConditions con onFail="MARK_RAN"
+         permiten omitir el changeset si el índice ya fue creado manualmente.
+         ───────────────────────────────────────────────────────────────── -->
+
+    <changeSet id="v2-caso-003" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="caso" schemaName="public"/>
+            <not><indexExists indexName="idx_caso_id_externo" schemaName="public"/></not>
+        </preConditions>
+        <comment>Índices para caso (id_externo_caso, created_at, correlation_id)</comment>
+
+        <!--
+            idx_caso_id_externo: B-tree simple sobre id_externo_caso.
+            Patrón: el MP consulta por su propio PK de caso tras enviar la notificación.
+        -->
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS idx_caso_id_externo
+                ON public.caso (id_externo_caso);
+        </sql>
+
+        <!--
+            idx_caso_created_at: B-tree sobre created_at DESC.
+            Patrón: panel admin lista casos en orden cronológico inverso.
+        -->
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS idx_caso_created_at
+                ON public.caso (created_at DESC);
+        </sql>
+
+        <!--
+            idx_caso_correlation_id: índice parcial WHERE correlation_id IS NOT NULL.
+            Solo indexa las filas que tienen trazabilidad de auditoría, reduciendo
+            el tamaño del índice para los casos sin correlation_id.
+            Patrón: lookup puntual en depuración de transacciones del hub.
+        -->
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS idx_caso_correlation_id
+                ON public.caso (correlation_id)
+                WHERE correlation_id IS NOT NULL;
+        </sql>
+
+        <rollback>
+            <sql>DROP INDEX IF EXISTS public.idx_caso_correlation_id;</sql>
+            <sql>DROP INDEX IF EXISTS public.idx_caso_created_at;</sql>
+            <sql>DROP INDEX IF EXISTS public.idx_caso_id_externo;</sql>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

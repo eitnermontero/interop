@@ -10,7 +10,7 @@ spring:
       discovery:
         enabled: false
   datasource:
-    url: jdbc:tc:postgresql:15://localhost/mdqr_decode_test
+    url: jdbc:tc:postgresql:15://localhost/hub_interop_test
     username: test
     password: test
     driver-class-name: org.testcontainers.jdbc.ContainerDatabaseDriver

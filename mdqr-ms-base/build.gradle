@@ -61,4 +61,8 @@ compileTestJava {
     exclude '**/PaymentServiceTest.java'
     exclude '**/AccountServiceScheduleValidationTest.java'
     exclude '**/IdempotencyServiceTest.java'
+    // Reemplazado por CasoInboundIT — apuntaba al endpoint /api/qr/decode con
+    // headers X-Request-Id / Idempotency-Key (ADR-0004). CasoInboundIT cubre el
+    // mismo pipeline sobre /api/inbound/CASO_PENAL/v1 con los headers del ADR-0005.
+    exclude '**/QrDecodePartnerIT.java'
 }
