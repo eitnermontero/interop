@@ -56,6 +56,12 @@ public class EfxRateProperties {
         /** Tiempo en milisegundos que el circuit breaker permanece abierto antes de pasar a HALF_OPEN. */
         private long cbWaitDurationMs = 30_000L;
 
+        /**
+         * Número mínimo de llamadas registradas antes de que el CB calcule la tasa de fallos.
+         * Resilience4j 2.x usa default=100; lo bajamos a 10 para entornos de baja carga.
+         */
+        private int cbMinimumNumberOfCalls = 10;
+
         /** Número máximo de llamadas concurrentes permitidas por el bulkhead. */
         private int bulkheadMaxConcurrent = 10;
     }

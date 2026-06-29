@@ -273,11 +273,9 @@ class EfxRateClientIT {
     @Order(5)
     @DisplayName("Debería abrir el circuit breaker tras suficientes fallos consecutivos")
     void shouldOpenCircuitBreakerAfterFailures() {
-        // El sliding window por default de Resilience4j es COUNT_BASED con 100 llamadas.
-        // Con cb-failure-rate-threshold=50 y minimum-number-of-calls=10 (default),
-        // necesitamos al menos 10 llamadas de las cuales >50% sean fallos.
-        // Los tests anteriores (Order=3: 3 fallos, Order=4: 2 fallos) ya contribuyeron
-        // con 5 fallos. Agregamos más para superar el minimum-number-of-calls.
+        // cb-failure-rate-threshold=50, cb-minimum-number-of-calls=10 (propiedad configurada).
+        // Order=3 contribuyó 1 fallo, Order=4 contribuyó 1 éxito → 2 eventos previos.
+        // Con estas iteraciones superamos las 10 llamadas mínimas con >50% de fallos.
         WIRE_MOCK.stubFor(get(urlPathEqualTo("/v1/rate"))
                 .willReturn(aResponse()
                         .withStatus(503)

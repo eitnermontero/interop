@@ -27,6 +27,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -60,8 +61,9 @@ class EfxRateAdapterTest {
         when(redisTemplate.opsForValue()).thenReturn(valueOps);
         when(valueOps.get(anyString())).thenReturn(null);
 
-        // Properties mínimas para la construcción del cache key
-        when(properties.getCacheTtlMinutes()).thenReturn(60);
+        // Properties mínimas para escritura en caché — lenient porque cuando el client
+        // lanza excepción nunca se llega a escribirEnCache(), y el stub quedaría sin usar.
+        lenient().when(properties.getCacheTtlMinutes()).thenReturn(60);
 
         adapter = new EfxRateAdapter(client, mapper, hubAuditService,
                 payloadHasher, properties, redisTemplate);

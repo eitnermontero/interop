@@ -56,9 +56,10 @@ subprojects {
     dependencyManagement {
         imports {
             mavenBom "org.springframework.cloud:spring-cloud-dependencies:${springCloudVersion}"
-            mavenBom "org.testcontainers:testcontainers-bom:1.20.4"
+            mavenBom "org.testcontainers:testcontainers-bom:1.21.1"
         }
     }
+
 
     jib {
         from {
@@ -106,7 +107,17 @@ subprojects {
         )
     }
 
+    // processTestAot solo es necesario para binarios native (nativeTest).
+    // Al correr ./gradlew test normal, el plugin graalvm lo engancha igual y falla
+    // porque @DynamicPropertySource llama a Testcontainers antes de que estén arrancados.
+    tasks.withType(org.springframework.boot.gradle.tasks.aot.ProcessTestAot).configureEach {
+        enabled = false
+    }
+
     test {
         useJUnitPlatform()
+        // docker-java lee DOCKER_API_VERSION como variable de entorno del proceso,
+        // no como system property JVM. Docker 29.x requiere API >=1.44.
+        environment 'DOCKER_API_VERSION', '1.44'
     }
 }

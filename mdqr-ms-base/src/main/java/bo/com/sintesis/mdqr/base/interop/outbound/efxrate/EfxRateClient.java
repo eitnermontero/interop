@@ -100,6 +100,7 @@ public class EfxRateClient {
         CircuitBreakerConfig cbConfig = CircuitBreakerConfig.custom()
                 .failureRateThreshold(r4j.getCbFailureRateThreshold())
                 .waitDurationInOpenState(Duration.ofMillis(r4j.getCbWaitDurationMs()))
+                .minimumNumberOfCalls(r4j.getCbMinimumNumberOfCalls())
                 .recordException(t -> t instanceof ExchangeRateProviderException)
                 .build();
         this.circuitBreaker = CircuitBreakerRegistry.of(cbConfig)
