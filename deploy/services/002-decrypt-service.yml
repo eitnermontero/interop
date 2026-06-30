@@ -64,7 +64,7 @@ services:
       VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
 
       # --- Database (PostgreSQL) ---
-      SPRING_DATASOURCE_URL: ${MDQR_DECRYPT_DB_URL:-jdbc:postgresql://host.docker.internal:5432/mdqr}
+      SPRING_DATASOURCE_URL: ${MDQR_DECRYPT_DB_URL:-jdbc:postgresql://host.docker.internal:5432/hub_interop}
       # username/password (claves) -> Vault secret/<ns>/system/database. NO en env.
       SPRING_LIQUIBASE_ENABLED: ${MDQR_DECRYPT_LIQUIBASE_ENABLED:-true}
 
@@ -82,14 +82,14 @@ services:
 
       # --- Keycloak / OIDC ---
       # keycloak.service-client.* publican via Vault; aqui las dejamos overrideables por env.
-      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}
       KEYCLOAK_SERVICE_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
       APPLICATION_KEYCLOAK_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
 
       # --- Audit (cliente; apunta al admin-service receptor) ---
       AUDIT_ENDPOINT: ${MDQR_AUDIT_ENDPOINT:-http://mdqr-gateway${TENANT_ID:+-}${TENANT_ID}:8080/services/mdqradminservice/admin/audit}
       # JWT client_credentials. Reusa el client mdqr-api (keycloak.service-client.*).
-      AUDIT_OAUTH_TOKEN_URI: ${MDQR_AUDIT_OAUTH_TOKEN_URI:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}/realms/${MDQR_KEYCLOAK_REALM_BASE:-mdqr}${TENANT_ID:+-}${TENANT_ID}/protocol/openid-connect/token}
+      AUDIT_OAUTH_TOKEN_URI: ${MDQR_AUDIT_OAUTH_TOKEN_URI:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}/realms/${MDQR_KEYCLOAK_REALM_BASE:-mdqr}${TENANT_ID:+-}${TENANT_ID}/protocol/openid-connect/token}
       AUDIT_OAUTH_CLIENT_ID: ${MDQR_AUDIT_OAUTH_CLIENT_ID:-mdqr-api}
       # client-secret (clave) -> Vault keycloak/service-client; audit.oauth.client-secret
       # encadena con keycloak.service-client.client-secret en el yml. NO en env.

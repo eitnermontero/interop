@@ -37,7 +37,8 @@ public class ForwardingGateway {
      * Se extiende al agregar nuevos adaptadores sin modificar este gateway.
      */
     private static final Map<String, String> PRODUCT_BEAN_MAP = Map.of(
-            "CASO_PENAL:v1", "stubInboundAdapter"
+            "CASO_PENAL:v1",        "stubInboundAdapter",
+            "CASO_PENAL_EDITAR:v1", "stubInboundAdapter"
     );
 
     public ForwardingGateway(Map<String, InboundPort> ports) {

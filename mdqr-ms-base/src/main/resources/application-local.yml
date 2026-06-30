@@ -1,3 +1,6 @@
+server:
+  port: 8091
+
 spring:
   # IMPORTANTE: Deshabilitar completamente config.import
   config:

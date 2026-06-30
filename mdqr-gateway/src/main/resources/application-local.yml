@@ -1,8 +1,14 @@
+server:
+  port: 8082
+
 spring:
   config:
     import: ""
 
   cloud:
+    loadbalancer:
+      cache:
+        ttl: 15s
     vault:
       enabled: false
       config:
@@ -16,6 +22,9 @@ spring:
           enabled: false
       discovery:
         enabled: true
+        # Solo instancias con health check passing — evita que el LB enrute
+        # a instancias de otros proyectos que se registren con el mismo service-name.
+        query-passing: true
 
   data:
     redis:

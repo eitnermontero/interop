@@ -27,6 +27,10 @@ spring:
   application:
     name: mdqr-ms-base
 
+  autoconfigure:
+    exclude:
+      - bo.com.sintesis.mdqr.audit.config.AuditAutoConfiguration
+
   config:
     import: "optional:consul:,optional:vault:,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/system/database?prefix=system.database.,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/system/redis?prefix=system.redis.,optional:vault://${VAULT_MOUNT:secret}/${VAULT_NS:mdqr-decode}/keycloak/service-client?prefix=keycloak.service-client.,optional:classpath:git.properties"
 

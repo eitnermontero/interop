@@ -71,14 +71,14 @@ services:
 
       # --- Keycloak / OIDC ---
       # keycloak.service-client.* publican via Vault; aqui las dejamos overrideables por env.
-      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}
       KEYCLOAK_SERVICE_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
       # application.keycloak.external-url = URL que keycloak embebe en el JWT iss
       # (validacion del resource-server). Default = mismo MDQR_KEYCLOAK_URL.
-      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}}
+      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}}
       APPLICATION_KEYCLOAK_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
       # partner-keycloak.external-url = URL del issuer en tokens del realm mdqr-partner.
-      KEYCLOAK_PARTNER_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}}
+      KEYCLOAK_PARTNER_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}}
 
       # --- Logging ---
       # LOG_DIR + LOG_FILE los lee logback-spring.xml para el RollingFileAppender.

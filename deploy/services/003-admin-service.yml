@@ -60,7 +60,7 @@ services:
       VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
 
       # --- Database (PostgreSQL) — schema 'admin' ---
-      SPRING_DATASOURCE_URL: ${MDQR_ADMIN_DB_URL:-jdbc:postgresql://host.docker.internal:5432/mdqr}
+      SPRING_DATASOURCE_URL: ${MDQR_ADMIN_DB_URL:-jdbc:postgresql://host.docker.internal:5432/mdqr_auth}
       # username/password (claves) -> Vault secret/<ns>/system/database. NO en env.
 
       # --- Redis (RedisTemplate, aislamiento multi-tenant por prefijo de key) ---
@@ -71,12 +71,12 @@ services:
       # activa con el perfil 'redis-cluster' (SPRING_PROFILES_ACTIVE) + MDQR_REDIS_CLUSTER_NODES.
 
       # --- Keycloak / OIDC ---
-      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}
       KEYCLOAK_SERVICE_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
-      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}}
+      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}}
       APPLICATION_KEYCLOAK_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
       # Service account para invocar la Keycloak Admin API (gestion de users/roles + poll de eventos LOGIN/LOGOUT).
-      KEYCLOAK_ADMIN_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8080}
+      KEYCLOAK_ADMIN_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}
       KEYCLOAK_ADMIN_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
       # client-id, client-secret, grant-type -> Vault keycloak/admin-client (100% de Vault, igual
       # que service-client). Tenerlos en env interferia con la carga del client-secret de Vault.

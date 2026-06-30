@@ -100,7 +100,17 @@ public class MtlsCertBindingFilter implements GlobalFilter, Ordered {
                     String cnfThumbprint = extraerCnfThumbprint(jwt);
 
                     if (cnfThumbprint == null) {
-                        // JWT válido pero sin cnf.x5t#S256 → rechazar
+                        if (testModeEnabled) {
+                            // En test-mode Keycloak emite tokens sin certificate-bound (sin mTLS real
+                            // en el token endpoint). Aceptar y propagar el partner-id sin validar binding.
+                            log.warn("Test-mode: JWT sin cnf.x5t#S256 — saltando RFC 8705 para path={}", path);
+                            String partnerId = jwt.getSubject();
+                            ServerWebExchange mutated = exchange.mutate()
+                                    .request(r -> r.header(HEADER_PARTNER_ID, partnerId))
+                                    .build();
+                            return chain.filter(mutated);
+                        }
+                        // Producción: JWT sin cnf.x5t#S256 → rechazar
                         log.warn("JWT sin claim cnf.x5t#S256 para path={}", path);
                         return rechazar(exchange, HttpStatus.UNAUTHORIZED, ERROR_BODY_NO_CNF);
                     }

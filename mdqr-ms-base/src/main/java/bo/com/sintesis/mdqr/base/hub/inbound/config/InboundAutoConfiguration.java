@@ -52,14 +52,39 @@ import java.util.List;
  * denominacion_caso          | STRING    |  N  | 500    |
  * tags                       | ARRAY     |  N  |        |
  * </pre>
+ *
+ * <h2>Contrato CASO_PENAL_EDITAR/v1</h2>
+ * Endpoint canónico: {@code POST /partner/v1/inbound/CASO_PENAL_EDITAR/v1}.
+ * Corresponde a {@code PATCH {urlPOL}/caso/{polCasoId}} (ficha §3.2).
+ * El path variable {@code polCasoId} se incluye en el body como {@code id_pol_caso}.
+ *
+ * <pre>
+ * Campo                      | Tipo      | Req | maxLen | format
+ * id_pol_caso                | INTEGER   |  S  |        |   — polCasoId de POL
+ * id_tipo_denuncia           | INTEGER   |  S  |        |
+ * id_externo_caso_referencia | INTEGER   |  N  |        |   — mpCasoPadreId
+ * id_municipio               | INTEGER   |  N  |        |
+ * zona                       | STRING    |  N  | 255    |
+ * direccion                  | STRING    |  N  |        |
+ * latitud                    | STRING    |  N  |  30    |
+ * longitud                   | STRING    |  N  |  30    |
+ * referencia                 | STRING    |  N  |        |
+ * relato                     | STRING    |  N  |        |
+ * fecha_caso                 | DATETIME  |  N  |        | iso8601  — hechoFechaHora
+ * fecha_fin                  | DATETIME  |  N  |        | iso8601
+ * fecha_aproximada           | STRING    |  N  | 255    |
+ * denominacion_caso          | STRING    |  N  | 500    |
+ * tags                       | ARRAY     |  N  |        |   — tagsId (ids de etiquetas)
+ * </pre>
  */
 @Slf4j
 @Configuration
 @RequiredArgsConstructor
 public class InboundAutoConfiguration {
 
-    private static final String PRODUCT_CASO_PENAL = "CASO_PENAL";
-    private static final String VERSION_V1 = "v1";
+    private static final String PRODUCT_CASO_PENAL        = "CASO_PENAL";
+    private static final String PRODUCT_CASO_PENAL_EDITAR = "CASO_PENAL_EDITAR";
+    private static final String VERSION_V1                = "v1";
 
     private final ContractRegistry contractRegistry;
 
@@ -71,6 +96,7 @@ public class InboundAutoConfiguration {
     public void registrarContratos() {
         log.info("Registrando contratos inbound del hub...");
         contractRegistry.register(contratoCasoPenalV1());
+        contractRegistry.register(contratoCasoPenalEditarV1());
         log.info("Contratos inbound registrados.");
     }
 
@@ -84,7 +110,7 @@ public class InboundAutoConfiguration {
     @Bean("stubInboundAdapter")
     @ConditionalOnProperty(name = "hub.inbound.stub-mode", havingValue = "true")
     public InboundPort stubInboundAdapter() {
-        log.warn("STUB MODE habilitado para CASO_PENAL/v1 — no usar en produccion");
+        log.warn("STUB MODE habilitado para todos los productos inbound — no usar en produccion");
         return new StubInboundAdapter();
     }
 
@@ -118,5 +144,30 @@ public class InboundAutoConfiguration {
         );
 
         return new ContractDefinition(PRODUCT_CASO_PENAL, VERSION_V1, campos);
+    }
+
+    private ContractDefinition contratoCasoPenalEditarV1() {
+        List<FieldRule> campos = List.of(
+                // Campo requerido (id_pol_caso viene del path — inyectado por el dispatcher)
+                new FieldRule("id_tipo_denuncia",            FieldType.INTEGER, true,  null, null),
+
+                // Campos opcionales
+                new FieldRule("id_externo_caso_referencia",  FieldType.INTEGER, false, null, null),
+                new FieldRule("id_municipio",                FieldType.INTEGER, false, null, null),
+                new FieldRule("zona",                        FieldType.STRING,  false, 255,  null),
+                new FieldRule("direccion",                   FieldType.STRING,  false, null, null),
+                new FieldRule("latitud",                     FieldType.STRING,  false, 30,   null),
+                new FieldRule("longitud",                    FieldType.STRING,  false, 30,   null),
+                new FieldRule("referencia",                  FieldType.STRING,  false, null, null),
+                new FieldRule("relato",                      FieldType.STRING,  false, null, null),
+                new FieldRule("fecha_caso",                  FieldType.DATETIME, false, null, "iso8601"),
+                new FieldRule("fecha_fin",                   FieldType.DATETIME, false, null, "iso8601"),
+                new FieldRule("fecha_aproximada",            FieldType.STRING,  false, 255,  null),
+                new FieldRule("denominacion_caso",           FieldType.STRING,  false, 500,  null),
+                new FieldRule("tags",                        FieldType.ARRAY,   false, null, null)
+        );
+
+        // resourceIdField: el dispatcher inyecta el {polCasoId} del path como "id_pol_caso"
+        return new ContractDefinition(PRODUCT_CASO_PENAL_EDITAR, VERSION_V1, campos, "id_pol_caso");
     }
 }
