@@ -1,0 +1,377 @@
+{
+  "info": {
+    "name": "Hub Interoperabilidad — API Partner",
+    "_postman_id": "hub-interop-partner-v1",
+    "description": "Colección de endpoints del Hub de Interoperabilidad para integración de sistemas externos.\n\n⚠️ REQUISITO PREVIO — mTLS:\nEsta API requiere certificado de cliente (mTLS). Antes de usar la colección:\n1. Ir a Postman → Settings → Certificates → Add Certificate\n2. Host: desarrollo.felcn.gob.bo  Puerto: 443\n3. CRT File: seleccionar 'fiscalia-bol-api.crt' (entregado por el Hub)\n4. KEY File: seleccionar 'fiscalia-bol-api.key' (entregado por el Hub)\n5. Guardar. Postman enviará el certificado automáticamente.\n\nFlujo básico:\n1. Configurar el certificado en Settings (arriba)\n2. Completar la variable 'client_secret' con el secret entregado\n3. Ejecutar 'Obtener Token' → el token se guarda automáticamente en {{token}}\n4. Usar cualquier endpoint de negocio — Authorization y certificado ya están configurados\n\nVariables de colección a configurar:\n- base_url: https://desarrollo.felcn.gob.bo (no cambiar)\n- client_id: fiscalia-bol-api (no cambiar)\n- client_secret: (completar con el valor entregado por el Hub)\n\nORDEN DE VALIDACIÓN EN EL SERVIDOR (cada petición):\n1. mTLS — certificado de cliente contra la CA del Hub (único punto de terminación TLS)\n2. JWT — firma / emisor / expiración del Bearer\n3. Binding RFC 8705 — el certificado de la conexión debe ser el mismo ligado al token (si no: 401)\n4. Suscripción / autorización del producto\n5. Registro de la petición + validación del contrato\nPrimero mTLS, luego el JWT, y recién entonces se procesa la petición. Un token sin su certificado es inútil.\n\nNOTA: Swagger (/interop/docs/) es solo referencia — no puede ejecutar por el mTLS. Use esta colección o cURL.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://desarrollo.felcn.gob.bo",
+      "type": "string",
+      "description": "URL base del servidor de pruebas"
+    },
+    {
+      "key": "client_id",
+      "value": "fiscalia-bol-api",
+      "type": "string",
+      "description": "Client ID provisto por el equipo del Hub"
+    },
+    {
+      "key": "client_secret",
+      "value": "fiscalia-bol-41aa1602b16970eb36a4d2a8f561c2fa",
+      "type": "string",
+      "description": "Client Secret provisto por el equipo del Hub (completar)"
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "string",
+      "description": "Token JWT — se llena automáticamente al ejecutar 'Obtener Token'"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "Obtener Token (OAuth2 client_credentials)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json.access_token) {",
+                  "    pm.collectionVariables.set('token', json.access_token);",
+                  "    console.log('Token guardado. Expira en: ' + json.expires_in + 's');",
+                  "    pm.test('Token obtenido correctamente', function() {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "} else {",
+                  "    console.error('No se obtuvo access_token:', JSON.stringify(json));",
+                  "    pm.test('Error al obtener token', function() { pm.expect.fail(JSON.stringify(json)); });",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/x-www-form-urlencoded"
+              }
+            ],
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                {
+                  "key": "grant_type",
+                  "value": "client_credentials",
+                  "type": "text"
+                },
+                {
+                  "key": "client_id",
+                  "value": "{{client_id}}",
+                  "type": "text"
+                },
+                {
+                  "key": "client_secret",
+                  "value": "{{client_secret}}",
+                  "type": "text"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{base_url}}/interop/oauth2/token",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "oauth2",
+                "token"
+              ]
+            },
+            "description": "Obtiene un access_token JWT válido por 300 segundos.\nEl token se guarda automáticamente en la variable {{token}} para todas las demás requests."
+          },
+          "response": [
+            {
+              "name": "200 — Token generado",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"access_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"expires_in\": 300,\n    \"refresh_expires_in\": 0,\n    \"token_type\": \"Bearer\",\n    \"scope\": \"email profile\"\n}"
+            },
+            {
+              "name": "401 — Credenciales inválidas",
+              "status": "Unauthorized",
+              "code": 401,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"error\": \"unauthorized_client\",\n    \"error_description\": \"Invalid client credentials\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Casos Penales (CASO_PENAL v1)",
+      "item": [
+        {
+          "name": "Registrar Caso Penal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(201);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "    pm.expect(json.data).to.have.property('id_pol_caso');",
+                  "    pm.collectionVariables.set('ultimo_id_pol_caso', json.data.id_pol_caso);",
+                  "    console.log('id_pol_caso creado:', json.data.id_pol_caso);",
+                  "});",
+                  "pm.test('Tiene correlationId', function() {",
+                  "    pm.expect(pm.response.json().correlationId).to.exist;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}",
+                "description": "Clave de idempotencia — mismo valor en reintentos del mismo request"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"cud\": \"120100240000012345\",\n    \"id_externo_caso\": 98765,\n    \"id_tipo_denuncia\": 1,\n    \"id_oficina\": 42,\n    \"id_estado\": 1,\n    \"id_etapa\": 2,\n    \"id_municipio\": 11,\n    \"zona\": \"Norte\",\n    \"direccion\": \"Av. 6 de Agosto s/n\",\n    \"latitud\": \"-16.500000\",\n    \"longitud\": \"-68.150000\",\n    \"fecha_caso\": \"2026-06-30T10:30:00-04:00\",\n    \"denominacion_caso\": \"Caso de prueba integración\",\n    \"relato\": \"Descripción del hecho delictivo\",\n    \"tags\": []\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CASO_PENAL/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CASO_PENAL",
+                "v1"
+              ]
+            },
+            "description": "Registra un nuevo caso penal en el sistema destino a través del hub.\n\nCampos REQUERIDOS: cud, id_externo_caso, id_tipo_denuncia, id_oficina, id_estado, id_etapa\nTodos los demás campos son opcionales.\n\nEl hub valida el payload contra el contrato CASO_PENAL/v1 antes de forwarding.\nRetorna 201 con id_pol_caso asignado por el sistema destino."
+          },
+          "response": [
+            {
+              "name": "201 — Caso registrado",
+              "status": "Created",
+              "code": 201,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "X-Correlation-ID",
+                  "value": "550e8400-e29b-41d4-a716-446655440000"
+                }
+              ],
+              "body": "{\n    \"success\": true,\n    \"status\": 201,\n    \"message\": \"Caso aceptado\",\n    \"data\": {\n        \"id_pol_caso\": 12345\n    },\n    \"correlationId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"timestamp\": \"2026-06-30T10:30:05.123-04:00\"\n}"
+            },
+            {
+              "name": "400 — Payload inválido",
+              "status": "Bad Request",
+              "code": 400,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"success\": false,\n    \"status\": 400,\n    \"message\": \"Error de validación\",\n    \"error\": {\n        \"code\": \"VALIDATION_ERROR\",\n        \"message\": \"El payload no cumple el contrato del producto CASO_PENAL/v1\",\n        \"violations\": [\n            {\"field\": \"cud\", \"message\": \"El campo es requerido\"},\n            {\"field\": \"id_oficina\", \"message\": \"El campo es requerido\"}\n        ]\n    },\n    \"correlationId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"timestamp\": \"2026-06-30T10:30:05.123-04:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Actualizar Caso Penal",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Actualización exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}"
+              },
+              {
+                "key": "X-Idempotency-Key",
+                "value": "{{$guid}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id_tipo_denuncia\": 1,\n    \"id_municipio\": 11,\n    \"zona\": \"Centro\",\n    \"direccion\": \"Calle Comercio 456\",\n    \"denominacion_caso\": \"Actualización denominación caso\",\n    \"fecha_caso\": \"2026-06-30T11:00:00-04:00\",\n    \"relato\": \"Relato actualizado del hecho\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CASO_PENAL/v1/{{ultimo_id_pol_caso}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CASO_PENAL",
+                "v1",
+                "{{ultimo_id_pol_caso}}"
+              ]
+            },
+            "description": "Actualiza un caso penal existente.\n\n{id} en el path = id_pol_caso retornado al crear el caso (se guarda automáticamente en {{ultimo_id_pol_caso}} si se ejecutó 'Registrar Caso Penal' antes).\n\nCampo REQUERIDO: id_tipo_denuncia\nNOTA: NO incluir id_pol_caso en el body — se toma del path."
+          },
+          "response": [
+            {
+              "name": "200 — Caso actualizado",
+              "status": "OK",
+              "code": 200,
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n    \"success\": true,\n    \"status\": 200,\n    \"message\": \"Caso actualizado\",\n    \"data\": {},\n    \"correlationId\": \"550e8400-e29b-41d4-a716-446655440000\",\n    \"timestamp\": \"2026-06-30T11:00:05.123-04:00\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Validación — Payload incompleto (espera 400)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Recibe 400 por payload inválido', function() {",
+                  "    pm.response.to.have.status(400);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.false;",
+                  "    pm.expect(json.error.code).to.eql('VALIDATION_ERROR');",
+                  "    pm.expect(json.error.violations.length).to.be.above(0);",
+                  "    console.log('Violaciones recibidas:', JSON.stringify(json.error.violations));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Correlation-ID",
+                "value": "test-validation-001"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"id_externo_caso\": 1\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CASO_PENAL/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CASO_PENAL",
+                "v1"
+              ]
+            },
+            "description": "Test de validación: envía un payload sin los campos requeridos (cud, id_tipo_denuncia, id_oficina, id_estado, id_etapa). Debe retornar 400 con la lista de violations."
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

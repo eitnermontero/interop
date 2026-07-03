@@ -61,7 +61,8 @@ services:
 
       # --- Database (PostgreSQL) — schema 'admin' ---
       SPRING_DATASOURCE_URL: ${MDQR_ADMIN_DB_URL:-jdbc:postgresql://host.docker.internal:5432/mdqr_auth}
-      # username/password (claves) -> Vault secret/<ns>/system/database. NO en env.
+      SYSTEM_DATABASE_USERNAME: ${MDQR_ADMIN_DB_USERNAME:-mdqr}
+      SYSTEM_DATABASE_PASSWORD: ${MDQR_ADMIN_DB_PASSWORD:-}
 
       # --- Redis (RedisTemplate, aislamiento multi-tenant por prefijo de key) ---
       SYSTEM_REDIS_HOST: ${MDQR_REDIS_HOST:-host.docker.internal}

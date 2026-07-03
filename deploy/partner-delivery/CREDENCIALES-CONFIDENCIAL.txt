@@ -1,0 +1,25 @@
+=====================================================================
+ CONFIDENCIAL — Credenciales de acceso al Hub de Interoperabilidad FELCN
+ Partner: Fiscalía General del Estado (Bolivia)
+ Entregar por canal seguro. NO versionar en git. NO enviar por email abierto.
+=====================================================================
+
+ Ambiente:        Desarrollo / Pruebas
+ Base URL:        https://desarrollo.felcn.gob.bo
+ client_id:       fiscalia-bol-api
+ client_secret:   fiscalia-bol-41aa1602b16970eb36a4d2a8f561c2fa
+
+ Certificado de cliente (mTLS):
+   - fiscalia-bol-api.crt   (certificado público)
+   - fiscalia-bol-api.key   (clave privada — proteger)
+   - fiscalia-bol-api.p12   (PKCS#12; password: changeit)
+
+ CA del Hub (para confiar en el servidor):
+   - hub-ca.crt
+
+ Thumbprint SHA-256 del certificado (cnf.x5t#S256 del token):
+   6TmfCBMaK4U8yDUbeXJiMQU29yLzGFcbdiwmu8KSU_o
+
+ Vigencia del certificado: 825 días desde su emisión.
+ El token (access_token) expira en 300 s.
+=====================================================================

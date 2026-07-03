@@ -11,6 +11,7 @@ services:
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - ${LOG_DIR:-~/logs/mdqr}${TENANT_ID:+-}${TENANT_ID}/gateway/:/app/logs
+      - ${MDQR_CERTS_DIR:-/srv/interop/deploy/certs}:/certs:ro
     extra_hosts:
       # Tools (Consul/Redis/Vault/Keycloak) viven en deploy/tools/ — otra red Docker.
       - "host.docker.internal:host-gateway"
@@ -24,8 +25,14 @@ services:
       # --- Spring profile ---
       SPRING_PROFILES_ACTIVE: ${MDQR_GATEWAY_PROFILE:-dev}
 
-      # --- Server ---
-      SERVER_PORT: 8080
+      # --- Server (mTLS en 8443, management HTTP en 8080) ---
+      SERVER_SSL_PORT: ${MDQR_GATEWAY_SSL_PORT:-8443}
+      MANAGEMENT_SERVER_PORT: 8080
+
+      # --- mTLS ---
+      SSL_CERTS_DIR: /certs
+      SSL_KEYSTORE_PASSWORD: ${MDQR_SSL_KEYSTORE_PASSWORD:-changeit}
+      SSL_TRUSTSTORE_PASSWORD: ${MDQR_SSL_TRUSTSTORE_PASSWORD:-changeit}
 
       # --- Service discovery (Consul) ---
       SPRING_CLOUD_CONSUL_HOST: ${MDQR_CONSUL_HOST:-host.docker.internal}
@@ -89,6 +96,9 @@ services:
       LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: ${MDQR_LOG_MAX_FILE_SIZE:-500MB}
       LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: ${MDQR_LOG_MAX_HISTORY:-90}
 
+      # --- mTLS RFC 8705 test mode (bypass cnf.x5t#S256 check) ---
+      HUB_MTLS_TEST_MODE: ${HUB_MTLS_TEST_MODE:-false}
+
       # --- CORS ---
       APPLICATION_CORS_ALLOWED_ORIGINS: ${MDQR_GATEWAY_CORS_ALLOWED_ORIGINS:-*}
       APPLICATION_CORS_ALLOWED_METHODS: ${MDQR_GATEWAY_CORS_ALLOWED_METHODS:-*}
@@ -97,6 +107,7 @@ services:
 
     # NOTA: ports: se define en el compose consumer (dev/prod), no aca.
     healthcheck:
+      # Puerto 8080 = management HTTP (sin TLS). El app principal está en 8443 HTTPS.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/management/health | grep -q '\"status\":\"UP\"'"]
       interval: ${MDQR_HC_API_INTERVAL:-30s}
       timeout: ${MDQR_HC_API_TIMEOUT:-10s}

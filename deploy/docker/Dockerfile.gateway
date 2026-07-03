@@ -1,0 +1,12 @@
+FROM eclipse-temurin:25-jre-alpine
+RUN addgroup -S mdqr && adduser -S -G mdqr mdqr
+WORKDIR /app
+COPY --chown=mdqr:mdqr mdqr-gateway/build/libs/mdqr-gateway-*.jar /app/app.jar
+USER mdqr
+EXPOSE 8443 8080
+ENTRYPOINT ["java", \
+    "--enable-native-access=ALL-UNNAMED", \
+    "-XX:+UseG1GC", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-jar", "/app/app.jar"]

@@ -1,2 +1,2 @@
 clientId,description,scopes,secret
-unilink-api,Unilink — Socio QR externo,https://api.sintesis.com.bo/qr.decode,unilink-api-secret
+fiscalia-bol-api,Fiscalía General del Estado (Bolivia) — Partner del Hub FELCN,https://api.sintesis.com.bo/qr.decode,CHANGE_ME_fiscalia_secret

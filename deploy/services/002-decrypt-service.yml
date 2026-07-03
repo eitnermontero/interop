@@ -65,7 +65,8 @@ services:
 
       # --- Database (PostgreSQL) ---
       SPRING_DATASOURCE_URL: ${MDQR_DECRYPT_DB_URL:-jdbc:postgresql://host.docker.internal:5432/hub_interop}
-      # username/password (claves) -> Vault secret/<ns>/system/database. NO en env.
+      SYSTEM_DATABASE_USERNAME: ${MDQR_DECRYPT_DB_USERNAME:-mdqr}
+      SYSTEM_DATABASE_PASSWORD: ${MDQR_DECRYPT_DB_PASSWORD:-}
       SPRING_LIQUIBASE_ENABLED: ${MDQR_DECRYPT_LIQUIBASE_ENABLED:-true}
 
       # --- Redis ---

@@ -1,17 +1,15 @@
 package bo.com.sintesis.mdqr.gateway.security.filter;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.cloud.gateway.filter.GatewayFilterChain;
-import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
 import org.springframework.core.env.Environment;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
-import org.springframework.security.core.context.ReactiveSecurityContextHolder;
-import org.springframework.security.oauth2.jwt.Jwt;
-import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ServerWebExchange;
+import org.springframework.web.server.WebFilter;
+import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 import java.nio.charset.StandardCharsets;
@@ -48,7 +46,7 @@ import java.util.Arrays;
  */
 @Slf4j
 @Component
-public class PartnerSubscriptionFilter implements GlobalFilter, Ordered {
+public class PartnerSubscriptionFilter implements WebFilter, Ordered {
 
     /** Scope que habilita el endpoint de decodificación de QR. */
     public static final String SCOPE_QR_DECODE = "https://api.sintesis.com.bo/qr.decode";
@@ -59,6 +57,8 @@ public class PartnerSubscriptionFilter implements GlobalFilter, Ordered {
     private static final String PARTNER_PATH_PREFIX   = "/partner/";
     private static final String TOKEN_PATH            = "/oauth2/token";
     private static final String ERROR_SUBSCRIPTION    = "{\"error\":\"subscription_not_found\"}";
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
 
     private final boolean testModeEnabled;
 
@@ -75,7 +75,7 @@ public class PartnerSubscriptionFilter implements GlobalFilter, Ordered {
     }
 
     @Override
-    public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
+    public Mono<Void> filter(ServerWebExchange exchange, WebFilterChain chain) {
         String path = exchange.getRequest().getPath().value();
 
         // Solo aplica a /partner/**, excluye el token endpoint público
@@ -93,24 +93,44 @@ public class PartnerSubscriptionFilter implements GlobalFilter, Ordered {
             return chain.filter(exchange);
         }
 
-        return ReactiveSecurityContextHolder.getContext()
-                .flatMap(ctx -> {
-                    if (!(ctx.getAuthentication() instanceof JwtAuthenticationToken jwtAuth)) {
-                        return chain.filter(exchange);
-                    }
+        // Los GlobalFilter del gateway no tienen acceso al SecurityContext (ni por
+        // ReactiveSecurityContextHolder ni por exchange.getPrincipal()); el scope se lee del
+        // claim del Bearer, ya validado por partnerSecurityChain (ver MtlsCertBindingFilter).
+        String scope = extraerScopeDelBearer(exchange);
+        boolean suscripcionValida = verificarSuscripcion(partnerId, path, scope);
 
-                    Jwt jwt = (Jwt) jwtAuth.getPrincipal();
-                    boolean suscripcionValida = verificarSuscripcion(partnerId, path, jwt);
+        if (!suscripcionValida) {
+            log.warn("Suscripción no encontrada o inactiva — partnerId={} path={}", partnerId, path);
+            return rechazar(exchange, ERROR_SUBSCRIPTION);
+        }
 
-                    if (!suscripcionValida) {
-                        log.warn("Suscripción no encontrada o inactiva — partnerId={} path={}", partnerId, path);
-                        return rechazar(exchange, ERROR_SUBSCRIPTION);
-                    }
+        log.debug("Suscripción válida — partnerId={} path={}", partnerId, path);
+        return chain.filter(exchange);
+    }
 
-                    log.debug("Suscripción válida — partnerId={} path={}", partnerId, path);
-                    return chain.filter(exchange);
-                })
-                .switchIfEmpty(chain.filter(exchange));
+    /**
+     * Lee el claim {@code scope} del JWT Bearer sin re-verificar la firma (ya validada
+     * por la cadena de seguridad). Devuelve {@code null} si no hay Bearer legible.
+     */
+    private String extraerScopeDelBearer(ServerWebExchange exchange) {
+        String auth = exchange.getRequest().getHeaders().getFirst(org.springframework.http.HttpHeaders.AUTHORIZATION);
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            return null;
+        }
+        String[] parts = auth.substring(7).split("\\.");
+        if (parts.length < 2) {
+            return null;
+        }
+        try {
+            byte[] payload = java.util.Base64.getUrlDecoder().decode(parts[1]);
+            @SuppressWarnings("unchecked")
+            java.util.Map<String, Object> claims = OBJECT_MAPPER.readValue(payload, java.util.Map.class);
+            Object scope = claims.get("scope");
+            return scope instanceof String s ? s : null;
+        } catch (Exception e) {
+            log.warn("No se pudo parsear el scope del Bearer: {}", e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -127,10 +147,9 @@ public class PartnerSubscriptionFilter implements GlobalFilter, Ordered {
      *    AND status = 'ACTIVE'
      *    AND (valid_to IS NULL OR valid_to > NOW())}
      */
-    private boolean verificarSuscripcion(String partnerId, String path, Jwt jwt) {
+    private boolean verificarSuscripcion(String partnerId, String path, String scope) {
         // Para el endpoint /partner/v1/qr/** verificar el scope qr.decode
         if (path.startsWith("/partner/v1/qr/")) {
-            String scope = jwt.getClaimAsString("scope");
             if (scope == null) {
                 log.debug("JWT sin claim scope — partnerId={}", partnerId);
                 return false;

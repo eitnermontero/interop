@@ -30,7 +30,10 @@ services:
     networks:
       - mdqr_net
     ports:
-      - "${MDQR_GATEWAY_PORT:-0.0.0.0:8080}:8080"
+      # 8443 — HTTPS/mTLS (partners + admin via nginx)
+      - "${MDQR_GATEWAY_PORT:-0.0.0.0:8443}:8443"
+      # 8080 — management HTTP (healthcheck Docker/Consul, solo localhost)
+      - "${MDQR_GATEWAY_MGMT_PORT:-127.0.0.1:8080}:8080"
     environment:
       LOG_FILE: gateway-${NODE_INDEX:-1}.log
       SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrgateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX:-1}
@@ -65,7 +68,7 @@ services:
     networks:
       - mdqr_net
     ports:
-      - "${MDQR_GATEWAY_PORT_EXTRA:-0.0.0.0:8086}:8080"
+      - "${MDQR_GATEWAY_PORT_EXTRA:-0.0.0.0:8446}:8443"
     environment:
       LOG_FILE: gateway-${NODE_INDEX_GATEWAY_EXTRA:-99}.log
       SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: mdqrgateway${TENANT_ID:+-}${TENANT_ID}-${NODE_INDEX_GATEWAY_EXTRA:-99}

@@ -141,6 +141,12 @@ services:
       # KC_PROXY_HEADERS: ${KEYCLOAK_PROXY_HEADERS}   # descomentar si KEYCLOAK_PROXY_HEADERS está definido en .env
       # HTTP enabled incluso con HTTPS configurado (para reverse proxy que termina TLS).
       KC_HTTP_ENABLED: ${KEYCLOAK_HTTP_ENABLED:-true}
+      # X.509 Certificate Lookup: leer cert del partner desde header X-SSL-Client-Cert
+      # inyectado por nginx (mTLS termination en reverse proxy).
+      # Permite que Keycloak emita JWT con cnf.x5t#S256 (RFC 8705).
+      KC_SPI_X509CERT_LOOKUP_PROVIDER: ${KEYCLOAK_X509_LOOKUP_PROVIDER:-nginx}
+      KC_SPI_X509CERT_LOOKUP_NGINX_SSL_CLIENT_CERT: ${KEYCLOAK_X509_HEADER:-X-SSL-Client-Cert}
+      KC_SPI_X509CERT_LOOKUP_NGINX_CERTIFICATE_CHAIN_LENGTH: "0"
     networks:
       - mdqr_tools_net
       - mdqr_shared

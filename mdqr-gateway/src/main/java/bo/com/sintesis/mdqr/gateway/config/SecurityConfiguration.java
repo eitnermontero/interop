@@ -14,8 +14,11 @@ import org.springframework.security.config.annotation.web.reactive.EnableWebFlux
 import org.springframework.security.config.web.server.ServerHttpSecurity;
 import org.springframework.security.oauth2.client.oidc.web.server.logout.OidcClientInitiatedServerLogoutSuccessHandler;
 import org.springframework.security.oauth2.client.registration.ReactiveClientRegistrationRepository;
+import org.springframework.security.oauth2.core.DelegatingOAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.security.oauth2.jwt.JwtIssuerValidator;
+import org.springframework.security.oauth2.jwt.JwtTimestampValidator;
 import org.springframework.security.oauth2.jwt.JwtValidators;
 import org.springframework.security.oauth2.jwt.NimbusReactiveJwtDecoder;
 import org.springframework.security.oauth2.jwt.ReactiveJwtDecoder;
@@ -144,7 +147,16 @@ public class SecurityConfiguration {
         log.info("Partner JWT decoder — issuer: {}, jwks: {}", issuerUri, jwkSetUri);
 
         NimbusReactiveJwtDecoder decoder = new NimbusReactiveJwtDecoder(jwkSetUri);
-        OAuth2TokenValidator<Jwt> validator = JwtValidators.createDefaultWithIssuer(issuerUri);
+        // NO usar JwtValidators.createDefaultWithIssuer: en Spring Security 6.5+ agrega
+        // automáticamente X509CertificateThumbprintValidator cuando el token trae el claim
+        // cnf.x5t#S256 (RFC 8705). Ese validador SOLO busca el certificado en SslInfo del
+        // request, que está vacío cuando el mTLS lo termina nginx y el cert llega por el
+        // header X-SSL-Client-Cert → falla con "Unable to obtain X509Certificate".
+        // El binding RFC 8705 lo enforcea MtlsCertBindingFilter (lee SslInfo O el header),
+        // así que aquí validamos solo timestamp + issuer.
+        OAuth2TokenValidator<Jwt> validator = new DelegatingOAuth2TokenValidator<>(
+                new JwtTimestampValidator(),
+                new JwtIssuerValidator(issuerUri));
         decoder.setJwtValidator(validator);
         return decoder;
     }

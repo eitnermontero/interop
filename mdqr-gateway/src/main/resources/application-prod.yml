@@ -9,6 +9,32 @@ springdoc:
   api-docs:
     enabled: false
 
+# ─── mTLS: el gateway escucha en HTTPS + client-auth=want ────────────────────
+# want = el servidor SOLICITA el certificado pero no lo exige para todas las rutas.
+# MtlsCertBindingFilter rechaza /partner/** si no hay cert o si no coincide con
+# el claim cnf.x5t#S256 del JWT (RFC 8705).
+# Los certs se montan en /certs/ desde deploy/certs/ (ver docker-compose).
+server:
+  port: ${SERVER_SSL_PORT:8443}
+  ssl:
+    enabled: true
+    key-store: file:${SSL_CERTS_DIR:/certs}/server.p12
+    key-store-password: ${SSL_KEYSTORE_PASSWORD:changeit}
+    key-store-type: PKCS12
+    key-alias: gateway
+    client-auth: want
+    trust-store: file:${SSL_CERTS_DIR:/certs}/truststore.p12
+    trust-store-password: ${SSL_TRUSTSTORE_PASSWORD:changeit}
+    trust-store-type: PKCS12
+
+# Puerto de management separado en HTTP plano — usado por el Docker healthcheck
+# y por Consul (sin requerir TLS ni cert de cliente).
+management:
+  server:
+    port: ${MANAGEMENT_SERVER_PORT:8080}
+    ssl:
+      enabled: false
+
 application:
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:}
