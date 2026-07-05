@@ -34,20 +34,20 @@ if [ -n "${COMPOSE_PROFILES:-}" ] && ! echo "${COMPOSE_PROFILES}" | grep -q 'clu
   exit 1
 fi
 
-MDQR_HOST_IP="${MDQR_HOST_IP:-${1:-}}"
-if [ -z "${MDQR_HOST_IP}" ]; then
-  echo "[error] MDQR_HOST_IP no esta definido."
+HUB_HOST_IP="${HUB_HOST_IP:-${1:-}}"
+if [ -z "${HUB_HOST_IP}" ]; then
+  echo "[error] HUB_HOST_IP no esta definido."
   exit 1
 fi
 
-MDQR_VAULT_1_NAME="${MDQR_VAULT_1_NAME:-mdqr-vault-1}"
-MDQR_VAULT_2_NAME="${MDQR_VAULT_2_NAME:-mdqr-vault-2}"
-MDQR_VAULT_3_NAME="${MDQR_VAULT_3_NAME:-mdqr-vault-3}"
-MDQR_VAULT_1_PORT="${MDQR_VAULT_1_PORT:-8200}"
-MDQR_VAULT_2_PORT="${MDQR_VAULT_2_PORT:-8210}"
-MDQR_VAULT_3_PORT="${MDQR_VAULT_3_PORT:-8220}"
+HUB_VAULT_1_NAME="${HUB_VAULT_1_NAME:-hub-vault-1}"
+HUB_VAULT_2_NAME="${HUB_VAULT_2_NAME:-hub-vault-2}"
+HUB_VAULT_3_NAME="${HUB_VAULT_3_NAME:-hub-vault-3}"
+HUB_VAULT_1_PORT="${HUB_VAULT_1_PORT:-8200}"
+HUB_VAULT_2_PORT="${HUB_VAULT_2_PORT:-8210}"
+HUB_VAULT_3_PORT="${HUB_VAULT_3_PORT:-8220}"
 
-NODES=("${MDQR_VAULT_1_NAME}" "${MDQR_VAULT_2_NAME}" "${MDQR_VAULT_3_NAME}")
+NODES=("${HUB_VAULT_1_NAME}" "${HUB_VAULT_2_NAME}" "${HUB_VAULT_3_NAME}")
 
 vault_exec() {
   local node="$1"; shift
@@ -82,17 +82,17 @@ for n in "${NODES[@]}"; do
 done
 
 # Check init status del primer nodo
-INITIALIZED=$(vault_exec "${MDQR_VAULT_1_NAME}" status -format=json 2>/dev/null | grep -o '"initialized": *true' || true)
+INITIALIZED=$(vault_exec "${HUB_VAULT_1_NAME}" status -format=json 2>/dev/null | grep -o '"initialized": *true' || true)
 
 if [ -z "${INITIALIZED}" ]; then
   echo ""
-  echo "[info] inicializando cluster (vault operator init en ${MDQR_VAULT_1_NAME})..."
+  echo "[info] inicializando cluster (vault operator init en ${HUB_VAULT_1_NAME})..."
   if [ -f "${INIT_FILE}" ]; then
     echo "[error] ${INIT_FILE} ya existe pero el cluster reporta no inicializado."
     echo "        Resolver manualmente: borrar volumen o eliminar ${INIT_FILE}."
     exit 1
   fi
-  vault_exec "${MDQR_VAULT_1_NAME}" operator init -key-shares=5 -key-threshold=3 -format=json > "${INIT_FILE}"
+  vault_exec "${HUB_VAULT_1_NAME}" operator init -key-shares=5 -key-threshold=3 -format=json > "${INIT_FILE}"
   chmod 600 "${INIT_FILE}"
   echo "[ok] keys guardadas en ${INIT_FILE} (gitignored)"
 else
@@ -149,7 +149,7 @@ unseal_node() {
 
 echo ""
 echo "[info] unseal nodo 1 (leader inicial del raft)..."
-unseal_node "${MDQR_VAULT_1_NAME}"
+unseal_node "${HUB_VAULT_1_NAME}"
 
 # Dar tiempo a que nodos 2 y 3 hagan retry_join al raft del leader
 echo ""
@@ -158,17 +158,17 @@ sleep 5
 
 echo ""
 echo "[info] unseal nodos 2 y 3..."
-unseal_node "${MDQR_VAULT_2_NAME}"
-unseal_node "${MDQR_VAULT_3_NAME}"
+unseal_node "${HUB_VAULT_2_NAME}"
+unseal_node "${HUB_VAULT_3_NAME}"
 
 echo ""
 echo "[info] esperando que el raft cluster forme quorum..."
 sleep 3
 
 echo ""
-echo "[info] raft peers (segun ${MDQR_VAULT_1_NAME}):"
+echo "[info] raft peers (segun ${HUB_VAULT_1_NAME}):"
 docker exec -e VAULT_ADDR=http://127.0.0.1:8200 -e VAULT_TOKEN="${ROOT_TOKEN}" \
-  "${MDQR_VAULT_1_NAME}" vault operator raft list-peers || true
+  "${HUB_VAULT_1_NAME}" vault operator raft list-peers || true
 
 echo ""
 echo "===================================="
@@ -178,7 +178,7 @@ echo " Root token: ${ROOT_TOKEN}"
 echo " Unseal keys + token guardados en:"
 echo "   ${INIT_FILE}"
 echo " Endpoints:"
-echo "   http://${MDQR_HOST_IP}:${MDQR_VAULT_1_PORT}"
-echo "   http://${MDQR_HOST_IP}:${MDQR_VAULT_2_PORT}"
-echo "   http://${MDQR_HOST_IP}:${MDQR_VAULT_3_PORT}"
+echo "   http://${HUB_HOST_IP}:${HUB_VAULT_1_PORT}"
+echo "   http://${HUB_HOST_IP}:${HUB_VAULT_2_PORT}"
+echo "   http://${HUB_HOST_IP}:${HUB_VAULT_3_PORT}"
 echo "===================================="

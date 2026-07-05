@@ -23,31 +23,31 @@ env_get() {
 }
 
 PROFILES=$(env_get COMPOSE_PROFILES single)
-HOST_IP=$(env_get MDQR_HOST_IP "")
-BIND_IP=$(env_get MDQR_TOOLS_BIND_IP 127.0.0.1)
+HOST_IP=$(env_get HUB_HOST_IP "")
+BIND_IP=$(env_get HUB_TOOLS_BIND_IP 127.0.0.1)
 [ -z "$HOST_IP" ] && HOST_IP=$(ip route get 1.1.1.1 2>/dev/null | awk '{print $7; exit}')
 
 KC_PORT=$(env_get KEYCLOAK_HTTP_PORT 8080)
 KC_HTTPS_PORT=$(env_get KEYCLOAK_HTTPS_PORT 8443)
 
-CONSUL_PORT=$(env_get MDQR_CONSUL_HTTP_PORT 8500)
-CONSUL_S1=$(env_get MDQR_CONSUL_S1_HTTP_PORT 8500)
-CONSUL_S2=$(env_get MDQR_CONSUL_S2_HTTP_PORT 8501)
-CONSUL_S3=$(env_get MDQR_CONSUL_S3_HTTP_PORT 8502)
+CONSUL_PORT=$(env_get HUB_CONSUL_HTTP_PORT 8500)
+CONSUL_S1=$(env_get HUB_CONSUL_S1_HTTP_PORT 8500)
+CONSUL_S2=$(env_get HUB_CONSUL_S2_HTTP_PORT 8501)
+CONSUL_S3=$(env_get HUB_CONSUL_S3_HTTP_PORT 8502)
 
-REDIS_PORT=$(env_get MDQR_REDIS_PORT 6379)
-REDIS_M1=$(env_get MDQR_REDIS_M1_PORT 6379)
-REDIS_M2=$(env_get MDQR_REDIS_M2_PORT 6380)
-REDIS_M3=$(env_get MDQR_REDIS_M3_PORT 6381)
-REDIS_R1=$(env_get MDQR_REDIS_R1_PORT 6382)
-REDIS_R2=$(env_get MDQR_REDIS_R2_PORT 6383)
-REDIS_R3=$(env_get MDQR_REDIS_R3_PORT 6384)
+REDIS_PORT=$(env_get HUB_REDIS_PORT 6379)
+REDIS_M1=$(env_get HUB_REDIS_M1_PORT 6379)
+REDIS_M2=$(env_get HUB_REDIS_M2_PORT 6380)
+REDIS_M3=$(env_get HUB_REDIS_M3_PORT 6381)
+REDIS_R1=$(env_get HUB_REDIS_R1_PORT 6382)
+REDIS_R2=$(env_get HUB_REDIS_R2_PORT 6383)
+REDIS_R3=$(env_get HUB_REDIS_R3_PORT 6384)
 
-VAULT_PORT=$(env_get MDQR_VAULT_PORT 8200)
-VAULT_1_PORT=$(env_get MDQR_VAULT_1_PORT 8200)
-VAULT_2_PORT=$(env_get MDQR_VAULT_2_PORT 8210)
-VAULT_3_PORT=$(env_get MDQR_VAULT_3_PORT 8220)
-VAULT_DEV_TOKEN=$(env_get MDQR_VAULT_DEV_ROOT_TOKEN root)
+VAULT_PORT=$(env_get HUB_VAULT_PORT 8200)
+VAULT_1_PORT=$(env_get HUB_VAULT_1_PORT 8200)
+VAULT_2_PORT=$(env_get HUB_VAULT_2_PORT 8210)
+VAULT_3_PORT=$(env_get HUB_VAULT_3_PORT 8220)
+VAULT_DEV_TOKEN=$(env_get HUB_VAULT_DEV_ROOT_TOKEN root)
 
 KC_USER=$(env_get KEYCLOAK_ADMIN_USER admin)
 KC_PASS=$(env_get KEYCLOAK_ADMIN_PASSWORD admin)
@@ -66,7 +66,7 @@ LAN_OPEN=false
 [[ "$BIND_IP" == "0.0.0.0" ]] && LAN_OPEN=true
 
 is_running() {
-  docker ps --filter "name=^mdqr-keycloak$" --format '{{.Names}}' | grep -q .
+  docker ps --filter "name=^hub-keycloak$" --format '{{.Names}}' | grep -q .
 }
 
 url_line() {
@@ -112,7 +112,7 @@ cmd_info() {
 
   if ! $LAN_OPEN; then
     printf "  %s⚠ bind=127.0.0.1 → puertos solo accesibles desde localhost del host.%s\n" "$YEL" "$R"
-    printf "  %s  Apps en otra red Docker no podran conectar. Setear MDQR_TOOLS_BIND_IP=0.0.0.0 en .env%s\n\n" "$YEL" "$R"
+    printf "  %s  Apps en otra red Docker no podran conectar. Setear HUB_TOOLS_BIND_IP=0.0.0.0 en .env%s\n\n" "$YEL" "$R"
   fi
 
   label "Keycloak"; printf "%s\n" "$(url_line "$KC_PORT")"
@@ -151,26 +151,26 @@ cmd_info() {
     "$B" "$R" "$D" "$R"
   if [[ "$PROFILES" == *cluster* ]]; then
     cat <<EOF
-    MDQR_CONSUL_HOST=$HOST_IP
-    MDQR_CONSUL_PORT=$CONSUL_S1
-    MDQR_REDIS_HOST=$HOST_IP
-    MDQR_REDIS_PORT=$REDIS_M1
-    MDQR_VAULT_HOST=$HOST_IP
-    MDQR_VAULT_PORT=$VAULT_1_PORT
-    MDQR_VAULT_AUTHENTICATION=APPROLE
-    MDQR_KEYCLOAK_URL=http://$HOST_IP:$KC_PORT
+    HUB_CONSUL_HOST=$HOST_IP
+    HUB_CONSUL_PORT=$CONSUL_S1
+    HUB_REDIS_HOST=$HOST_IP
+    HUB_REDIS_PORT=$REDIS_M1
+    HUB_VAULT_HOST=$HOST_IP
+    HUB_VAULT_PORT=$VAULT_1_PORT
+    HUB_VAULT_AUTHENTICATION=APPROLE
+    HUB_KEYCLOAK_URL=http://$HOST_IP:$KC_PORT
 EOF
   else
     cat <<EOF
-    MDQR_CONSUL_HOST=$HOST_IP
-    MDQR_CONSUL_PORT=$CONSUL_PORT
-    MDQR_REDIS_HOST=$HOST_IP
-    MDQR_REDIS_PORT=$REDIS_PORT
-    MDQR_VAULT_HOST=$HOST_IP
-    MDQR_VAULT_PORT=$VAULT_PORT
-    MDQR_VAULT_AUTHENTICATION=TOKEN
-    MDQR_VAULT_TOKEN=$VAULT_DEV_TOKEN
-    MDQR_KEYCLOAK_URL=http://$HOST_IP:$KC_PORT
+    HUB_CONSUL_HOST=$HOST_IP
+    HUB_CONSUL_PORT=$CONSUL_PORT
+    HUB_REDIS_HOST=$HOST_IP
+    HUB_REDIS_PORT=$REDIS_PORT
+    HUB_VAULT_HOST=$HOST_IP
+    HUB_VAULT_PORT=$VAULT_PORT
+    HUB_VAULT_AUTHENTICATION=TOKEN
+    HUB_VAULT_TOKEN=$VAULT_DEV_TOKEN
+    HUB_KEYCLOAK_URL=http://$HOST_IP:$KC_PORT
 EOF
   fi
   echo
@@ -204,10 +204,10 @@ cmd_up() {
     bash "$TOOLS_DIR/scripts/vault-cluster-init.sh"
   fi
   echo
-  wait_healthy "${MDQR_KEYCLOAK_NAME:-mdqr-keycloak}" 180
-  wait_healthy "${MDQR_CONSUL_NAME:-mdqr-consul}"
-  wait_healthy "${MDQR_VAULT_NAME:-mdqr-vault}"
-  wait_healthy "${MDQR_REDIS_NAME:-mdqr-redis}"
+  wait_healthy "${HUB_KEYCLOAK_NAME:-hub-keycloak}" 180
+  wait_healthy "${HUB_CONSUL_NAME:-hub-consul}"
+  wait_healthy "${HUB_VAULT_NAME:-hub-vault}"
+  wait_healthy "${HUB_REDIS_NAME:-hub-redis}"
   echo
   cmd_info
 }
@@ -262,9 +262,9 @@ ${B}COMANDOS${R}
 
 ${B}EJEMPLOS${R}
   tools.sh -u                       ${D}# levantar todo${R}
-  tools.sh --logs mdqr-keycloak      ${D}# tail logs de keycloak${R}
+  tools.sh --logs hub-keycloak      ${D}# tail logs de keycloak${R}
   tools.sh -d -v                    ${D}# down + borrar volumes${R}
-  tools.sh -r mdqr-redis-master-1    ${D}# restart un container${R}
+  tools.sh -r hub-redis-master-1    ${D}# restart un container${R}
 EOF
 }
 

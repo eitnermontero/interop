@@ -3,7 +3,7 @@
 Estado: Propuesto · Fecha: 2026-06-22
 
 > Complementa a ADR-0001 (decisiones de arquitectura del hub) y ADR-0002 (diseño
-> concreto sobre la base MDQR). Este ADR no redefine la arquitectura: la analiza
+> concreto sobre la base HUB). Este ADR no redefine la arquitectura: la analiza
 > bajo el lente de un atacante usando **STRIDE** y fija qué controles son
 > obligatorios antes de producción.
 
@@ -13,9 +13,9 @@ Estado: Propuesto · Fecha: 2026-06-22
 
 **En alcance.** Las dos direcciones de tráfico del hub y todo lo que las soporta:
 
-- **Inbound**: tercero (partner M2M) → `mdqr-gateway` → `lb://mdqrbaseservice`
-  (`mdqr-ms-base`) → lógica de negocio (p. ej. `qr.decode`) → Tuxedo API.
-- **Outbound**: app interna → `mdqr-gateway` → `mdqr-ms-base` (framework ACL,
+- **Inbound**: tercero (partner M2M) → `hub-gateway` → `lb://hubbaseservice`
+  (`hub-ms-base`) → lógica de negocio (p. ej. `qr.decode`) → Tuxedo API.
+- **Outbound**: app interna → `hub-gateway` → `hub-ms-base` (framework ACL,
   Fase 5) → proveedor externo.
 - Las capas transversales: mTLS + RFC 8705, las dos cadenas de seguridad del
   gateway, la cadena de auditoría (hash-chain + Vault Transit, Fases 0/1), el
@@ -31,7 +31,7 @@ interna de la Tuxedo API (Go) que es un sistema de terceros.
 
 1. El estado del código es el verificado en ADR-0002: el gateway **no termina
    mTLS hoy**, ms-base está en **MODO DESARROLLO** (`anyRequest().permitAll()`,
-   JWT comentado en `mdqr-ms-base/.../config/SecurityConfiguration.java`), y la
+   JWT comentado en `hub-ms-base/.../config/SecurityConfiguration.java`), y la
    librería de auditoría **aún no tiene** `requestHash`/`responseHash`/`prevHash`/
    `recordHash`/`signature` (la costura `AuditEventSink`/`InProcessSink` existe
    pero `InProcessSink.toRequest` no propaga esos campos porque no existen).
@@ -93,18 +93,18 @@ INBOUND (tercero consume API de negocio)
   Partner M2M
      │  (1) POST /oauth2/token   [TLS, sin auth — público]
      ▼
- ┌──────────── mdqr-gateway :8080 ───────────────────────────────────────┐
+ ┌──────────── hub-gateway :8080 ───────────────────────────────────────┐
  │  [S1] terminación mTLS (proxy delante en prod / Netty en dev) ── Fase 3│
  │        └─ valida cert cliente contra CA PKI Vault; CN/SAN = partner    │
  │  [S4] IpWhitelistFilter(Order=1)  → Redis whitelist:ip:{azp}           │
  │  [S4] RateLimitFilter(Order=3)    → Redis ratelimit:{azp} (sliding win)│
- │  partnerSecurityChain(Order=1): JWT realm mdqr-partner (issuer chk)    │
+ │  partnerSecurityChain(Order=1): JWT realm hub-partner (issuer chk)    │
  │        └─ CertBindingFilter (cnf.x5t#S256 == thumbprint mTLS) ── Fase 3│
  │  RewritePath /partner/v1/** → /api/**                                  │
  └───────────────────────────────┬───────────────────────────────────────┘
-                                  │ lb://mdqrbaseservice (Consul + LB)
+                                  │ lb://hubbaseservice (Consul + LB)
                                   ▼
- ┌──────────── mdqr-ms-base :8081 ───────────────────────────────────────┐
+ ┌──────────── hub-ms-base :8081 ───────────────────────────────────────┐
  │  [S5] SecurityConfiguration: MODO DESARROLLO permitAll ── Fase 6 pend. │
  │  negocio: QrDecryptionService / CryptoService (RSA, BouncyCastle)      │
  │  [S6] audit-commons: canonicaliza → SHA-256 req/resp → hash-chain      │
@@ -116,9 +116,9 @@ INBOUND (tercero consume API de negocio)
 OUTBOUND (app interna consume tercero a través del hub)
 
   App interna
-     │  (auth como client de servicio, realm mdqr-admin/scope servicio)
+     │  (auth como client de servicio, realm hub-admin/scope servicio)
      ▼  /outbound/v1/**   [cadena interna del gateway]
- mdqr-gateway :8080 ──► lb://mdqrbaseservice ──► OutboundAdapter (ACL, Fase 5)
+ hub-gateway :8080 ──► lb://hubbaseservice ──► OutboundAdapter (ACL, Fase 5)
                                                    │ resilience4j (timeout/
                                                    │ retry/CB/bulkhead)
                                                    │ credenciales ← Vault KV
@@ -251,15 +251,15 @@ Privilege]_
 - Estado: **Mitigado por diseño** para las cadenas actuales; **pendiente**
   reverificar al añadir la cadena outbound (Fase 5).
 
-**T3.2 — Confusión de realms (token de `mdqr-admin` aceptado en `/partner/**`
+**T3.2 — Confusión de realms (token de `hub-admin` aceptado en `/partner/**`
 o viceversa).** _[Spoofing / Elevation of Privilege]_
 - Superficie: partnerSecurityChain / adminSecurityChain.
 - Vector: un partner usa un token del realm admin (o al revés) para alcanzar
   rutas de la otra cadena.
 - Impacto: C/I — cruce de privilegios entre el plano externo y el interno.
 - Mitigación: decoders JWT **separados por realm** y por cadena
-  (`partnerJwtDecoder` valida issuer `…/realms/mdqr-partner`, `adminJwtDecoder`
-  issuer `…/realms/mdqr-admin`); cada cadena enlaza su decoder explícitamente en
+  (`partnerJwtDecoder` valida issuer `…/realms/hub-partner`, `adminJwtDecoder`
+  issuer `…/realms/hub-admin`); cada cadena enlaza su decoder explícitamente en
   `oauth2ResourceServer`. Un token de admin falla la validación de issuer en la
   cadena partner.
 - Estado: **Mitigado por diseño** (verificado en `SecurityConfiguration` del
@@ -620,7 +620,7 @@ Disclosure / Spoofing]_
 - Mitigación: `provider_credential_ref` guarda **referencia** a la credencial,
   no el secreto (ADR-0002); políticas Vault de mínimo privilegio por adaptador
   (cada adaptador solo lee su path); rotación de credenciales; auditoría de
-  accesos Vault; namespaces Vault (`mdqr-decode`) por servicio. La
+  accesos Vault; namespaces Vault (`hub-base`) por servicio. La
   centralización es una decisión consciente (ADR-0001 §4: centralizar
   credenciales) cuyo coste es la concentración del riesgo.
 - Estado: **Mitigado por diseño** (referencia + Vault + mínimo privilegio) —
@@ -688,8 +688,8 @@ Repudiation]_
   valores llegan a un entorno no-local o al repo público, son explotables. La
   API key de Tuxedo se inyecta en `TuxedoApiClient` desde `ApplicationProperties`.
 - Impacto: C/EoP.
-- Mitigación: secretos reales **solo en Vault** (namespaces `mdqr-auth`/
-  `mdqr-decode`); los `*-secret` y el token `root` son **exclusivos de `local`**
+- Mitigación: secretos reales **solo en Vault** (namespaces `hub-auth`/
+  `hub-base`); los `*-secret` y el token `root` son **exclusivos de `local`**
   (`vault.enabled=false`, valores de juguete) y nunca deben usarse en dev/qa/prod;
   `.gitignore` de `.env`; rotación de secretos de cliente Keycloak; la API key de
   Tuxedo debe provenir de Vault, no de config en claro en prod. Escaneo de
@@ -702,7 +702,7 @@ Repudiation]_
 _[Tampering / Elevation of Privilege]_
 - Superficie: S9.
 - Vector: dependencia transitiva con CVE crítico, o imagen base manipulada
-  (`eclipse-temurin:25-jre-alpine`, registry `cr.sintesis.com.bo/mdqr-dev`).
+  (`eclipse-temurin:25-jre-alpine`, registry `cr.sintesis.com.bo/hub-dev`).
 - Impacto: C/I/EoP.
 - Mitigación: build reproducible con Jib (sin Dockerfile arbitrario); fijar
   digests de imagen base; escaneo de dependencias (OWASP dependency-check /
@@ -714,7 +714,7 @@ _[Tampering / Elevation of Privilege]_
 
 **T9.5 — ms-base en MODO DESARROLLO: bypass de autorización por acceso directo.**
 _[Elevation of Privilege]_
-- Superficie: S5 (`mdqr-ms-base` `:8081`).
+- Superficie: S5 (`hub-ms-base` `:8081`).
 - Vector: `SecurityConfiguration` de ms-base tiene `anyRequest().permitAll()`,
   `oauth2ResourceServer` JWT comentado y `@EnableMethodSecurity`/`@PreAuthorize`
   deshabilitados (verificado en código). Cualquiera que alcance `:8081`
@@ -725,7 +725,7 @@ _[Elevation of Privilege]_
 - Impacto: C/I/EoP — descifrado de QR no autorizado, manipulación del ciclo de
   vida de certificados, lectura de logs con PII.
 - Mitigación compensatoria (vigente): ms-base **no se expone directo en prod**;
-  el único ingreso es el gateway, que sí autentica (JWT realm `mdqr-partner` +
+  el único ingreso es el gateway, que sí autentica (JWT realm `hub-partner` +
   binding tras Fase 3) — ADR-0002 restricción 5. Aislamiento de red entre el
   gateway y ms-base (Consul/LB en red privada).
 - Mitigación pendiente (control real): habilitar JWT +
@@ -800,7 +800,7 @@ tráfico real de partners sin completar al menos los items 1–6.
 1. **Habilitar seguridad real en ms-base (Fase 6) — T9.5.** Descomentar
    `oauth2ResourceServer` JWT, `@EnableMethodSecurity` y `@PreAuthorize`
    (`API_CLIENT`/`ADMIN`/`AUDITOR`) cableando `KeycloakRealmRoleConverter` en
-   `mdqr-ms-base/.../config/SecurityConfiguration.java`. Mientras no esté:
+   `hub-ms-base/.../config/SecurityConfiguration.java`. Mientras no esté:
    garantizar por configuración de red/despliegue que `:8081` **nunca** sea
    alcanzable fuera del gateway.
 

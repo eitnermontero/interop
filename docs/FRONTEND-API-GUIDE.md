@@ -1,6 +1,9 @@
-# Guía de APIs para el Frontend — MDQR
+# Guía de APIs para el Frontend — HUB
 
-Referencia completa para integrar el sistema MDQR desde aplicaciones frontend (Angular, React, etc.).
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
+Referencia completa para integrar el sistema HUB desde aplicaciones frontend (Angular, React, etc.).
 
 ---
 
@@ -36,17 +39,17 @@ El SPA **nunca llama `/admin/auth/login` directamente**. `keycloak-angular` mane
 ```json
 {
   "apiUrl": "http://localhost:8080",
-  "appName": "MDQR Admin",
+  "appName": "HUB Admin",
   "basePath": "/",
   "keycloak": {
     "url": "http://127.0.0.1:8180",
-    "realm": "mdqr-admin",
-    "clientId": "mdqr-admin-fe"
+    "realm": "hub-admin",
+    "clientId": "hub-admin-fe"
   }
 }
 ```
 
-El cliente `mdqr-admin-fe` es **público** (no tiene secret), usa Authorization Code + PKCE S256. Lo crea `keycloak-sync-admin.sh`.
+El cliente `hub-admin-fe` es **público** (no tiene secret), usa Authorization Code + PKCE S256. Lo crea `keycloak-sync-admin.sh`.
 
 #### Inicialización en Angular
 
@@ -57,10 +60,10 @@ export function appConfig(cfg: RuntimeConfig): ApplicationConfig {
     providers: [
       provideHttpClient(),
       provideRouter(routes),
-      provideMdqrAuth({
+      provideHubAuth({
         authority: cfg.keycloak.url,       // http://127.0.0.1:8180
-        realm: cfg.keycloak.realm,         // mdqr-admin
-        clientId: cfg.keycloak.clientId,   // mdqr-admin-fe
+        realm: cfg.keycloak.realm,         // hub-admin
+        clientId: cfg.keycloak.clientId,   // hub-admin-fe
         bearerUrls: ['^' + cfg.apiUrl + '/.*'],  // agrega token a todas las llamadas al gateway
       }),
     ],
@@ -68,14 +71,14 @@ export function appConfig(cfg: RuntimeConfig): ApplicationConfig {
 }
 ```
 
-`provideMdqrAuth` configura `keycloak-angular` con PKCE S256 y el interceptor `includeBearerTokenInterceptor` que agrega automáticamente el `Authorization: Bearer` a cada petición HTTP cuya URL coincida con `bearerUrls`.
+`provideHubAuth` configura `keycloak-angular` con PKCE S256 y el interceptor `includeBearerTokenInterceptor` que agrega automáticamente el `Authorization: Bearer` a cada petición HTTP cuya URL coincida con `bearerUrls`.
 
 #### Endpoints que el SPA llama después del login
 
 **Perfil del usuario autenticado:**
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
@@ -94,7 +97,7 @@ curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
 **Árbol de permisos (menús + acciones RBAC):**
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me/permissions \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me/permissions \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
@@ -126,13 +129,13 @@ curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me/permission
 
 ```bash
 ADMIN_TOKEN=$(curl -s -X POST \
-  'http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token' \
+  'http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token' \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'grant_type=client_credentials&client_id=mdqradminservice&client_secret=mdqradminservice-secret' \
+  -d 'grant_type=client_credentials&client_id=hubadminservice&client_secret=hubadminservice-secret' \
   | jq -r '.access_token')
 ```
 
-> Este token usa el service account `mdqradminservice` (confidencial). Solo para testing con curl. El SPA usa `mdqr-admin-fe` (público, PKCE).
+> Este token usa el service account `hubadminservice` (confidencial). Solo para testing con curl. El SPA usa `hub-admin-fe` (público, PKCE).
 
 ---
 
@@ -178,13 +181,13 @@ Esta operación requiere token **admin** (no partner).
 ```bash
 # 1. Obtener token admin
 ADMIN_TOKEN=$(curl -s -X POST \
-  http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+  http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=mdqradminservice&client_secret=mdqradminservice-secret" \
+  -d "grant_type=client_credentials&client_id=hubadminservice&client_secret=hubadminservice-secret" \
   | jq -r '.access_token')
 
 # 2. Cargar certificado de Banco Solidario (ejemplo real de preprod)
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   --data '{
@@ -215,7 +218,7 @@ Respuesta esperada (201 Created):
 
 Verificar que quedó cargado:
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/api/certificates \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq '.content[] | {id, entityId, entityName, status}'
 ```
 
@@ -291,16 +294,16 @@ Parámetros multipart:
 
 ## API Admin — Certificados
 
-Base path en el gateway: `/services/mdqrbaseservice/api/certificates`
+Base path en el gateway: `/services/hubbaseservice/api/certificates`
 
 Todos los endpoints requieren: `Authorization: Bearer <admin_token>`
 
-### GET /services/mdqrbaseservice/api/certificates
+### GET /services/hubbaseservice/api/certificates
 
 Lista certificados con paginación.
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates?page=0&size=20&sort=validTo,asc" \
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/certificates?page=0&size=20&sort=validTo,asc" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
@@ -308,12 +311,12 @@ Query params: `page` (default 0), `size` (default 20), `sort` (campo,dirección)
 
 Respuesta: Page de `CertificateDTO` con header `X-Total-Count`.
 
-### POST /services/mdqrbaseservice/api/certificates
+### POST /services/hubbaseservice/api/certificates
 
 Registra un nuevo certificado a partir del contenido PEM.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -327,12 +330,12 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates 
 # → 201 Created con CertificateDTO
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/upload-file
+### POST /services/hubbaseservice/api/certificates/upload-file
 
 Sube un certificado desde archivo .pem o .crt (multipart).
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/upload-file \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/upload-file \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -F "file=@/ruta/banco.pem" \
   -F "entityId=MLD1017" \
@@ -340,86 +343,86 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/
 # → 201 Created
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/validate
+### POST /services/hubbaseservice/api/certificates/validate
 
 Valida un certificado sin guardarlo.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/validate \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/validate \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"pemContent": "-----BEGIN CERTIFICATE-----\n...", "entityId": "MLD1017"}' | jq .
 # → 200 con metadata del certificado
 ```
 
-### GET /services/mdqrbaseservice/api/certificates/{id}
+### GET /services/hubbaseservice/api/certificates/{id}
 
 Detalle completo de un certificado (incluye PEM content).
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1 \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1 \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
-### GET /services/mdqrbaseservice/api/certificates/{id}/pem
+### GET /services/hubbaseservice/api/certificates/{id}/pem
 
 Descarga el contenido PEM del certificado.
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1/pem \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1/pem \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -o certificado.pem
 ```
 
-### GET /services/mdqrbaseservice/api/certificates/entity/{entityId}
+### GET /services/hubbaseservice/api/certificates/entity/{entityId}
 
 Lista certificados de una entidad específica.
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/entity/MLD1017 \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/api/certificates/entity/MLD1017 \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
-### GET /services/mdqrbaseservice/api/certificates/expiring/{days}
+### GET /services/hubbaseservice/api/certificates/expiring/{days}
 
 Lista certificados que expiran en N días.
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/expiring/30 \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/api/certificates/expiring/30 \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/{id}/activate
+### POST /services/hubbaseservice/api/certificates/{id}/activate
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1/activate \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1/activate \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/{id}/deactivate
+### POST /services/hubbaseservice/api/certificates/{id}/deactivate
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1/deactivate \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1/deactivate \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/{id}/revoke
+### POST /services/hubbaseservice/api/certificates/{id}/revoke
 
 Revocación irreversible.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1/revoke \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1/revoke \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"reason": "Certificado comprometido"}' | jq .
 ```
 
-### POST /services/mdqrbaseservice/api/certificates/{id}/replace
+### POST /services/hubbaseservice/api/certificates/{id}/replace
 
 Reemplaza con un nuevo certificado. Marca el anterior como SUPERSEDED.
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1/replace \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1/replace \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -433,12 +436,12 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/
 
 ## API Admin — Auditoría QR
 
-### GET /services/mdqrbaseservice/api/qr/audits
+### GET /services/hubbaseservice/api/qr/audits
 
 Log de todas las desencriptaciones realizadas.
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/qr/audits?\
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/qr/audits?\
 status=SUCCESS&fromDate=2026-06-01T00:00:00Z&page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
@@ -458,12 +461,12 @@ Query params:
 | `sort` | Default: `createdDate` |
 | `order` | `asc` \| `desc` (default: `desc`) |
 
-### GET /services/mdqrbaseservice/api/certificates/audits
+### GET /services/hubbaseservice/api/certificates/audits
 
 Log de operaciones sobre certificados.
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/audits?\
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/certificates/audits?\
 action=REVOKE&fromDate=2026-06-01T00:00:00Z" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 ```
@@ -478,11 +481,11 @@ Query params: `certificateId`, `serialNumber`, `action` (UPLOAD|VALIDATE|ACTIVAT
 
 ```bash
 # Listar usuarios
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/users?page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/users?page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 
 # Crear usuario
-curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/users \
+curl -s -X POST http://127.0.0.1:8080/services/hubadminservice/admin/users \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -498,13 +501,13 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/users \
 # → 201 Created con Location header
 
 # Actualizar usuario
-curl -s -X PUT http://127.0.0.1:8080/services/mdqradminservice/admin/users/{userId} \
+curl -s -X PUT http://127.0.0.1:8080/services/hubadminservice/admin/users/{userId} \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"firstName": "Juan Carlos", "enabled": true}' | jq .
 
 # Activar/desactivar
-curl -s -X PUT http://127.0.0.1:8080/services/mdqradminservice/admin/users/{userId}/status \
+curl -s -X PUT http://127.0.0.1:8080/services/hubadminservice/admin/users/{userId}/status \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"enabled": false}' \
@@ -512,7 +515,7 @@ curl -s -X PUT http://127.0.0.1:8080/services/mdqradminservice/admin/users/{user
 # → 204
 
 # Asignar roles
-curl -s -X PUT http://127.0.0.1:8080/services/mdqradminservice/admin/users/{userId}/roles \
+curl -s -X PUT http://127.0.0.1:8080/services/hubadminservice/admin/users/{userId}/roles \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"roles": ["OPERATOR", "AUDITOR"]}' \
@@ -524,11 +527,11 @@ curl -s -X PUT http://127.0.0.1:8080/services/mdqradminservice/admin/users/{user
 
 ```bash
 # Listar roles
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/roles \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/roles \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 
 # Crear rol
-curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/roles \
+curl -s -X POST http://127.0.0.1:8080/services/hubadminservice/admin/roles \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{"name": "SUPERVISOR", "description": "Supervisor de operaciones"}' | jq .
@@ -538,12 +541,12 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/roles \
 
 ```bash
 # Log de acciones admin
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit?\
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit?\
 fromDate=2026-06-01T00:00:00Z&modules=USUARIOS,ROLES&page=0&size=50" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .
 
 # Exportar CSV
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/export?\
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit/export?\
 fromDate=2026-06-01T00:00:00Z" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -o audit-export.csv
@@ -558,11 +561,11 @@ fromDate=2026-06-01T00:00:00Z" \
 curl -s http://127.0.0.1:8080/management/health | jq .
 
 # ms-auth vía gateway (con auth)
-curl -s http://127.0.0.1:8080/services/mdqradminservice/management/health \
+curl -s http://127.0.0.1:8080/services/hubadminservice/management/health \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 
 # ms-base vía gateway (con auth)
-curl -s http://127.0.0.1:8080/services/mdqrbaseservice/management/health \
+curl -s http://127.0.0.1:8080/services/hubbaseservice/management/health \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 ```
 
@@ -791,11 +794,11 @@ interface RoleDto {
 
 ## Interceptor Angular
 
-El SPA **no necesita implementar un interceptor manual**. `keycloak-angular` registra `includeBearerTokenInterceptor` automáticamente cuando se usa `provideMdqrAuth`. Este interceptor agrega el `Authorization: Bearer` a todas las peticiones HTTP cuya URL coincida con `bearerUrls`.
+El SPA **no necesita implementar un interceptor manual**. `keycloak-angular` registra `includeBearerTokenInterceptor` automáticamente cuando se usa `provideHubAuth`. Este interceptor agrega el `Authorization: Bearer` a todas las peticiones HTTP cuya URL coincida con `bearerUrls`.
 
 ```typescript
 // Configuración en app.config.ts — bearerUrls define a qué URLs se agrega el token
-provideMdqrAuth({
+provideHubAuth({
   authority: cfg.keycloak.url,
   realm: cfg.keycloak.realm,
   clientId: cfg.keycloak.clientId,
@@ -810,7 +813,7 @@ Si necesitas manejar errores 401/403 globalmente (ej. mostrar un toast), usa un 
 import { inject } from '@angular/core';
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { catchError, throwError } from 'rxjs';
-import { AuthFacade } from '@mdqr/auth';
+import { AuthFacade } from '@hub/auth';
 
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthFacade);

@@ -1,4 +1,4 @@
-# MDQR — Desencriptación de QR Bancarios
+# HUB — Desencriptación de QR Bancarios
 
 Sistema de desencriptación de códigos QR generados por entidades financieras bolivianas.
 
@@ -9,16 +9,16 @@ Sistema de desencriptación de códigos QR generados por entidades financieras b
 ```
                            ┌─────────────────────────────────────┐
                            │          Keycloak :8180              │
-                           │  realm: mdqr-admin  mdqr-partner     │
+                           │  realm: hub-admin  hub-partner     │
                            └──────────┬──────────────┬───────────┘
                                       │              │
                            ┌──────────▼──────────────▼───────────┐
-                           │       mdqr-gateway :8080             │
+                           │       hub-gateway :8080             │
                            │  Spring Cloud Gateway + JWT OAuth2   │
                            └──────────┬──────────────┬───────────┘
                                       │              │
                      ┌────────────────▼───┐   ┌──────▼─────────────────┐
-                     │  mdqr-ms-auth :8083│   │  mdqr-ms-base :8081    │
+                     │  hub-ms-auth :8083│   │  hub-ms-base :8081    │
                      │  RBAC + Usuarios   │   │  QR Decrypt + Certs    │
                      └────────────────────┘   └────────────────────────┘
 ```
@@ -27,10 +27,10 @@ Sistema de desencriptación de códigos QR generados por entidades financieras b
 
 | Servicio        | Puerto | Descripción                          | Consul Name        |
 |-----------------|--------|--------------------------------------|--------------------|
-| mdqr-gateway    | 8080   | Punto de entrada único, JWT + routing | —                 |
-| mdqr-ms-auth    | 8083   | Gestión de usuarios, roles, permisos | `mdqradminservice` |
-| mdqr-ms-base    | 8081   | Desencriptación QR + certificados    | `mdqrbaseservice`  |
-| Keycloak        | 8180   | IdP: realms `mdqr-admin` + `mdqr-partner` | —             |
+| hub-gateway    | 8080   | Punto de entrada único, JWT + routing | —                 |
+| hub-ms-auth    | 8083   | Gestión de usuarios, roles, permisos | `hubadminservice` |
+| hub-ms-base    | 8081   | Desencriptación QR + certificados    | `hubbaseservice`  |
+| Keycloak        | 8180   | IdP: realms `hub-admin` + `hub-partner` | —             |
 | Consul          | 8500   | Service discovery                    | —                  |
 | Vault           | 8200   | Secrets management                   | —                  |
 | Redis           | 6379   | Cache + rate limit + sesiones        | —                  |
@@ -40,25 +40,25 @@ Sistema de desencriptación de códigos QR generados por entidades financieras b
 
 | Realm           | Client             | Secret                    | Uso                               |
 |-----------------|--------------------|---------------------------|-----------------------------------|
-| `mdqr-admin`    | `mdqradminservice` | `mdqradminservice-secret` | Panel admin, ms-auth, ms-base admin |
-| `mdqr-partner`  | `unilink-api`      | `unilink-api-secret`      | APIs externas, partner M2M        |
+| `hub-admin`    | `hubadminservice` | `hubadminservice-secret` | Panel admin, ms-auth, ms-base admin |
+| `hub-partner`  | `unilink-api`      | `unilink-api-secret`      | APIs externas, partner M2M        |
 
 ### Bases de Datos
 
 | Módulo        | DB                      | Schema  | Vault NS          |
 |---------------|-------------------------|---------|-------------------|
-| mdqr-ms-auth  | `mdqr_auth`             | `admin` | `mdqr-auth`       |
-| mdqr-ms-base  | `mdqr_decode`          | `public`| `mdqr-decode`    |
+| hub-ms-auth  | `hub_auth`             | `admin` | `hub-auth`       |
+| hub-ms-base  | `hub_base`          | `public`| `hub-base`    |
 
 ### Flujo de Rutas Gateway
 
 | Método | Ruta Gateway                          | Destino                                | Auth requerida      |
 |--------|---------------------------------------|----------------------------------------|---------------------|
-| POST   | `/oauth2/token`                       | Keycloak `mdqr-partner` (token proxy)  | Sin auth            |
-| POST   | `/partner/v1/qr/decode`               | `ms-base /api/qr/decode`               | JWT `mdqr-partner`  |
-| POST   | `/partner/v1/qr/decode/file`          | `ms-base /api/qr/decode/file`          | JWT `mdqr-partner`  |
-| *      | `/services/mdqradminservice/**`       | `ms-auth` (vía Consul discovery)       | JWT `mdqr-admin`    |
-| *      | `/services/mdqrbaseservice/**`        | `ms-base` (vía Consul discovery)       | JWT `mdqr-admin`    |
+| POST   | `/oauth2/token`                       | Keycloak `hub-partner` (token proxy)  | Sin auth            |
+| POST   | `/partner/v1/qr/decode`               | `ms-base /api/qr/decode`               | JWT `hub-partner`  |
+| POST   | `/partner/v1/qr/decode/file`          | `ms-base /api/qr/decode/file`          | JWT `hub-partner`  |
+| *      | `/services/hubadminservice/**`       | `ms-auth` (vía Consul discovery)       | JWT `hub-admin`    |
+| *      | `/services/hubbaseservice/**`        | `ms-base` (vía Consul discovery)       | JWT `hub-admin`    |
 
 ---
 
@@ -69,9 +69,9 @@ Sistema de desencriptación de códigos QR generados por entidades financieras b
 deploy/scripts/tools.sh --up
 
 # 2. Levantar los tres servicios (terminales separadas)
-./gradlew :mdqr-ms-auth:bootRun --args='--spring.profiles.active=local'   # Terminal A
-./gradlew :mdqr-ms-base:bootRun --args='--spring.profiles.active=local'   # Terminal B
-./gradlew :mdqr-gateway:bootRun --args='--spring.profiles.active=local'   # Terminal C
+./gradlew :hub-ms-auth:bootRun --args='--spring.profiles.active=local'   # Terminal A
+./gradlew :hub-ms-base:bootRun --args='--spring.profiles.active=local'   # Terminal B
+./gradlew :hub-gateway:bootRun --args='--spring.profiles.active=local'   # Terminal C
 ```
 
 > Levantar el gateway **después** de que ms-auth y ms-base estén registrados en Consul.
@@ -104,7 +104,7 @@ chmod +x gradlew
 
 ```bash
 # Primera vez: crear la red Docker compartida
-docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 mdqr-shared
+docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 hub-shared
 
 # Primera vez: copiar el .env de ejemplo
 cp deploy/tools/.env.example deploy/tools/.env
@@ -129,34 +129,34 @@ deploy/scripts/tools.sh --info
 ### Paso 2 — Crear las bases de datos
 
 ```bash
-psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE mdqr_auth;"
-psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE mdqr_decode;"
-psql -U postgres -h 127.0.0.1 -d mdqr_auth -c "CREATE SCHEMA IF NOT EXISTS admin;"
+psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE hub_auth;"
+psql -U postgres -h 127.0.0.1 -c "CREATE DATABASE hub_base;"
+psql -U postgres -h 127.0.0.1 -d hub_auth -c "CREATE SCHEMA IF NOT EXISTS admin;"
 ```
 
 ### Paso 3 — Seedear Vault
 
 ```bash
-# Secretos para mdqr-ms-auth (realm: mdqr-admin)
-DB_NAME=mdqr_auth DB_HOST=localhost \
-  deploy/scripts/vault-seed.sh --ns mdqr-auth --kc-realm mdqr-admin
+# Secretos para hub-ms-auth (realm: hub-admin)
+DB_NAME=hub_auth DB_HOST=localhost \
+  deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
 
-# Secretos para mdqr-ms-base (realm: mdqr-admin)
-DB_NAME=mdqr_decode DB_HOST=localhost \
-  deploy/scripts/vault-seed.sh --ns mdqr-decode --kc-realm mdqr-admin
+# Secretos para hub-ms-base (realm: hub-admin)
+DB_NAME=hub_base DB_HOST=localhost \
+  deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
 ```
 
 Verificar:
 
 ```bash
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv list secret/mdqr-auth
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv list secret/hub-auth
 
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv list secret/mdqr-decode
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv list secret/hub-base
 ```
 
-> **Importante:** el flag `--kc-realm mdqr-admin` es obligatorio. Sin él, Vault almacena
+> **Importante:** el flag `--kc-realm hub-admin` es obligatorio. Sin él, Vault almacena
 > el realm incorrecto y los servicios fallan al validar JWTs.
 
 ### Paso 4 — Sincronizar Keycloak
@@ -164,46 +164,46 @@ docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
 Crea realms, clients, roles y usuarios de prueba. Idempotente:
 
 ```bash
-deploy/scripts/keycloak-sync-admin.sh     # realm mdqr-admin
-deploy/scripts/keycloak-sync-partner.sh   # realm mdqr-partner
+deploy/scripts/keycloak-sync-admin.sh     # realm hub-admin
+deploy/scripts/keycloak-sync-partner.sh   # realm hub-partner
 ```
 
 Usuarios de prueba creados: `admin` / `admin`.
 
-### Paso 5 — Levantar mdqr-ms-auth
+### Paso 5 — Levantar hub-ms-auth
 
 ```bash
-./gradlew :mdqr-ms-auth:bootRun --args='--spring.profiles.active=local'
+./gradlew :hub-ms-auth:bootRun --args='--spring.profiles.active=local'
 ```
 
-Primera ejecución: Liquibase crea las tablas en el schema `admin` de `mdqr_auth`.
+Primera ejecución: Liquibase crea las tablas en el schema `admin` de `hub_auth`.
 
 Verificar:
 
 ```bash
-psql -U postgres -h 127.0.0.1 -d mdqr_auth -c "\dt admin.*"
+psql -U postgres -h 127.0.0.1 -d hub_auth -c "\dt admin.*"
 curl -s http://localhost:8083/management/health | jq .status   # → "UP"
 ```
 
-### Paso 6 — Levantar mdqr-ms-base
+### Paso 6 — Levantar hub-ms-base
 
 ```bash
-./gradlew :mdqr-ms-base:bootRun --args='--spring.profiles.active=local'
+./gradlew :hub-ms-base:bootRun --args='--spring.profiles.active=local'
 ```
 
-Primera ejecución: Liquibase crea las tablas en `mdqr_decode`.
+Primera ejecución: Liquibase crea las tablas en `hub_base`.
 
 Verificar:
 
 ```bash
-psql -U postgres -h 127.0.0.1 -d mdqr_decode -c "\dt"
+psql -U postgres -h 127.0.0.1 -d hub_base -c "\dt"
 curl -s http://localhost:8081/management/health | jq .status   # → "UP"
 ```
 
-### Paso 7 — Levantar mdqr-gateway
+### Paso 7 — Levantar hub-gateway
 
 ```bash
-./gradlew :mdqr-gateway:bootRun --args='--spring.profiles.active=local'
+./gradlew :hub-gateway:bootRun --args='--spring.profiles.active=local'
 ```
 
 Verificar que ambos servicios están registrados en Consul antes:
@@ -212,7 +212,7 @@ Verificar que ambos servicios están registrados en Consul antes:
 curl -s http://localhost:8500/v1/catalog/services | jq
 ```
 
-Deben aparecer `mdqradminservice` y `mdqrbaseservice`.
+Deben aparecer `hubadminservice` y `hubbaseservice`.
 
 ---
 
@@ -221,21 +221,21 @@ Deben aparecer `mdqradminservice` y `mdqrbaseservice`.
 > **Importante:** siempre usar `127.0.0.1` (no `localhost`) para Keycloak.
 > El issuer del token debe coincidir exactamente con el configurado en el resource server.
 
-### Token Admin — realm `mdqr-admin`
+### Token Admin — realm `hub-admin`
 
 Acceso al panel de administración (ms-auth + ms-base admin):
 
 ```bash
 ADMIN_TOKEN=$(curl -s -X POST \
-  http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+  http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=client_credentials&client_id=mdqradminservice&client_secret=mdqradminservice-secret" \
+  -d "grant_type=client_credentials&client_id=hubadminservice&client_secret=hubadminservice-secret" \
   | jq -r '.access_token')
 
 echo "Admin token: ${ADMIN_TOKEN:0:60}..."
 ```
 
-### Token Partner — realm `mdqr-partner` (vía Gateway)
+### Token Partner — realm `hub-partner` (vía Gateway)
 
 Clientes externos M2M que consumen la API de desencriptación:
 
@@ -253,7 +253,7 @@ echo "Partner token: ${PARTNER_TOKEN:0:60}..."
 
 ```bash
 PARTNER_TOKEN=$(curl -s -X POST \
-  http://127.0.0.1:8180/realms/mdqr-partner/protocol/openid-connect/token \
+  http://127.0.0.1:8180/realms/hub-partner/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
   -d "grant_type=client_credentials&client_id=unilink-api&client_secret=unilink-api-secret" \
   | jq -r '.access_token')
@@ -275,11 +275,11 @@ curl -s http://localhost:8080/management/health | jq .status   # gateway → "UP
 
 ```bash
 # ms-auth vía gateway
-curl -s http://localhost:8080/services/mdqradminservice/management/health \
+curl -s http://localhost:8080/services/hubadminservice/management/health \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 
 # ms-base vía gateway
-curl -s http://localhost:8080/services/mdqrbaseservice/management/health \
+curl -s http://localhost:8080/services/hubbaseservice/management/health \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq .status
 ```
 
@@ -318,8 +318,8 @@ deploy/scripts/tools.sh --down -v
 curl http://localhost:8500/v1/catalog/services | jq
 
 # Verificar salud de un servicio en Consul
-curl http://localhost:8500/v1/health/service/mdqradminservice | jq
-curl http://localhost:8500/v1/health/service/mdqrbaseservice | jq
+curl http://localhost:8500/v1/health/service/hubadminservice | jq
+curl http://localhost:8500/v1/health/service/hubbaseservice | jq
 
 # Swagger UI (solo en perfil local)
 # ms-auth: http://localhost:8083/swagger-ui.html
@@ -335,11 +335,11 @@ curl http://localhost:8500/v1/health/service/mdqrbaseservice | jq
 deploy/scripts/tools.sh --down -v
 
 # 2. Eliminar la red Docker
-docker network rm mdqr-shared
+docker network rm hub-shared
 
 # 3. Borrar bases de datos
-psql -U postgres -h 127.0.0.1 -c "DROP DATABASE IF EXISTS mdqr_auth;"
-psql -U postgres -h 127.0.0.1 -c "DROP DATABASE IF EXISTS mdqr_decode;"
+psql -U postgres -h 127.0.0.1 -c "DROP DATABASE IF EXISTS hub_auth;"
+psql -U postgres -h 127.0.0.1 -c "DROP DATABASE IF EXISTS hub_base;"
 
 # 4. Repetir desde el Paso 1 del setup
 ```
@@ -372,7 +372,7 @@ Los servicios no están registrados en Consul.
 curl http://localhost:8500/v1/catalog/services | jq
 ```
 
-Si `mdqradminservice` o `mdqrbaseservice` no aparecen: el servicio no arrancó
+Si `hubadminservice` o `hubbaseservice` no aparecen: el servicio no arrancó
 o Consul discovery está deshabilitado en el perfil local.
 
 ### Error 401 "JWT issuer mismatch"
@@ -395,12 +395,12 @@ management:
 
 ### Vault con realm incorrecto
 
-Si el realm almacenado en Vault es incorrecto (ej: `mdqr-decode` en vez de `mdqr-admin`),
+Si el realm almacenado en Vault es incorrecto (ej: `hub-base` en vez de `hub-admin`),
 los servicios fallan al arrancar. Re-seedear Vault incluyendo `--kc-realm`:
 
 ```bash
-DB_NAME=mdqr_decode DB_HOST=localhost \
-  deploy/scripts/vault-seed.sh --ns mdqr-decode --kc-realm mdqr-admin
+DB_NAME=hub_base DB_HOST=localhost \
+  deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
 ```
 
 ### Redis: `Unable to connect`

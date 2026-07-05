@@ -4,7 +4,7 @@ set -euo pipefail
 # --- Defaults --------------------------------------------------------
 KC_URL="${KC_URL:-http://localhost:8080}"
 TENANT_ID="${TENANT_ID:-}"
-NAMESPACE_BASE="${NAMESPACE_BASE:-mdqr}"
+NAMESPACE_BASE="${NAMESPACE_BASE:-hub}"
 # Realm/vault namespace efectivo: <base>[-<tenant>]
 if [ -n "$TENANT_ID" ]; then
   KC_REALM="${KC_REALM:-${NAMESPACE_BASE}-${TENANT_ID}}"
@@ -16,11 +16,11 @@ fi
 KC_USERNAME="${KC_USERNAME:-admin}"
 KC_PASSWORD="${KC_PASSWORD:-admin}"
 
-VAULT_CONTAINER="${VAULT_CONTAINER:-mdqr-vault}"
+VAULT_CONTAINER="${VAULT_CONTAINER:-hub-vault}"
 VAULT_ADDR="http://127.0.0.1:8200"
 
 DB_CONTAINER="${DB_CONTAINER:-postgres}"
-DB_NAME="${DB_NAME:-mdqr}"
+DB_NAME="${DB_NAME:-hub}"
 DB_USER="${DB_USER:-postgres}"
 
 KC_TOKEN=""
@@ -101,13 +101,13 @@ Flags:
 
 Environment variables:
   KC_URL          Keycloak server URL        (default: http://localhost:8080)
-  KC_REALM        Target realm               (default: mdqr)
+  KC_REALM        Target realm               (default: hub)
   KC_USERNAME     Admin username             (default: admin)
   KC_PASSWORD     Admin password             (default: admin)
-  VAULT_CONTAINER Vault container name       (default: mdqr-vault)
+  VAULT_CONTAINER Vault container name       (default: hub-vault)
   VAULT_TOKEN     Vault token                (default: root)
   DB_CONTAINER    Postgres container name    (default: postgres)
-  DB_NAME         Database name              (default: mdqr)
+  DB_NAME         Database name              (default: hub)
   DB_USER         Database user              (default: postgres)
 
 Examples:
@@ -544,7 +544,7 @@ run_dry() {
 main() {
   echo -e "${BOLD}"
   echo "╔═══════════════════════════════════════════════╗"
-  echo "║         Create Partner — MDQR                 ║"
+  echo "║         Create Partner — HUB                 ║"
   echo "╚═══════════════════════════════════════════════╝"
   echo -e "${NC}"
   echo -e "  Partner ID:     ${CYAN}${PARTNER_ID}${NC}"

@@ -1,20 +1,23 @@
 # 01 - Seguridad: Cadenas de seguridad, JWT y filtros del Gateway
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Arquitectura general
 
 ```
 Cliente externo (partner)
     │
     │  POST /oauth2/token  (sin auth)
-    │  POST /partner/v1/** (JWT mdqr-partner)
+    │  POST /partner/v1/** (JWT hub-partner)
     ▼
-mdqr-gateway :8080  ──── Spring Cloud Gateway
+hub-gateway :8080  ──── Spring Cloud Gateway
     │  Cadena 1 (Order=1) — partner
     │  Cadena 2 (Order=2) — admin
     │  Filtros globales: IpWhitelistFilter, RateLimitFilter
     │
-    ├──── lb://mdqrbaseservice  ──▶  mdqr-ms-base :8081
-    └──── lb://mdqradminservice ──▶  mdqr-ms-auth :8083
+    ├──── lb://hubbaseservice  ──▶  hub-ms-base :8081
+    └──── lb://hubadminservice ──▶  hub-ms-auth :8083
 ```
 
 **Keycloak** corre en el puerto `8180` (no confundir con el gateway en `8080`).
@@ -30,9 +33,9 @@ Gestiona el acceso de clientes M2M externos.
 | Elemento | Valor |
 |---|---|
 | Rutas cubiertas | `/partner/v1/**`, `/oauth2/token` |
-| `/oauth2/token` | `permitAll()` — proxy al token endpoint de Keycloak realm `mdqr-partner` |
-| `/partner/v1/**` | Requiere JWT válido del realm `mdqr-partner` |
-| Issuer JWT | `http://127.0.0.1:8180/realms/mdqr-partner` |
+| `/oauth2/token` | `permitAll()` — proxy al token endpoint de Keycloak realm `hub-partner` |
+| `/partner/v1/**` | Requiere JWT válido del realm `hub-partner` |
+| Issuer JWT | `http://127.0.0.1:8180/realms/hub-partner` |
 | Client Keycloak | `unilink-api` / secret `unilink-api-secret` |
 
 ### Cadena 2 — Admin (Order=2)
@@ -43,21 +46,21 @@ Gestiona el acceso interno y administrativo.
 |---|---|
 | Rutas cubiertas | `/services/**`, `/management/**` |
 | `/management/health` | `permitAll()` |
-| Todo lo demás | Requiere JWT válido del realm `mdqr-admin` |
-| Issuer JWT | `http://127.0.0.1:8180/realms/mdqr-admin` |
-| Client Keycloak | `mdqradminservice` / secret `mdqradminservice-secret` |
+| Todo lo demás | Requiere JWT válido del realm `hub-admin` |
+| Issuer JWT | `http://127.0.0.1:8180/realms/hub-admin` |
+| Client Keycloak | `hubadminservice` / secret `hubadminservice-secret` |
 
 ### Rutas cubiertas por cada cadena
 
 | Método | Ruta | Cadena | Autenticación |
 |--------|------|--------|--------------|
 | POST | `/oauth2/token` | 1 — partner | Sin auth (permitAll) |
-| POST | `/partner/v1/qr/decode` | 1 — partner | JWT realm `mdqr-partner` |
-| POST | `/partner/v1/qr/decode/file` | 1 — partner | JWT realm `mdqr-partner` |
-| `*` | `/services/mdqradminservice/**` | 2 — admin | JWT realm `mdqr-admin` |
-| `*` | `/services/mdqrbaseservice/**` | 2 — admin | JWT realm `mdqr-admin` |
+| POST | `/partner/v1/inbound/{product}/{version}` | 1 — partner | JWT realm `hub-partner` |
+| PATCH | `/partner/v1/inbound/{product}/{version}/{id}` | 1 — partner | JWT realm `hub-partner` |
+| `*` | `/services/hubadminservice/**` | 2 — admin | JWT realm `hub-admin` |
+| `*` | `/services/hubbaseservice/**` | 2 — admin | JWT realm `hub-admin` |
 | GET | `/management/health` | 2 — admin | Sin auth (permitAll) |
-| `*` | `/management/**` | 2 — admin | JWT realm `mdqr-admin` |
+| `*` | `/management/**` | 2 — admin | JWT realm `hub-admin` |
 
 ---
 
@@ -130,7 +133,7 @@ Mapeo de excepciones a códigos HTTP:
 
 ### Obtener token partner (vía gateway)
 
-El gateway expone `/oauth2/token` como proxy al endpoint de Keycloak del realm `mdqr-partner`. El cliente hace una sola llamada al gateway; no necesita conocer la dirección de Keycloak.
+El gateway expone `/oauth2/token` como proxy al endpoint de Keycloak del realm `hub-partner`. El cliente hace una sola llamada al gateway; no necesita conocer la dirección de Keycloak.
 
 ```bash
 PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
@@ -142,9 +145,9 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
 ### Obtener token admin (directo a Keycloak)
 
 ```bash
-ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&client_id=mdqradminservice&client_secret=mdqradminservice-secret&username=admin&password=admin" \
+  -d "grant_type=password&client_id=hubadminservice&client_secret=hubadminservice-secret&username=admin&password=admin" \
   | jq -r '.access_token')
 ```
 
@@ -156,23 +159,23 @@ El issuer declarado en los tokens y el configurado en el gateway **deben coincid
 
 ## Configuración de Keycloak
 
-### Realm `mdqr-partner`
+### Realm `hub-partner`
 
 | Campo | Valor |
 |---|---|
-| Realm | `mdqr-partner` |
+| Realm | `hub-partner` |
 | Client ID | `unilink-api` |
 | Client Secret | `unilink-api-secret` |
 | Grant type | `client_credentials` |
 | Uso | APIs externas — `/partner/v1/**` |
 
-### Realm `mdqr-admin`
+### Realm `hub-admin`
 
 | Campo | Valor |
 |---|---|
-| Realm | `mdqr-admin` |
-| Client ID | `mdqradminservice` |
-| Client Secret | `mdqradminservice-secret` |
+| Realm | `hub-admin` |
+| Client ID | `hubadminservice` |
+| Client Secret | `hubadminservice-secret` |
 | Grant type | `password` (usuarios humanos) o `client_credentials` (M2M) |
 | Uso | APIs internas — `/services/**`, Swagger, OIDC |
 
@@ -184,10 +187,10 @@ El gateway usa Consul para resolución de nombres. Los microservicios se registr
 
 | Microservicio | Nombre en Consul | URI en gateway |
 |---|---|---|
-| `mdqr-ms-auth` | `mdqradminservice` | `lb://mdqradminservice` |
-| `mdqr-ms-base` | `mdqrbaseservice` | `lb://mdqrbaseservice` |
+| `hub-ms-auth` | `hubadminservice` | `lb://hubadminservice` |
+| `hub-ms-base` | `hubbaseservice` | `lb://hubbaseservice` |
 
-La ruta `/services/mdqradminservice/**` aplica `StripPrefix=2` antes de enviar al microservicio.
+La ruta `/services/hubadminservice/**` aplica `StripPrefix=2` antes de enviar al microservicio.
 
 Para que el enrutamiento funcione en local, el perfil `local` deshabilita Vault y Consul config, pero habilita Consul discovery.
 
@@ -234,9 +237,12 @@ Errores de validación incluyen el campo `violations`:
 | `VALIDATION_ERROR` | 400 | Datos de entrada inválidos |
 | `AUTHENTICATION_ERROR` | 401 | Token ausente, expirado o inválido |
 | `ACCESS_DENIED` | 403 | Sin permisos o IP no autorizada |
-| `CERTIFICATE_NOT_FOUND` | 404 | Certificado no existe |
 | `RATE_LIMIT_EXCEEDED` | 429 | Límite de requests excedido |
-| `INVALID_QR_FORMAT` | 400 | Formato de QR no reconocido |
-| `DECRYPTION_ERROR` | 500 | Error al desencriptar el QR |
-| `TUXEDO_API_ERROR` | 502 | Error en el servicio Tuxedo backend |
+| `PRODUCT_NOT_AUTHORIZED` | 403 | Producto/versión inbound no registrado o no autorizado |
+| `INVALID_RESOURCE_ID` | 400 | El id de recurso del path no es un entero válido (PATCH) |
+| `FORWARD_ERROR` | (varía) | Error al reenviar al sistema interno destino |
 | `INTERNAL_ERROR` | 500 | Error interno no clasificado |
+
+> Los códigos del producto QR anterior (`INVALID_QR_FORMAT`, `DECRYPTION_ERROR`,
+> `CERTIFICATE_NOT_FOUND`, `TUXEDO_API_ERROR`) fueron eliminados junto con ese
+> negocio (ver `docs/adr/ADR-0004-eliminacion-qr.md`).

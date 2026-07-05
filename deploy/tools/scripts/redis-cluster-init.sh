@@ -8,7 +8,7 @@
 #   2. Agrega cada REPLICA explicitamente como slave del master correspondiente
 #
 # Lee config del .env del dir padre (deploy/tools/.env).
-# Override puntual: MDQR_HOST_IP=otra-ip ./scripts/redis-cluster-init.sh
+# Override puntual: HUB_HOST_IP=otra-ip ./scripts/redis-cluster-init.sh
 #
 # Ejecutar UNA vez. Idempotente: si el cluster ya esta formado, retorna OK.
 set -euo pipefail
@@ -23,10 +23,10 @@ if [ -f "${ENV_FILE}" ]; then
   set +a
 fi
 
-MDQR_HOST_IP="${MDQR_HOST_IP:-${1:-}}"
-if [ -z "${MDQR_HOST_IP}" ]; then
-  echo "[error] MDQR_HOST_IP no esta definido."
-  echo "        Setealo en ${ENV_FILE} o pasalo como var: MDQR_HOST_IP=192.168.0.12 $0"
+HUB_HOST_IP="${HUB_HOST_IP:-${1:-}}"
+if [ -z "${HUB_HOST_IP}" ]; then
+  echo "[error] HUB_HOST_IP no esta definido."
+  echo "        Setealo en ${ENV_FILE} o pasalo como var: HUB_HOST_IP=192.168.0.12 $0"
   exit 1
 fi
 
@@ -41,28 +41,28 @@ if [ -n "${COMPOSE_PROFILES:-}" ] && ! echo "${COMPOSE_PROFILES}" | grep -q 'clu
   exit 1
 fi
 
-MDQR_REDIS_IMAGE="${MDQR_REDIS_IMAGE:-redis:8.0.0}"
-MDQR_REDIS_M1_PORT="${MDQR_REDIS_M1_PORT:-6379}"
-MDQR_REDIS_M2_PORT="${MDQR_REDIS_M2_PORT:-6380}"
-MDQR_REDIS_M3_PORT="${MDQR_REDIS_M3_PORT:-6381}"
-MDQR_REDIS_R1_PORT="${MDQR_REDIS_R1_PORT:-6382}"
-MDQR_REDIS_R2_PORT="${MDQR_REDIS_R2_PORT:-6383}"
-MDQR_REDIS_R3_PORT="${MDQR_REDIS_R3_PORT:-6384}"
+HUB_REDIS_IMAGE="${HUB_REDIS_IMAGE:-redis:8.0.0}"
+HUB_REDIS_M1_PORT="${HUB_REDIS_M1_PORT:-6379}"
+HUB_REDIS_M2_PORT="${HUB_REDIS_M2_PORT:-6380}"
+HUB_REDIS_M3_PORT="${HUB_REDIS_M3_PORT:-6381}"
+HUB_REDIS_R1_PORT="${HUB_REDIS_R1_PORT:-6382}"
+HUB_REDIS_R2_PORT="${HUB_REDIS_R2_PORT:-6383}"
+HUB_REDIS_R3_PORT="${HUB_REDIS_R3_PORT:-6384}"
 
 MASTERS=(
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M1_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M2_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M3_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M1_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M2_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M3_PORT}"
 )
 REPLICAS=(
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R1_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R2_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R3_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R1_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R2_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R3_PORT}"
 )
 ALL_NODES=("${MASTERS[@]}" "${REPLICAS[@]}")
 
 run_redis_cli() {
-  docker run --rm --network host "${MDQR_REDIS_IMAGE}" redis-cli "$@"
+  docker run --rm --network host "${HUB_REDIS_IMAGE}" redis-cli "$@"
 }
 
 echo "[info] esperando que los 6 nodos respondan a PING..."

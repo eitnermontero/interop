@@ -1,13 +1,16 @@
 # 05 - Modelo de Datos PostgreSQL
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Visión General
 
-El sistema MDQR utiliza dos bases de datos PostgreSQL independientes, una por módulo:
+El sistema HUB utiliza dos bases de datos PostgreSQL independientes, una por módulo:
 
 | Base de datos | Módulo | Schema | Puerto |
 |---|---|---|---|
-| `mdqr_decode` | `mdqr-ms-base` | `public` | 8081 |
-| `mdqr_auth` | `mdqr-ms-auth` | `admin` | 8083 |
+| `hub_base` | `hub-ms-base` | `public` | 8081 |
+| `hub_auth` | `hub-ms-auth` | `admin` | 8083 |
 
 ## Campos de Auditoría (`AbstractAuditingEntity`)
 
@@ -30,181 +33,32 @@ Los changelogs se ubican en `src/main/resources/db/changelog/` de cada módulo.
 
 ---
 
-## Base de datos: `mdqr_decode` (ms-base)
+## Base de datos: `hub_base` (ms-base)
 
-### Diagrama de relaciones
+> **Nota histórica**: las tablas del producto QR anterior (`certificate`,
+> `decryption_log`, `certificate_version`, `certificate_audit_log`,
+> `trx_entity_code`, `admin_audit_log`) fueron **eliminadas** junto con ese
+> negocio (ver `docs/adr/ADR-0004-eliminacion-qr.md`). El esquema actual (v2)
+> corresponde al hub de interoperabilidad.
 
-```
-certificate (1) ──< decryption_log
-certificate (1) ──< certificate_version
-certificate (1) ──< certificate_audit_log (opcional, via serial_number)
-trx_entity_code  (catálogo independiente)
-admin_audit_log  (auditoría de acciones administrativas)
-```
+Changelogs v2 en `hub-ms-base/src/main/resources/db/changelog/v2/` (fuente de
+verdad de columnas e índices):
 
-### Tabla `certificate`
+| Tabla | Changelog | Propósito |
+|---|---|---|
+| `hub_audit_log` | `0001-hub-audit-log.xml` | Auditoría de toda transacción inbound/outbound. **Particionada por rango sobre `ts`** (particiones mensuales + `hub_audit_log_default`). Guarda hash SHA-256 canónico (RFC 8785) del request y del response, cadena `prev_hash` (tamper-evident), producto (p.ej. `CASO_PENAL`), partner y correlation id. Sin FK físicas hacia ella (PostgreSQL no permite FK a tablas particionadas). |
+| `hub_audit_idempotency` | `0001-hub-audit-log.xml` | Control de idempotencia por `idempotency_key` (at-least-once del relay sin duplicados). |
+| `outbox_event` | `0002-outbox-event.xml` | Patrón outbox: el evento de facturación/medición se escribe en la **misma transacción** que el registro de auditoría; un relay lo consume después. |
+| `hub_measurement` | `0003-hub-measurement.xml` | Medición/facturación agregada por partner/producto/período (unique por partner+período). |
+| `provider`, `provider_credential_ref` | `0004-provider.xml` | Catálogo de proveedores externos (outbound) y referencia a sus credenciales en Vault (nunca el secreto en DB). |
 
-Almacena los certificados digitales (PEM) utilizados para descifrar QRs financieros. Cada entidad financiera puede tener múltiples certificados con versionado.
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `id` | BIGINT | Si | PK |
-| `serial_number` | VARCHAR(100) | Si | UNIQUE. Número de serie del certificado |
-| `fingerprint_sha256` | VARCHAR(64) | Si | Huella SHA-256 del certificado |
-| `entity_id` | VARCHAR(50) | No | Identificador de la entidad financiera |
-| `entity_name` | VARCHAR(200) | No | Nombre de la entidad financiera |
-| `pem_content` | TEXT | Si | Contenido del certificado en formato PEM |
-| `subject_dn` | VARCHAR(500) | No | Distinguished Name del sujeto |
-| `issuer_dn` | VARCHAR(500) | No | Distinguished Name del emisor |
-| `issuer_cn` | VARCHAR(200) | No | Common Name del emisor |
-| `valid_from` | TIMESTAMPTZ | No | Inicio de validez del certificado |
-| `valid_to` | TIMESTAMPTZ | No | Fin de validez del certificado |
-| `status` | VARCHAR(20) | Si | Estado del certificado. Default: `ACTIVE` |
-| `version_number` | INTEGER | Si | Número de versión. Default: `1` |
-| `is_current_version` | BOOLEAN | Si | Indica si es la versión vigente. Default: `true` |
-| `is_active` | BOOLEAN | Si | Indica si el certificado está activo. Default: `true` |
-| `is_revoked` | BOOLEAN | Si | Indica si fue revocado. Default: `false` |
-| `revoked_at` | TIMESTAMPTZ | No | Fecha y hora de revocación |
-| `revoked_by` | VARCHAR | No | Usuario que realizó la revocación |
-| `revoked_reason` | VARCHAR | No | Motivo de la revocación |
-| `description` | VARCHAR | No | Descripción libre del certificado |
-| `tags` | VARCHAR[] | No | Etiquetas para clasificación |
-| `notification_emails` | TEXT[] | No | Emails para notificaciones de expiración |
-| + campos de auditoría | | | `created_by`, `created_date`, `last_modified_by`, `last_modified_date` |
-
-**Valores válidos para `status`:**
-
-| Valor | Descripción |
-|---|---|
-| `ACTIVE` | Certificado vigente y operativo |
-| `EXPIRING_SOON` | Próximo a vencer (umbral configurable) |
-| `EXPIRED` | Fuera del rango de validez |
-| `REVOKED` | Revocado explícitamente |
-| `SUPERSEDED` | Reemplazado por una versión más nueva |
-
-### Tabla `decryption_log`
-
-Registro de cada operación de descifrado de QR. Por privacidad, no se almacena el QR completo sino su hash SHA-256.
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `id` | BIGINT | Si | PK |
-| `log_id` | VARCHAR(60) | Si | UNIQUE. Identificador único del log |
-| `keycloak_client_id` | VARCHAR(255) | No | Client ID de Keycloak que realizó la solicitud |
-| `mtls_cert_cn` | VARCHAR(255) | No | Common Name del certificado mTLS del cliente |
-| `certificate_id` | BIGINT | No | FK → `certificate`. Certificado usado para descifrar |
-| `qr_string_hash` | VARCHAR(64) | No | SHA-256 del string QR (no se guarda el QR completo) |
-| `entity_id_request` | VARCHAR(50) | No | Entidad financiera del QR |
-| `external_reference` | VARCHAR(200) | No | Referencia externa del solicitante |
-| `metadata` | JSONB | No | Metadatos adicionales de contexto |
-| `status` | VARCHAR(20) | No | Resultado: `SUCCESS` o `ERROR` |
-| `qr_type` | VARCHAR(20) | No | Tipo de QR procesado |
-| `decrypted_data_json` | JSONB | No | Datos descifrados en formato JSON |
-| `error_message` | TEXT | No | Mensaje de error si `status = ERROR` |
-| `processing_time_ms` | BIGINT | No | Tiempo de procesamiento en milisegundos |
-| `ip_address` | VARCHAR(45) | No | IP de origen de la solicitud |
-| `user_agent` | VARCHAR(500) | No | User-Agent del cliente |
-| + auditoría parcial | | | `created_by`, `created_date` (solo inserción) |
-
-### Tabla `certificate_version`
-
-Historial de versiones anteriores de un certificado. Se registra cada vez que un certificado es reemplazado.
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `id` | BIGINT | Si | PK |
-| `certificate_id` | BIGINT | Si | FK → `certificate` |
-| `version_number` | INTEGER | Si | Número de versión archivada |
-| `pem_content_snapshot` | TEXT | No | Copia del PEM en el momento del reemplazo |
-| `fingerprint_sha256_snapshot` | VARCHAR | No | Huella SHA-256 de la versión archivada |
-| `valid_from_snapshot` | TIMESTAMPTZ | No | Inicio de validez de la versión archivada |
-| `valid_to_snapshot` | TIMESTAMPTZ | No | Fin de validez de la versión archivada |
-| `subject_dn_snapshot` | VARCHAR | No | Subject DN de la versión archivada |
-| `issuer_dn_snapshot` | VARCHAR | No | Issuer DN de la versión archivada |
-| `replaced_at` | TIMESTAMPTZ | No | Fecha y hora del reemplazo |
-| `replaced_by` | VARCHAR(100) | No | Usuario que realizó el reemplazo |
-| `change_reason` | VARCHAR(500) | No | Motivo del reemplazo |
-| `change_type` | VARCHAR(50) | No | Tipo de cambio (ej: RENEWAL, REVOCATION) |
-
-### Tabla `certificate_audit_log`
-
-Registro de auditoría detallado de todas las acciones realizadas sobre certificados, incluyendo operaciones de descifrado asociadas.
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `id` | BIGINT | Si | PK |
-| `certificate_id` | BIGINT | No | ID del certificado involucrado |
-| `serial_number` | VARCHAR | No | Número de serie del certificado |
-| `action` | VARCHAR(50) | Si | Acción realizada (ver valores abajo) |
-| `user_id` | VARCHAR(100) | Si | ID del usuario en Keycloak |
-| `user_email` | VARCHAR(255) | No | Email del usuario |
-| `ip_address` | VARCHAR | No | IP de origen |
-| `user_agent` | TEXT | No | User-Agent del cliente |
-| `timestamp` | TIMESTAMPTZ | No | Fecha y hora de la acción |
-| `before_state` | JSONB | No | Estado del certificado antes de la acción |
-| `after_state` | JSONB | No | Estado del certificado después de la acción |
-| `success` | BOOLEAN | No | Resultado de la operación |
-| `error_message` | TEXT | No | Mensaje de error si aplica |
-| `error_code` | VARCHAR(50) | No | Código de error |
-| `request_id` | VARCHAR | No | ID del request HTTP |
-| `entity_id_request` | VARCHAR | No | Entidad del QR si aplica |
-| `qr_content_hash` | VARCHAR | No | Hash SHA-256 del QR si aplica |
-| `processing_time_ms` | INTEGER | No | Tiempo de procesamiento |
-
-**Valores válidos para `action`:**
-
-| Valor | Descripción |
-|---|---|
-| `UPLOAD` | Carga de nuevo certificado |
-| `VALIDATE` | Validación del certificado |
-| `ACTIVATE` | Activación del certificado |
-| `DEACTIVATE` | Desactivación del certificado |
-| `REVOKE` | Revocación del certificado |
-| `REPLACE` | Reemplazo por versión nueva |
-| `VIEW` | Consulta del certificado |
-| `DOWNLOAD` | Descarga del certificado |
-| `DECRYPT_QR` | Uso del certificado para descifrar un QR |
-
-### Tabla `trx_entity_code`
-
-Catálogo de entidades financieras participantes del sistema QR en Bolivia. Es una tabla de referencia, no tiene relaciones FK activas pero los registros de `decryption_log` referencian sus códigos en `entity_id_request`.
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `code` | VARCHAR(20) | Si | PK. Código único de la entidad (ej: `MLD1017`, `ACCL1009`) |
-| `participant` | VARCHAR(255) | No | Nombre completo del banco o cooperativa |
-| `entity_group` | VARCHAR(10) | No | Grupo al que pertenece |
-
-**Grupos de entidades:**
-
-| Grupo | Descripción |
-|---|---|
-| `MLD` | Moneda y Liquidación Diferida |
-| `ACCL` | Cámara de Compensación y Liquidación |
-| `UNI` | Unilink |
-
-El catálogo incluye 70 o más bancos y cooperativas de Bolivia. Se carga mediante Liquibase con datos iniciales.
-
-### Tabla `admin_audit_log`
-
-Auditoría de acciones administrativas realizadas sobre certificados desde el módulo ms-base (distinto de `certificate_audit_log` que registra todas las operaciones, incluyendo las del sistema).
-
-| Campo | Tipo | Req | Descripción |
-|---|---|---|---|
-| `id` | BIGINT | Si | PK |
-| `keycloak_user_id` | VARCHAR | No | ID del usuario en Keycloak |
-| `keycloak_username` | VARCHAR | No | Username del usuario en Keycloak |
-| `action` | VARCHAR(100) | Si | Acción administrativa ejecutada |
-| `resource_type` | VARCHAR(100) | No | Tipo de recurso afectado |
-| `resource_id` | VARCHAR(100) | No | ID del recurso afectado |
-| `old_value` | JSONB | No | Valor anterior del recurso |
-| `new_value` | JSONB | No | Valor nuevo del recurso |
-| `ip_address` | VARCHAR(45) | No | IP de origen |
-| `created_at` | TIMESTAMPTZ | No | Fecha y hora del evento |
+> `0005-caso.xml` existe en el repo pero **no se aplica** (no está incluido en
+> `db.changelog-master.xml`): por ADR-0006 §9.3 el hub es intermediario (Modelo A)
+> y no persiste campos de dominio del producto (PII en claro).
 
 ---
 
-## Base de datos: `mdqr_auth` (ms-auth)
+## Base de datos: `hub_auth` (ms-auth)
 
 ### Tabla `menu`
 
@@ -286,7 +140,7 @@ Registro de auditoría centralizado de todas las acciones de usuarios en el sist
 
 **Valores válidos para `module`:**
 
-`CERTIFICATES`, `QR`, `AUTH`, `USUARIOS`, `ROLES`, `MENUS`, `PERMISOS`
+`AUTH`, `USUARIOS`, `ROLES`, `MENUS`, `PERMISOS` (los módulos `CERTIFICATES` y `QR` del producto anterior fueron eliminados)
 
 El campo `details` tiene un índice GIN para optimizar búsquedas sobre su contenido JSONB.
 
@@ -294,7 +148,7 @@ El campo `details` tiene un índice GIN para optimizar búsquedas sobre su conte
 
 ## Consideraciones
 
-- **Retención de datos:** `decryption_log` y `certificate_audit_log` pueden crecer significativamente en producción. Se recomienda implementar una política de retención (ej: 90 días) o particionamiento por rango de fecha en `decryption_log`.
-- **Seguridad del contenido QR:** El campo `qr_string_hash` almacena solo el SHA-256 del QR original. El contenido descifrado en `decrypted_data_json` debe evaluarse según clasificación de datos en cada despliegue.
+- **Retención de datos:** `hub_audit_log` está particionada por mes (rango sobre `ts`); la política de retención se implementa desacoplando/eliminando particiones antiguas, no con `DELETE` masivos.
+- **Payloads nunca en claro:** en `hub_audit_log` solo se persisten los hashes SHA-256 canónicos (RFC 8785) del request/response. Si se requiere almacenar el payload, va cifrado con Vault Transit (ADR-0006).
 - **Índice GIN en `audit_log.details`:** Habilitar para consultas de filtrado sobre el JSONB en entornos con alto volumen de logs.
 - **Liquibase sin autoconfiguración:** Al usar Spring Boot 4 / Liquibase 5, la configuración del bean `SpringLiquibase` debe ser explícita en `LiquibaseConfiguration.java`. No se puede confiar en la autoconfiguración de Spring Boot.

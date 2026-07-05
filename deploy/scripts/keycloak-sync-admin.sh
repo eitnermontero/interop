@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# keycloak-sync-admin.sh — Realm mdqr-admin (usuarios internos / SPA admin)
+# keycloak-sync-admin.sh — Realm hub-admin (usuarios internos / SPA admin)
 #
 # Idempotente: crea recursos faltantes, omite los existentes.
 #
@@ -9,7 +9,7 @@
 #
 # Variables de entorno:
 #   KC_URL          URL de Keycloak      (default: http://localhost:8180)
-#   KC_REALM        Nombre del realm     (default: mdqr-admin)
+#   KC_REALM        Nombre del realm     (default: hub-admin)
 #   KC_USERNAME     Admin de master      (default: admin)
 #   KC_PASSWORD     Password admin       (default: admin)
 #   ADMIN_PASSWORD  Password del usuario admin del realm (default: admin)
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 KC_URL="${KC_URL:-http://localhost:8180}"
-KC_REALM="${KC_REALM:-mdqr-admin}"
+KC_REALM="${KC_REALM:-hub-admin}"
 KC_USERNAME="${KC_USERNAME:-admin}"
 KC_PASSWORD="${KC_PASSWORD:-admin}"
 ADMIN_PASSWORD="${ADMIN_PASSWORD:-admin}"
@@ -31,7 +31,7 @@ while [ $# -gt 0 ]; do
     --yes-to-all) CONFIRM_ALL=true; shift ;;
     -h|--help)
       echo "Usage: $(basename "$0") [--yes-to-all]"
-      echo "Syncs the mdqr-admin Keycloak realm for the internal admin web app."
+      echo "Syncs the hub-admin Keycloak realm for the internal admin web app."
       exit 0 ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
@@ -319,8 +319,8 @@ create_admin_user() {
 
   local user_id
   user_id=$(kc_post_get_id "/users" "$(jq -n --arg pw "$ADMIN_PASSWORD" '{
-    username:"admin", email:"admin@mdqr.local",
-    firstName:"Admin", lastName:"MDQR",
+    username:"admin", email:"admin@hub.local",
+    firstName:"Admin", lastName:"HUB",
     enabled:true, emailVerified:true,
     credentials:[{type:"password",value:$pw,temporary:false}]
   }')")
@@ -363,7 +363,7 @@ create_test_users() {
     local user_id
     user_id=$(kc_post_get_id "/users" "$(jq -n \
       --arg u "$username" --arg d "$description" '{
-        username:$u, email:($u+"@mdqr.local"),
+        username:$u, email:($u+"@hub.local"),
         firstName:$d, lastName:"Test",
         enabled:true, emailVerified:true,
         credentials:[{type:"password",value:$u,temporary:false}]
@@ -403,7 +403,7 @@ sync_events_config() {
 main() {
   echo -e "${BOLD}"
   echo "╔═══════════════════════════════════════════════════╗"
-  echo "║   Keycloak Sync — Realm: mdqr-admin               ║"
+  echo "║   Keycloak Sync — Realm: hub-admin               ║"
   echo "╚═══════════════════════════════════════════════════╝"
   echo -e "${NC}"
   echo -e "  Server: ${CYAN}${KC_URL}${NC}"
@@ -438,7 +438,7 @@ main() {
   sync_events_config
 
   echo ""
-  echo -e "${BOLD}${GREEN}═══ mdqr-admin sync complete ═══${NC}"
+  echo -e "${BOLD}${GREEN}═══ hub-admin sync complete ═══${NC}"
 }
 
 main "$@"

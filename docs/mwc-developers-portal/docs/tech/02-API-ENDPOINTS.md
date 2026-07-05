@@ -14,7 +14,7 @@
 
 ## Obtener tokens
 
-### Token partner (vía gateway — realm mdqr-partner)
+### Token partner (vía gateway — realm hub-partner)
 
 ```bash
 PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
@@ -23,21 +23,21 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
   | jq -r '.access_token')
 ```
 
-### Token admin (directo a Keycloak — realm mdqr-admin)
+### Token admin (directo a Keycloak — realm hub-admin)
 
 ```bash
-ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&client_id=mdqradminservice&client_secret=mdqradminservice-secret&username=admin&password=admin" \
+  -d "grant_type=password&client_id=hubadminservice&client_secret=hubadminservice-secret&username=admin&password=admin" \
   | jq -r '.access_token')
 ```
 
 ---
 
-## mdqr-ms-base — Desencriptación QR y certificados
+## hub-ms-base — Desencriptación QR y certificados
 
-Accesible para partners a través del gateway en `/partner/v1/` (JWT realm `mdqr-partner`).
-Accesible para admins a través del gateway en `/services/mdqrbaseservice/` (JWT realm `mdqr-admin`).
+Accesible para partners a través del gateway en `/partner/v1/` (JWT realm `hub-partner`).
+Accesible para admins a través del gateway en `/services/hubbaseservice/` (JWT realm `hub-admin`).
 
 ### POST /api/qr/decode — Desencriptar QR
 
@@ -133,7 +133,7 @@ curl -s -X POST http://127.0.0.1:8080/partner/v1/qr/decode/file \
 
 **Curl ejemplo (admin):**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/qr/audits?status=ERROR&page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/qr/audits?status=ERROR&page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -147,7 +147,7 @@ curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/qr/audits?status=ERR
 
 **Curl ejemplo (admin):**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates?page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/certificates?page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -180,7 +180,7 @@ curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates?page=0&
 
 **Curl ejemplo:**
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -206,7 +206,7 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates 
 
 **Curl ejemplo:**
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/upload-file \
+curl -s -X POST http://127.0.0.1:8080/services/hubbaseservice/api/certificates/upload-file \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -F "file=@/ruta/certificado.pem" \
   -F "entityId=ENTITY-001" | jq
@@ -230,7 +230,7 @@ Valida el contenido PEM y retorna los metadatos del certificado sin persistirlo.
 
 **Curl ejemplo:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1" \
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/certificates/1" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -256,7 +256,7 @@ Retorna certificados que vencen en los próximos `{days}` días.
 
 **Curl ejemplo:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/expiring/30" \
+curl -s "http://127.0.0.1:8080/services/hubbaseservice/api/certificates/expiring/30" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -359,9 +359,9 @@ Crea una nueva versión del certificado. El anterior queda en estado `SUPERSEDED
 
 ---
 
-## mdqr-ms-auth — Autenticación y RBAC
+## hub-ms-auth — Autenticación y RBAC
 
-Accesible a través del gateway en `/services/mdqradminservice/` (JWT realm `mdqr-admin`).
+Accesible a través del gateway en `/services/hubadminservice/` (JWT realm `hub-admin`).
 
 ---
 
@@ -370,7 +370,7 @@ Accesible a través del gateway en `/services/mdqradminservice/` (JWT realm `mdq
 #### POST /admin/auth/login
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/auth/login \
+curl -s -X POST http://127.0.0.1:8080/services/hubadminservice/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "admin"}' | jq
 ```
@@ -431,7 +431,7 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/auth/login
 #### GET /admin/auth/me — Perfil del usuario autenticado
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -455,7 +455,7 @@ curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
 Retorna el árbol de menús y acciones permitidas para el usuario autenticado.
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me/permissions \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me/permissions \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -494,7 +494,7 @@ Base: `/admin/users`
 
 **Curl listar usuarios:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/users?page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/users?page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -570,7 +570,7 @@ Base: `/admin/actions`
 
 **Curl ejemplo:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit?from=2026-06-01T00:00:00Z&page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit?from=2026-06-01T00:00:00Z&page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -579,7 +579,7 @@ curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit?from=2026-0
 #### GET /admin/audit/{id} — Detalle de evento de auditoría
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/123" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit/123" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -604,7 +604,7 @@ Acepta los mismos query params que `GET /admin/audit`.
 **Response 200:** archivo CSV con `Content-Disposition: attachment; filename=audit-export.csv`
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/export?from=2026-06-01T00:00:00Z" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit/export?from=2026-06-01T00:00:00Z" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -o audit-export.csv
 ```
@@ -615,34 +615,34 @@ curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/export?from
 
 | Método | Gateway path | Microservicio | Auth |
 |--------|-------------|---------------|------|
-| POST | `/oauth2/token` | Keycloak mdqr-partner | Sin auth |
-| POST | `/partner/v1/qr/decode` | ms-base `/api/qr/decode` | JWT mdqr-partner |
-| POST | `/partner/v1/qr/decode/file` | ms-base `/api/qr/decode/file` | JWT mdqr-partner |
-| GET | `/services/mdqrbaseservice/api/qr/audits` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/upload-file` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/validate` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/{id}` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/{id}/pem` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/entity/{entityId}` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/expiring/{days}` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/activate` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/deactivate` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/revoke` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/replace` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/audits` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqradminservice/admin/auth/login` | ms-auth | Sin auth |
-| POST | `/services/mdqradminservice/admin/auth/refresh` | ms-auth | Sin auth |
-| POST | `/services/mdqradminservice/admin/auth/logout` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/auth/me` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/auth/me/permissions` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/users/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/roles/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/menus/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/actions/**` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/{id}` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/event-types` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/modules` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/export` | ms-auth | JWT mdqr-admin |
+| POST | `/oauth2/token` | Keycloak hub-partner | Sin auth |
+| POST | `/partner/v1/qr/decode` | ms-base `/api/qr/decode` | JWT hub-partner |
+| POST | `/partner/v1/qr/decode/file` | ms-base `/api/qr/decode/file` | JWT hub-partner |
+| GET | `/services/hubbaseservice/api/qr/audits` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/upload-file` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/validate` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates/{id}` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates/{id}/pem` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates/entity/{entityId}` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates/expiring/{days}` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/{id}/activate` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/{id}/deactivate` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/{id}/revoke` | ms-base | JWT hub-admin |
+| POST | `/services/hubbaseservice/api/certificates/{id}/replace` | ms-base | JWT hub-admin |
+| GET | `/services/hubbaseservice/api/certificates/audits` | ms-base | JWT hub-admin |
+| POST | `/services/hubadminservice/admin/auth/login` | ms-auth | Sin auth |
+| POST | `/services/hubadminservice/admin/auth/refresh` | ms-auth | Sin auth |
+| POST | `/services/hubadminservice/admin/auth/logout` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/auth/me` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/auth/me/permissions` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/users/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/roles/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/menus/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/actions/**` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/{id}` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/event-types` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/modules` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/export` | ms-auth | JWT hub-admin |

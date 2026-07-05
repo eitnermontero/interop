@@ -1,5 +1,8 @@
 # Guía de Producción — Scripts de Bootstrap, Alta de Partners y PKI
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 **Documento operativo** · Hub de Interoperabilidad FELCN · Dominio `felcn.gob.bo`
 
 > Objetivo: dejar por escrito **cómo se configura el hub desde cero por script**,
@@ -36,8 +39,8 @@
 | `tools.sh` | bootstrap | Levanta el stack Docker de tools (Keycloak, Consul, Vault, Redis). |
 | `create-pki.sh` | bootstrap + por partner | Genera CA raíz, cert de servidor, truststore y certs de cliente (OpenSSL). |
 | `vault-seed.sh` | bootstrap (por namespace) | Escribe los KV que las apps leen al arrancar (redis, db, keycloak). |
-| `keycloak-sync-admin.sh` | bootstrap | Crea/sincroniza realm `mdqr-admin` (clients, roles, scopes, SPA). |
-| `keycloak-sync-partner.sh` | bootstrap + por partner | Crea/sincroniza realm `mdqr-partner`; `--add-client` para un partner. |
+| `keycloak-sync-admin.sh` | bootstrap | Crea/sincroniza realm `hub-admin` (clients, roles, scopes, SPA). |
+| `keycloak-sync-partner.sh` | bootstrap + por partner | Crea/sincroniza realm `hub-partner`; `--add-client` para un partner. |
 | `create-partner.sh` | por partner | Crea client M2M + secreto en Vault + (opcional) registros en DB. |
 | `build-images.sh` | por release | Construye imágenes Docker con `Dockerfile.service`. |
 | `env-sync.sh` | soporte | Sincroniza variables de entorno entre configs. |
@@ -52,11 +55,11 @@ Orden estricto. Cada paso deja listo el siguiente.
 
 ```bash
 # Red docker compartida
-docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 mdqr-shared
+docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 hub-shared
 
 # PostgreSQL en el host (no en el stack tools). Crear las DBs:
 #   hub_interop  (ms-base / decode + hub_audit_log, outbox)  schema public
-#   mdqr_auth    (ms-auth / admin)                            schema admin
+#   hub_auth    (ms-auth / admin)                            schema admin
 ```
 
 Herramientas requeridas en el host: `docker`, `curl`, `jq`, `openssl`, `keytool` (JDK), `nginx`.
@@ -96,13 +99,13 @@ Produce en `deploy/certs/`: `ca.crt`, `ca.key` (⚠️ secreto), `server.p12`,
 ### 2.4 Sembrar Vault (KV) por namespace
 
 ```bash
-# Namespace mdqr-auth (ms-auth)
-VAULT_TOKEN=<token> TOOLS_HOST=<IP_HOST> DB_NAME=mdqr_auth DB_PASSWORD='***' \
-  deploy/scripts/vault-seed.sh --ns mdqr-auth --kc-realm mdqr-admin --external https://vault.felcn:8200
+# Namespace hub-auth (ms-auth)
+VAULT_TOKEN=<token> TOOLS_HOST=<IP_HOST> DB_NAME=hub_auth DB_PASSWORD='***' \
+  deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin --external https://vault.felcn:8200
 
-# Namespace mdqr-decode (ms-base + gateway)
+# Namespace hub-base (ms-base + gateway)
 VAULT_TOKEN=<token> TOOLS_HOST=<IP_HOST> DB_NAME=hub_interop DB_PASSWORD='***' \
-  deploy/scripts/vault-seed.sh --ns mdqr-decode --kc-realm mdqr-admin --external https://vault.felcn:8200
+  deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin --external https://vault.felcn:8200
 ```
 
 > El flag `--external` usa un container Vault efímero (no requiere CLI en el host)
@@ -122,15 +125,15 @@ KC_URL=http://<IP_HOST>:8180 KC_PASSWORD='<ADMIN_PWD>' \
 
 ```bash
 deploy/scripts/build-images.sh   # usa deploy/docker/Dockerfile.service
-# push al registry cr.sintesis.com.bo/mdqr/...
+# push al registry cr.sintesis.com.bo/hub/...
 ```
 
 ### 2.7 Configurar y levantar los servicios
 
 ```bash
 cp deploy/production/.env.example deploy/production/.env
-# Completar todos los <REQUERIDO>: MDQR_KEYCLOAK_URL, MDQR_VAULT_TOKEN,
-# MDQR_SSL_*_PASSWORD (deben coincidir con create-pki.sh), CORS, DB URLs.
+# Completar todos los <REQUERIDO>: HUB_KEYCLOAK_URL, HUB_VAULT_TOKEN,
+# HUB_SSL_*_PASSWORD (deben coincidir con create-pki.sh), CORS, DB URLs.
 docker compose -f deploy/production/docker-compose.yml up -d
 ```
 
@@ -192,8 +195,8 @@ SHA-256 (Base64url)** = el `cnf.x5t#S256` que Keycloak pondrá en el token.
 ### Paso B — Client M2M + secreto en Vault (+ opcional DB)
 
 ```bash
-KC_URL=http://<IP_HOST>:8180 KC_REALM=mdqr-partner KC_PASSWORD='<ADMIN_PWD>' \
-VAULT_CONTAINER=mdqr-vault VAULT_TOKEN='<token>' \
+KC_URL=http://<IP_HOST>:8180 KC_REALM=hub-partner KC_PASSWORD='<ADMIN_PWD>' \
+VAULT_CONTAINER=hub-vault VAULT_TOKEN='<token>' \
   deploy/scripts/create-partner.sh --name <nombre-partner> \
     --client-secret '<SECRETO-FUERTE>' \
     --roles "qr:decode"
@@ -204,7 +207,7 @@ VAULT_CONTAINER=mdqr-vault VAULT_TOKEN='<token>' \
 
 ### Paso C — Habilitar X.509 en Keycloak (una vez por realm)
 
-Para que Keycloak emita el `cnf.x5t#S256`, el realm `mdqr-partner` debe tener
+Para que Keycloak emita el `cnf.x5t#S256`, el realm `hub-partner` debe tener
 **X.509/Validate Certificate** configurado (client authenticator o mapper que lea
 el cert reenviado `X-SSL-Client-Cert`). Esto se configura una sola vez.
 
@@ -304,17 +307,17 @@ quedan inválidos**. Por lo tanto, migrar a Vault PKI **obliga** a:
 | **CA mTLS interna** | La CA del hub (`create-pki.sh` o Vault PKI) que firma los certs de partners. |
 | **Vault** | Persistente + unseal + AppRole + backup (ver §6.2). Habilitar **Transit** (firma de auditoría) y, si se migra, **PKI**. |
 | **Keycloak** | Storage `postgres` (no `dev-file`), issuer estable = hostname del dominio, HTTPS. |
-| **PostgreSQL** | DBs `hub_interop` y `mdqr_auth`, backups, retención de `hub_audit_log`/`outbox`. |
+| **PostgreSQL** | DBs `hub_interop` y `hub_auth`, backups, retención de `hub_audit_log`/`outbox`. |
 | **Consul / Redis** | Persistentes; considerar profile `cluster` para HA. |
 | **nginx** | Terminación TLS pública + (al activar) validación mTLS de cliente + reenvío `X-SSL-Client-Cert`. |
 
 ### 7.2 Endurecimiento obligatorio antes de prod (cambiar defaults de dev)
 
 - [ ] `KEYSTORE_PASSWORD` / `TRUSTSTORE_PASSWORD` ≠ `changeit`.
-- [ ] `MDQR_VAULT_TOKEN` = AppRole, **no** token `root`.
+- [ ] `HUB_VAULT_TOKEN` = AppRole, **no** token `root`.
 - [ ] `client_secret` de cada partner **fuerte** (no `= client_id`, que es el default del script).
 - [ ] `SERVER_CN` de la PKI = dominio, no IP `172.16.76.20`.
-- [ ] `MDQR_KEYCLOAK_URL` / `external-url` = hostname real del dominio (issuer consistente).
+- [ ] `HUB_KEYCLOAK_URL` / `external-url` = hostname real del dominio (issuer consistente).
 - [ ] CORS restringido al dominio del frontend (no `*`).
 - [ ] `HUB_MTLS_TEST_MODE=false` y mTLS real activado en nginx (§2.8).
 - [ ] Habilitar validación JWT en **ms-base** (hoy `permitAll` — modo desarrollo).
@@ -354,12 +357,12 @@ En producción con `felcn.gob.bo`, lo natural es **(A)**.
 ## 8. Checklist resumido de puesta en producción
 
 **Bootstrap (una vez):**
-1. [ ] Red docker + DBs `hub_interop` / `mdqr_auth`.
+1. [ ] Red docker + DBs `hub_interop` / `hub_auth`.
 2. [ ] tools.sh --up (Vault persistente en prod).
 3. [ ] create-pki.sh con `SERVER_CN=<dominio>` y passwords fuertes.
-4. [ ] vault-seed.sh por namespace (`mdqr-auth`, `mdqr-decode`) con token real.
+4. [ ] vault-seed.sh por namespace (`hub-auth`, `hub-base`) con token real.
 5. [ ] keycloak-sync-admin.sh + keycloak-sync-partner.sh.
-6. [ ] X.509 client auth configurado en realm `mdqr-partner`.
+6. [ ] X.509 client auth configurado en realm `hub-partner`.
 7. [ ] build-images.sh + push.
 8. [ ] .env de producción completo + `docker compose up`.
 9. [ ] nginx con TLS público del dominio + mTLS activado.

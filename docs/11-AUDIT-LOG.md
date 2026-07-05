@@ -1,19 +1,22 @@
 # 11 - Audit Logs
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Descripcion General
 
-El sistema MDQR implementa auditoría en dos módulos con propósitos distintos:
+El sistema HUB implementa auditoría en dos módulos con propósitos distintos:
 
-1. **`mdqr-ms-auth`** — audita las acciones del panel administrativo: logins, CRUD de usuarios, roles, menús y permisos.
-2. **`mdqr-ms-base`** — audita las operaciones de negocio: desencriptaciones QR y operaciones sobre certificados digitales.
+1. **`hub-ms-auth`** — audita las acciones del panel administrativo: logins, CRUD de usuarios, roles, menús y permisos.
+2. **`hub-ms-base`** — audita las operaciones de negocio: desencriptaciones QR y operaciones sobre certificados digitales.
 
 ---
 
-## Auditoría en mdqr-ms-auth
+## Auditoría en hub-ms-auth
 
 ### Tabla audit_log
 
-Base de datos: `mdqr_auth`, schema: `admin`.
+Base de datos: `hub_auth`, schema: `admin`.
 
 ```sql
 CREATE TABLE admin.audit_log (
@@ -90,11 +93,11 @@ La consulta y exportacion del log requieren las acciones `READ` y `EXPORT` respe
 
 ---
 
-## Auditoría en mdqr-ms-base
+## Auditoría en hub-ms-base
 
 ### Tabla decryption_log
 
-Base de datos: `mdqr_decode`, schema: `public`.
+Base de datos: `hub_base`, schema: `public`.
 
 Registra cada llamada al endpoint de desencriptacion.
 
@@ -119,7 +122,7 @@ El QR no se almacena completo — solo su hash SHA-256. Esto garantiza que los d
 
 ### Tabla certificate_audit_log
 
-Base de datos: `mdqr_decode`, schema: `public`.
+Base de datos: `hub_base`, schema: `public`.
 
 Registra operaciones sobre certificados digitales.
 
@@ -161,20 +164,20 @@ GET  /api/certificates/audits
 
 ## Acceso via Gateway
 
-Los tres tipos de log se consultan usando un JWT del realm `mdqr-admin`:
+Los tres tipos de log se consultan usando un JWT del realm `hub-admin`:
 
 ```bash
 # Log de desencriptaciones QR
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "http://127.0.0.1:8080/services/mdqrbaseservice/api/qr/audits?from=2026-01-01T00:00:00Z"
+  "http://127.0.0.1:8080/services/hubbaseservice/api/qr/audits?from=2026-01-01T00:00:00Z"
 
 # Log de operaciones de certificados
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/audits"
+  "http://127.0.0.1:8080/services/hubbaseservice/api/certificates/audits"
 
 # Log de acciones del panel admin
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  "http://127.0.0.1:8080/services/mdqradminservice/admin/audit"
+  "http://127.0.0.1:8080/services/hubadminservice/admin/audit"
 ```
 
 ---

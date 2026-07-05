@@ -24,12 +24,12 @@ Estado: Aceptado · Fecha: 2026-06-22 · Revisión: 2 (2026-06-22)
 El hub está incorporando el dominio de **interoperabilidad de casos penales
 (POL/FELCN ↔ MP)**. Históricamente convivían varias formas de respuesta:
 
-1. **El hub** (módulo `mdqr-ms-base`, Spring Boot 4 / MVC) tiene un
+1. **El hub** (módulo `hub-ms-base`, Spring Boot 4 / MVC) tiene un
    `GlobalExceptionHandler` que emitía errores con **`ProblemDetail` (RFC 7807 /
    RFC 9457)**: `type`, `title`, `status`, `detail` + propiedades extendidas
    (`timestamp`, `errorCode`, `violations`).
 
-2. **El gateway** (`mdqr-gateway`, WebFlux) emitía errores de seguridad
+2. **El gateway** (`hub-gateway`, WebFlux) emitía errores de seguridad
    (`ProblemDetailAuthEntryPoint`) y de routing (`GatewayExceptionHandler`)
    también como `ProblemDetail`.
 
@@ -654,7 +654,7 @@ hay dos subcasos:
 
 ## 6. Manejo de errores por capa (detalle)
 
-### 6.1. Capa 1 — Gateway (`mdqr-gateway`, WebFlux)
+### 6.1. Capa 1 — Gateway (`hub-gateway`, WebFlux)
 
 El gateway es el primer punto de contacto. Tres subcasos.
 
@@ -758,7 +758,7 @@ Mapeo de excepción → `error.code` / status:
 El handler debe verificar `response.isCommitted()` (como ya hace) antes de
 escribir; si la respuesta ya fue comprometida, no puede reescribir el body.
 
-### 6.2. Capa 2 — Microservicio base (`mdqr-ms-base`, MVC)
+### 6.2. Capa 2 — Microservicio base (`hub-ms-base`, MVC)
 
 Los requests que llegan aquí ya pasaron el gateway. Dos subcasos.
 

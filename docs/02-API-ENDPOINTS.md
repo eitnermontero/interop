@@ -1,5 +1,8 @@
 # 02 - API Endpoints
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Convenciones
 
 - Gateway base URL: `http://127.0.0.1:8080`
@@ -14,7 +17,7 @@
 
 ## Obtener tokens
 
-### Token partner (vía gateway — realm mdqr-partner)
+### Token partner (vía gateway — realm hub-partner)
 
 ```bash
 PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
@@ -23,345 +26,96 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
   | jq -r '.access_token')
 ```
 
-### Token admin (directo a Keycloak — realm mdqr-admin)
+### Token admin (directo a Keycloak — realm hub-admin)
 
 ```bash
-ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+ADMIN_TOKEN=$(curl -s -X POST http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password&client_id=mdqradminservice&client_secret=mdqradminservice-secret&username=admin&password=admin" \
+  -d "grant_type=password&client_id=hubadminservice&client_secret=hubadminservice-secret&username=admin&password=admin" \
   | jq -r '.access_token')
 ```
 
 ---
 
-## mdqr-ms-base — Desencriptación QR y certificados
+## hub-ms-base — Motor inbound genérico
 
-Accesible para partners a través del gateway en `/partner/v1/` (JWT realm `mdqr-partner`).
-Accesible para admins a través del gateway en `/services/mdqrbaseservice/` (JWT realm `mdqr-admin`).
+Accesible para partners a través del gateway en `/partner/v1/` (JWT realm `hub-partner`),
+reescrito a `/api/` en el microservicio. Los endpoints de negocio QR/certificados del
+producto anterior fueron **eliminados** (ver `docs/adr/ADR-0004-eliminacion-qr.md`);
+hoy ms-base expone un **dispatcher genérico** que valida el payload contra el contrato
+declarativo del producto y lo reenvía al sistema interno destino.
 
-### POST /api/qr/decode — Desencriptar QR
+### POST /api/inbound/{product}/{version} — Crear recurso
 
-Desencripta el contenido de un código QR. Acepta datos pre-procesados o imagen en base64.
+Ejemplo de producto registrado: `CASO_PENAL` / `v1`.
 
-**Request:**
+**Headers relevantes:**
+
+| Header | Requerido | Descripción |
+|---|---|---|
+| `Authorization` | Sí | Bearer JWT realm `hub-partner` (scope `https://api.sintesis.com.bo/caso.penal`) |
+| `X-Partner-Id` | No | Identificador lógico del partner |
+| `X-Correlation-ID` | No | Se genera uno (UUID) si no se envía; siempre se devuelve en la respuesta |
+| `X-Idempotency-Key` | No | Clave de idempotencia de la operación |
+
+**Request:** JSON libre validado contra el contrato del producto (`ContractRegistry`).
+
+**Response (envelope `ApiResponse`):**
 ```json
 {
-    "inputType": "DECODED_DATA",
-    "content": "...",
-    "entityIdRequest": "OPCIONAL",
-    "externalReference": "OPCIONAL",
-    "metadata": {}
+    "success": true,
+    "status": 201,
+    "message": "...",
+    "data": { },
+    "error": null
 }
 ```
 
-| Campo | Tipo | Requerido | Descripción |
-|---|---|---|---|
-| `inputType` | string | Si | `DECODED_DATA` o `BASE64_IMAGE` |
-| `content` | string | Si | Datos del QR o imagen en base64 |
-| `entityIdRequest` | string | No | ID de entidad para filtrar el certificado |
-| `externalReference` | string | No | Referencia externa para trazabilidad |
-| `metadata` | object | No | Metadatos adicionales libres |
+En error, `error` contiene `{ "code", "detail", "violations": [{ "field", "message" }] }`.
 
-**Response 200:**
-```json
-{
-    "logId": "a1b2c3d4-e5f6-...",
-    "decryptedData": "...",
-    "certificateCode": "CERT-001",
-    "entityId": "ENTITY-001",
-    "qrType": "TIPO_QR",
-    "processingTimeMs": 123,
-    "decryptedAt": "2026-06-15T10:00:00Z",
-    "fromCache": false
-}
-```
+**Errores:** `403 PRODUCT_NOT_AUTHORIZED` (producto/versión no registrado),
+`400 VALIDATION_ERROR` (payload no cumple el contrato), `FORWARD_ERROR`
+(fallo al reenviar al sistema interno; respeta el status del destino).
 
 **Curl ejemplo (partner):**
 ```bash
-curl -s -X POST http://127.0.0.1:8080/partner/v1/qr/decode \
+curl -s -X POST http://127.0.0.1:8080/partner/v1/inbound/CASO_PENAL/v1 \
   -H "Authorization: Bearer $PARTNER_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "inputType": "DECODED_DATA",
-    "content": "datos-del-qr"
-  }' | jq
+  -H "X-Correlation-ID: $(uuidgen)" \
+  -d '{ "...payload del caso penal..." : "..." }' | jq
 ```
 
 ---
 
-### POST /api/qr/decode/file — Desencriptar QR desde imagen
+### PATCH /api/inbound/{product}/{version}/{id} — Editar recurso
 
-Acepta una imagen del código QR como archivo multipart.
+Convención de routing: resuelve el contrato `{product}_EDITAR/{version}`
+(p.ej. `CASO_PENAL_EDITAR/v1`). El `{id}` del path (entero) se inyecta en el payload
+bajo el campo `resourceIdField` del contrato; si el body lo incluye, el valor del
+path prevalece.
 
-**Request:** `multipart/form-data`
-
-| Param | Tipo | Requerido | Descripción |
-|---|---|---|---|
-| `file` | MultipartFile | Si | Imagen del código QR |
-| `entityIdRequest` | string | No | ID de entidad |
-| `externalReference` | string | No | Referencia externa |
-
-**Response 200:** igual a `/api/qr/decode`
+**Errores adicionales:** `400 INVALID_RESOURCE_ID` si `{id}` no es un entero.
 
 **Curl ejemplo (partner):**
 ```bash
-curl -s -X POST http://127.0.0.1:8080/partner/v1/qr/decode/file \
+curl -s -X PATCH http://127.0.0.1:8080/partner/v1/inbound/CASO_PENAL/v1/12345 \
   -H "Authorization: Bearer $PARTNER_TOKEN" \
-  -F "file=@/ruta/imagen.png" | jq
-```
-
----
-
-### GET /api/qr/audits — Auditoría de desencriptaciones
-
-**Query params:**
-
-| Param | Tipo | Descripción |
-|---|---|---|
-| `keycloakClientId` | string | Filtrar por client ID del partner |
-| `certificateCode` | string | Filtrar por código de certificado |
-| `entityId` | string | Filtrar por entidad |
-| `status` | string | `SUCCESS` o `ERROR` |
-| `fromDate` | string (ISO-8601) | Fecha inicio |
-| `toDate` | string (ISO-8601) | Fecha fin |
-| `page` | int | Página (default 0) |
-| `size` | int | Tamaño (default 20, max 100) |
-| `sort` | string | Campo de ordenamiento (default `createdDate`) |
-| `order` | string | `asc` o `desc` (default `desc`) |
-
-**Response 200:** Page de registros de auditoría. Header `X-Total-Count` con el total.
-
-**Curl ejemplo (admin):**
-```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/qr/audits?status=ERROR&page=0&size=20" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
-```
-
----
-
-### GET /api/certificates — Listar certificados
-
-**Query params:** Pageable estándar (`page`, `size`, `sort`)
-
-**Response 200:** Page de `CertificateDTO`. Header `X-Total-Count`.
-
-**Curl ejemplo (admin):**
-```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates?page=0&size=20" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
-```
-
----
-
-### POST /api/certificates — Crear certificado
-
-**Request:**
-```json
-{
-    "pemContent": "-----BEGIN CERTIFICATE-----\n...\n-----END CERTIFICATE-----",
-    "entityId": "ENTITY-001",
-    "entityName": "Nombre entidad",
-    "description": "Descripción opcional",
-    "tags": ["tag1", "tag2"],
-    "notificationEmails": ["admin@empresa.com"]
-}
-```
-
-| Campo | Tipo | Requerido |
-|---|---|---|
-| `pemContent` | string | Si |
-| `entityId` | string | Si |
-| `entityName` | string | No |
-| `description` | string | No |
-| `tags` | string[] | No |
-| `notificationEmails` | string[] | No |
-
-**Response 201:** `CertificateDTO`
-
-**Curl ejemplo:**
-```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
   -H "Content-Type: application/json" \
-  -d '{
-    "pemContent": "-----BEGIN CERTIFICATE-----\n...",
-    "entityId": "ENTITY-001"
-  }' | jq
+  -d '{ "...campos a editar..." : "..." }' | jq
 ```
 
 ---
 
-### POST /api/certificates/upload-file — Crear certificado desde archivo PEM
-
-**Request:** `multipart/form-data`
-
-| Param | Tipo | Requerido |
-|---|---|---|
-| `file` | MultipartFile | Si |
-| `entityId` | string | Si |
-| `entityName` | string | No |
-| `description` | string | No |
-
-**Response 201:** `CertificateDTO`
-
-**Curl ejemplo:**
-```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/upload-file \
-  -H "Authorization: Bearer $ADMIN_TOKEN" \
-  -F "file=@/ruta/certificado.pem" \
-  -F "entityId=ENTITY-001" | jq
-```
+Toda transacción inbound queda registrada en `hub_audit_log` (hash SHA-256 de
+request/response, cadena `prev_hash`) y genera el evento de medición vía `outbox_event`
+en la misma transacción (ver `11-AUDIT-LOG.md`).
 
 ---
 
-### POST /api/certificates/validate — Validar certificado sin guardarlo
+## hub-ms-auth — Autenticación y RBAC
 
-Valida el contenido PEM y retorna los metadatos del certificado sin persistirlo.
-
-**Request:** igual a `POST /api/certificates`
-
-**Response 200:** metadatos del certificado (sin `id`)
-
----
-
-### GET /api/certificates/{id} — Detalle de certificado
-
-**Response 200:** `CertificateDetailDTO` (incluye `pemContent`)
-
-**Curl ejemplo:**
-```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/1" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
-```
-
----
-
-### GET /api/certificates/{id}/pem — Descargar PEM
-
-**Response 200:** texto PEM con header `Content-Disposition: attachment; filename=certificate-{id}.pem`
-
----
-
-### GET /api/certificates/entity/{entityId} — Certificados por entidad
-
-**Response 200:** `List<CertificateDTO>`
-
----
-
-### GET /api/certificates/expiring/{days} — Certificados próximos a vencer
-
-Retorna certificados que vencen en los próximos `{days}` días.
-
-**Response 200:** `List<CertificateDTO>`
-
-**Curl ejemplo:**
-```bash
-curl -s "http://127.0.0.1:8080/services/mdqrbaseservice/api/certificates/expiring/30" \
-  -H "Authorization: Bearer $ADMIN_TOKEN" | jq
-```
-
----
-
-### POST /api/certificates/{id}/activate — Activar certificado
-
-**Response 200:** `CertificateDTO`
-
----
-
-### POST /api/certificates/{id}/deactivate — Desactivar certificado
-
-**Response 200:** `CertificateDTO`
-
----
-
-### POST /api/certificates/{id}/revoke — Revocar certificado
-
-**Request:**
-```json
-{
-    "reason": "Motivo de revocación"
-}
-```
-
-**Response 200:** `CertificateDTO`
-
----
-
-### POST /api/certificates/{id}/replace — Reemplazar certificado
-
-Crea una nueva versión del certificado. El anterior queda en estado `SUPERSEDED`.
-
-**Request:**
-```json
-{
-    "newPemContent": "-----BEGIN CERTIFICATE-----\n...",
-    "changeReason": "Renovación anual"
-}
-```
-
-**Response 201:** `CertificateDTO` (nueva versión)
-
----
-
-### GET /api/certificates/audits — Auditoría de certificados
-
-**Query params:**
-
-| Param | Tipo | Descripción |
-|---|---|---|
-| `certificateId` | long | Filtrar por ID de certificado |
-| `serialNumber` | string | Filtrar por número de serie |
-| `action` | string | Acción realizada |
-| `userId` | string | ID del usuario que realizó la acción |
-| `success` | boolean | Si la operación fue exitosa |
-| `fromDate` | string (ISO-8601) | Fecha inicio |
-| `toDate` | string (ISO-8601) | Fecha fin |
-| `page` | int | Página (default 0) |
-| `size` | int | Tamaño (default 20) |
-| `sort` | string | Campo de ordenamiento |
-
-**Response 200:** Page con header `X-Total-Count`.
-
----
-
-### CertificateDTO — Campos
-
-| Campo | Tipo | Descripción |
-|---|---|---|
-| `id` | long | ID interno |
-| `serialNumber` | string | Número de serie del certificado |
-| `fingerprintSha256` | string | Huella SHA-256 |
-| `entityId` | string | ID de la entidad propietaria |
-| `entityName` | string | Nombre de la entidad |
-| `subjectDn` | string | DN del sujeto |
-| `issuerDn` | string | DN del emisor |
-| `issuerCn` | string | CN del emisor |
-| `validFrom` | string (ISO-8601) | Inicio de validez |
-| `validTo` | string (ISO-8601) | Fin de validez |
-| `daysRemaining` | int | Días restantes hasta vencimiento |
-| `status` | string | `ACTIVE`, `EXPIRING_SOON`, `EXPIRED`, `REVOKED`, `SUPERSEDED` |
-| `versionNumber` | int | Número de versión |
-| `isCurrentVersion` | boolean | Si es la versión activa |
-| `isActive` | boolean | Si está activo |
-| `isRevoked` | boolean | Si está revocado |
-| `revokedAt` | string (ISO-8601) | Fecha de revocación |
-| `revokedBy` | string | Usuario que revocó |
-| `revokedReason` | string | Motivo de revocación |
-| `description` | string | Descripción |
-| `tags` | string[] | Etiquetas |
-| `notificationEmails` | string[] | Emails para notificaciones de vencimiento |
-| `createdDate` | string (ISO-8601) | Fecha de creación |
-| `createdBy` | string | Usuario que creó |
-| `lastModifiedDate` | string (ISO-8601) | Última modificación |
-| `lastModifiedBy` | string | Usuario que modificó |
-
-`CertificateDetailDTO` extiende `CertificateDTO` e incluye además el campo `pemContent`.
-
----
-
-## mdqr-ms-auth — Autenticación y RBAC
-
-Accesible a través del gateway en `/services/mdqradminservice/` (JWT realm `mdqr-admin`).
+Accesible a través del gateway en `/services/hubadminservice/` (JWT realm `hub-admin`).
 
 ---
 
@@ -370,7 +124,7 @@ Accesible a través del gateway en `/services/mdqradminservice/` (JWT realm `mdq
 #### POST /admin/auth/login
 
 ```bash
-curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/auth/login \
+curl -s -X POST http://127.0.0.1:8080/services/hubadminservice/admin/auth/login \
   -H "Content-Type: application/json" \
   -d '{"username": "admin", "password": "admin"}' | jq
 ```
@@ -431,7 +185,7 @@ curl -s -X POST http://127.0.0.1:8080/services/mdqradminservice/admin/auth/login
 #### GET /admin/auth/me — Perfil del usuario autenticado
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -455,7 +209,7 @@ curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me \
 Retorna el árbol de menús y acciones permitidas para el usuario autenticado.
 
 ```bash
-curl -s http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me/permissions \
+curl -s http://127.0.0.1:8080/services/hubadminservice/admin/auth/me/permissions \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -494,7 +248,7 @@ Base: `/admin/users`
 
 **Curl listar usuarios:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/users?page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/users?page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -570,7 +324,7 @@ Base: `/admin/actions`
 
 **Curl ejemplo:**
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit?from=2026-06-01T00:00:00Z&page=0&size=20" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit?from=2026-06-01T00:00:00Z&page=0&size=20" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -579,7 +333,7 @@ curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit?from=2026-0
 #### GET /admin/audit/{id} — Detalle de evento de auditoría
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/123" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit/123" \
   -H "Authorization: Bearer $ADMIN_TOKEN" | jq
 ```
 
@@ -604,7 +358,7 @@ Acepta los mismos query params que `GET /admin/audit`.
 **Response 200:** archivo CSV con `Content-Disposition: attachment; filename=audit-export.csv`
 
 ```bash
-curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/export?from=2026-06-01T00:00:00Z" \
+curl -s "http://127.0.0.1:8080/services/hubadminservice/admin/audit/export?from=2026-06-01T00:00:00Z" \
   -H "Authorization: Bearer $ADMIN_TOKEN" \
   -o audit-export.csv
 ```
@@ -615,34 +369,20 @@ curl -s "http://127.0.0.1:8080/services/mdqradminservice/admin/audit/export?from
 
 | Método | Gateway path | Microservicio | Auth |
 |--------|-------------|---------------|------|
-| POST | `/oauth2/token` | Keycloak mdqr-partner | Sin auth |
-| POST | `/partner/v1/qr/decode` | ms-base `/api/qr/decode` | JWT mdqr-partner |
-| POST | `/partner/v1/qr/decode/file` | ms-base `/api/qr/decode/file` | JWT mdqr-partner |
-| GET | `/services/mdqrbaseservice/api/qr/audits` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/upload-file` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/validate` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/{id}` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/{id}/pem` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/entity/{entityId}` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/expiring/{days}` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/activate` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/deactivate` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/revoke` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqrbaseservice/api/certificates/{id}/replace` | ms-base | JWT mdqr-admin |
-| GET | `/services/mdqrbaseservice/api/certificates/audits` | ms-base | JWT mdqr-admin |
-| POST | `/services/mdqradminservice/admin/auth/login` | ms-auth | Sin auth |
-| POST | `/services/mdqradminservice/admin/auth/refresh` | ms-auth | Sin auth |
-| POST | `/services/mdqradminservice/admin/auth/logout` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/auth/me` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/auth/me/permissions` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/users/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/roles/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/menus/**` | ms-auth | JWT mdqr-admin |
-| `*` | `/services/mdqradminservice/admin/actions/**` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/{id}` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/event-types` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/modules` | ms-auth | JWT mdqr-admin |
-| GET | `/services/mdqradminservice/admin/audit/export` | ms-auth | JWT mdqr-admin |
+| POST | `/oauth2/token` | Keycloak hub-partner | Sin auth |
+| POST | `/partner/v1/inbound/{product}/{version}` | ms-base `/api/inbound/{product}/{version}` | JWT hub-partner |
+| PATCH | `/partner/v1/inbound/{product}/{version}/{id}` | ms-base `/api/inbound/{product}/{version}/{id}` | JWT hub-partner |
+| POST | `/services/hubadminservice/admin/auth/login` | ms-auth | Sin auth |
+| POST | `/services/hubadminservice/admin/auth/refresh` | ms-auth | Sin auth |
+| POST | `/services/hubadminservice/admin/auth/logout` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/auth/me` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/auth/me/permissions` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/users/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/roles/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/menus/**` | ms-auth | JWT hub-admin |
+| `*` | `/services/hubadminservice/admin/actions/**` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/{id}` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/event-types` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/modules` | ms-auth | JWT hub-admin |
+| GET | `/services/hubadminservice/admin/audit/export` | ms-auth | JWT hub-admin |

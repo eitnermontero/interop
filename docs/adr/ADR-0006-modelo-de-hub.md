@@ -168,7 +168,7 @@ Opción 2 (auditar evidencia no validada viola el ADR-0001 y deja el hub ciego).
 
 Todos estos componentes son **transversales**: aplican a **toda** transacción
 inbound, independientemente del `product`. Se implementan una vez y no cambian al
-agregar productos. (Paquete sugerido: `bo.com.sintesis.mdqr.base.hub.inbound`,
+agregar productos. (Paquete sugerido: `bo.com.sintesis.hub.base.hub.inbound`,
 respetando los nombres heredados.)
 
 | Componente | Tipo | Responsabilidad |
@@ -279,7 +279,7 @@ hizo el `ContractValidator`); solo entrega al destino y devuelve su resultado.
 
 ### 7.2. Adaptador stub/dummy — `StubInboundAdapter`
 
-Implementación que devuelve un ID simulado y `OK`. Vive en `mdqr-ms-base`. Se
+Implementación que devuelve un ID simulado y `OK`. Vive en `hub-ms-base`. Se
 activa **solo** con perfil `local` **o** flag `hub.inbound.stub-mode=true`:
 
 ```java
@@ -501,7 +501,7 @@ firmar (async/no bloqueante) → responder.
 
 | # | Componente | Qué hace | ¿Audita? | ¿Hashea? | ¿DB? | Transacción |
 |---|---|---|---|---|---|---|
-| 1 | **Gateway** | mTLS + RFC 8705 token binding; `CorrelationIdFilter` (WebFlux) resuelve/genera `X-Correlation-ID`; propaga `X-Partner-Id` derivado del cert; reescribe `/partner/v1/casos` → `/api/...` y rutea `lb://mdqrbaseservice`. | No | No | No | — |
+| 1 | **Gateway** | mTLS + RFC 8705 token binding; `CorrelationIdFilter` (WebFlux) resuelve/genera `X-Correlation-ID`; propaga `X-Partner-Id` derivado del cert; reescribe `/partner/v1/casos` → `/api/...` y rutea `lb://hubbaseservice`. | No | No | No | — |
 | 2 | **DispatcherController** (ms-base) | Recibe request genérico; lee body como `Map`; extrae `product=CASO_PENAL`, `version=v1` (de la ruta/headers). | No | No | No | — |
 | 3 | **ContractRegistry** | `lookup("CASO_PENAL","v1")` → `ContractDefinition` (§8.2). Si no existe → `ApiResponse` `RESOURCE_NOT_FOUND`/`PRODUCT_NOT_AUTHORIZED`, fin. | No | No | No | — |
 | 4 | **ContractValidator** | Valida el payload contra el contrato. Si hay violaciones → `ApiResponse` `VALIDATION_ERROR` (400) con `violations`. **No avanza** a hashear ni persistir. | No | No | No | — |
@@ -552,8 +552,8 @@ El hub **no conoce a sus consumidores**: los desacopla vía `outbox_event`.
 sequenceDiagram
     autonumber
     participant P as Partner (MP/POL)
-    participant GW as mdqr-gateway<br/>(mTLS + RFC 8705 + correlation)
-    box mdqr-ms-base (motor genérico)
+    participant GW as hub-gateway<br/>(mTLS + RFC 8705 + correlation)
+    box hub-ms-base (motor genérico)
         participant DC as DispatcherController
         participant CR as ContractRegistry
         participant CV as ContractValidator

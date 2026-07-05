@@ -1,5 +1,8 @@
 # Hub de Interoperabilidad — Arquitectura de Seguridad y Flujo de Petición
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 **Documento técnico-ejecutivo** · Versión 1.0 · 2026-06-30
 
 > Referencia para presentación técnica. Describe cómo el Hub protege cada
@@ -43,7 +46,7 @@ condición necesaria en **cada** llamada.
                 ▼
 ┌──────────────────────────────────────────────────────────────────────┐
 │  API GATEWAY (Spring Cloud Gateway, WebFlux)                           │
-│  · Valida el JWT (firma/issuer/expiración) — realm mdqr-partner        │
+│  · Valida el JWT (firma/issuer/expiración) — realm hub-partner        │
 │  · Valida el binding RFC 8705: cnf.x5t#S256 (JWT) == thumbprint(cert)  │
 │  · Valida suscripción/scope del partner                                │
 │  · Propaga X-Partner-Id y enruta al microservicio                      │

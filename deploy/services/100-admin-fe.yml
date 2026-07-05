@@ -1,13 +1,13 @@
 services:
-  mdqr-admin-fe:
-    image: ${MDQR_ADMIN_FE_IMAGE:-cr.sintesis.com.bo/mdqr-dev/mdqr-admin-fe}:${MDQR_ADMIN_FE_VERSION:-latest}
+  hub-admin-fe:
+    image: ${HUB_ADMIN_FE_IMAGE:-cr.sintesis.com.bo/hub-dev/hub-admin-fe}:${HUB_ADMIN_FE_VERSION:-latest}
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: ${MDQR_ADMIN_FE_MEM_LIMIT:-128M}
+          memory: ${HUB_ADMIN_FE_MEM_LIMIT:-128M}
         reservations:
-          memory: ${MDQR_ADMIN_FE_MEM_RESERVATION:-32M}
+          memory: ${HUB_ADMIN_FE_MEM_RESERVATION:-32M}
     volumes:
       - /etc/localtime:/etc/localtime:ro
     environment:
@@ -15,13 +15,13 @@ services:
       APP_API_URL: ${APP_API_URL:-}
       APP_KEYCLOAK_URL: ${APP_KEYCLOAK_URL:-}
       APP_KEYCLOAK_REALM: ${APP_KEYCLOAK_REALM:-}
-      APP_KEYCLOAK_CLIENT_ID: ${APP_KEYCLOAK_CLIENT_ID:-mdqr-admin-fe}
-      # Context-path runtime (sin rebuild): '/' = raiz, '/mdqradmin/' = bajo subpath.
-      APP_BASE_PATH: ${MDQR_ADMIN_FE_BASE_PATH:-/}
-      APP_NAME: ${APP_NAME:-MDQR Admin}
+      APP_KEYCLOAK_CLIENT_ID: ${APP_KEYCLOAK_CLIENT_ID:-hub-admin-fe}
+      # Context-path runtime (sin rebuild): '/' = raiz, '/hubadmin/' = bajo subpath.
+      APP_BASE_PATH: ${HUB_ADMIN_FE_BASE_PATH:-/}
+      APP_NAME: ${APP_NAME:-HUB Admin}
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost/health || exit 1"]
-      interval: ${MDQR_HC_WEB_INTERVAL:-30s}
-      timeout: ${MDQR_HC_WEB_TIMEOUT:-5s}
-      retries: ${MDQR_HC_WEB_RETRIES:-3}
-      start_period: ${MDQR_HC_WEB_START_PERIOD:-10s}
+      interval: ${HUB_HC_WEB_INTERVAL:-30s}
+      timeout: ${HUB_HC_WEB_TIMEOUT:-5s}
+      retries: ${HUB_HC_WEB_RETRIES:-3}
+      start_period: ${HUB_HC_WEB_START_PERIOD:-10s}

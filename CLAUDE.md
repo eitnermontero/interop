@@ -1,4 +1,4 @@
-# CLAUDE.md — MDQR (Middleware Decode QR)
+# CLAUDE.md — Hub de Interoperabilidad (hub-interop)
 
 Guía para agentes de Claude Code que trabajen en este monorepo. Documenta cada
 módulo, la infraestructura y los gotchas conocidos para tomar decisiones de
@@ -12,114 +12,114 @@ implementación sin tener que leer todo el código.
 
 ## Descripción del proyecto
 
-`middleware-decode-qr` (group `bo.com.sintesis.mdqr`) es un middleware que
-**desencripta y decodifica códigos QR cifrados** (RSA + certificados por entidad
-financiera) y expone un panel de administración. Está compuesto por un API
-Gateway, dos microservicios Spring Boot, una librería de auditoría compartida y
-un frontend Angular multi-app.
+`hub-interop` (group `bo.com.sintesis.hub`) es un **hub de interoperabilidad
+con terceros**: único punto de entrada y salida de información entre la empresa
+y las instituciones partner (Ministerio Público, Policía/FELCN). El primer
+dominio de negocio es el **intercambio de casos penales** (POL/FELCN ↔ MP).
+Está compuesto por un API Gateway, dos microservicios Spring Boot, una librería
+de auditoría compartida y un frontend Angular multi-app.
 
-- **Monorepo Gradle multi-módulo** (Groovy DSL, `settings.gradle`).
+> **Historia**: el proyecto nació de un middleware de decodificación de QR.
+> El negocio QR fue **eliminado** (ADR-0004) y el decoupling de nombres del
+> proyecto base se **ejecutó el 2026-07-03**: módulos, paquetes
+> (`bo.com.sintesis.hub.*`), realms (`hub-admin`/`hub-partner`), DBs
+> (`hub_auth`/`hub_base`), namespaces de Vault (`hub-auth`/`hub-base`) y
+> nombres de Consul (`hubadminservice`/`hubbaseservice`).
+
+- **Monorepo Gradle multi-módulo** (Groovy DSL, `settings.gradle`,
+  rootProject `hub-interop`).
 - **Java 25** (toolchain), **Spring Boot 4.0.5**, **Spring Cloud 2025.1.1**.
 - Versionado: versión central `projectVersion=1.0` + patch independiente por
   módulo en `gradle.properties` (resultando `1.0.x`).
 - Build de imágenes con **Jib** (base `eclipse-temurin:25-jre-alpine`,
-  registry `cr.sintesis.com.bo/mdqr-dev`) y soporte **GraalVM native**.
+  registry `cr.sintesis.com.bo/hub-dev`) y soporte **GraalVM native**.
 - Repos Maven: Maven Central + Nexus de Síntesis (`nexus.sintesis.com.bo`,
   requiere `NEXUS_USERNAME`/`NEXUS_PASSWORD`).
 
----
+### ADRs (en `docs/adr/`)
 
-## Hub de interoperabilidad
-
-El proyecto evolucionó a un **hub de interoperabilidad con terceros**
-(instituciones, negocios, partners, clientes), documentado en
-`docs/adr/ADR-0001-interop-hub.md`. El hub es el **único punto de entrada y de
-salida** de información entre la empresa y los terceros, en dos direcciones:
-
-- **Inbound**: los terceros consumen las APIs de negocio internas de la empresa
-  a través del hub.
-- **Outbound**: las aplicaciones internas consumen APIs de terceros **siempre a
-  través del hub, nunca directamente**.
+| ADR | Tema | Estado |
+|---|---|---|
+| ADR-0001 | Hub de interoperabilidad: mTLS + RFC 8705, auditoría hash-chain, outbox, ACL outbound | Base vigente |
+| ADR-0004 | Eliminación del negocio QR | Implementado |
+| ADR-0005 | Contrato de respuesta universal `ApiResponse<T>` + catálogo `error.code` | Vigente |
+| ADR-0006 | Motor genérico inbound (DispatcherController + contratos + InboundPort) | Vigente |
+| ADR-0007 | Registro declarativo de APIs (YAML) + auditoría de payloads | Propuesto |
 
 ### Reglas no negociables
 
-1. **mTLS + RFC 8705 (token enlazado al certificado)**: todo partner debe
-   presentar un **certificado de cliente** emitido por la **PKI de Vault** (motor
-   `pki`). El access token (OAuth2 client_credentials, Keycloak) queda
-   **criptográficamente ligado al certificado** (OAuth 2.0 mTLS, RFC 8705): un
-   token robado es inútil sin la clave privada del partner. Sin certificado
-   válido **mapeado a una suscripción activa** → rechazo en el edge.
+1. **mTLS + RFC 8705 (token enlazado al certificado)**: todo partner presenta
+   un certificado de cliente emitido por la **PKI de Vault**. El access token
+   (OAuth2 client_credentials, Keycloak realm `hub-partner`) queda ligado al
+   certificado (`cnf.x5t#S256`): un token robado es inútil sin la clave privada.
+   Sin certificado válido mapeado a una suscripción activa → rechazo en el edge.
 
 2. **Auditoría + hash de toda transacción**: cada transacción (inbound y
-   outbound) genera un registro de auditoría con **hash SHA-256 del request y del
-   response**, previa **canonicalización (JSON Canonicalization Scheme, RFC 8785)**
-   para que los hashes sean reproducibles en conciliaciones. Los registros forman
-   una **cadena de hashes** (`prev_hash`, tamper-evident) como evidencia de
-   integridad, se **firman** con clave gestionada por Vault y, si se requiere
-   almacenar el payload, se **cifran con Vault Transit** (nunca en claro).
+   outbound) genera un registro con **hash SHA-256 del request y del response**
+   (canonicalización RFC 8785), en **cadena de hashes** por partner
+   (`prev_hash` → `chain_hash`, tamper-evident), **firmada** con Vault Transit.
+   Payloads: inbound puede guardarse en claro, outbound **cifrado con Transit**
+   y visible solo bajo control de acceso auditado (ADR-0007).
 
-3. **Outbox para facturación**: el registro de auditoría y el evento de
-   facturación se escriben en la **misma transacción** de negocio sobre una tabla
-   `outbox`. Un relay consume el outbox y alimenta la medición/facturación, con
-   garantía **at-least-once + idempotencia por `idempotency_key`**. **Nunca
-   perder un evento facturable** ni desalinear lo auditado de lo facturado.
+3. **Sin facturación como lógica de negocio** (decisión 2026-07-03): no se
+   construye relay/medición/facturación. Los **reportes por cliente** (qué se
+   intercambió, cuánto, cuándo) salen de `hub_audit_log` (+ `connector_call_log`
+   cuando exista). El patrón outbox (`outbox_event`) se conserva como mecanismo
+   de propagación de eventos, no como pipeline de facturación. Las tablas
+   `hub_measurement` y `provider`/`provider_credential_ref` fueron **eliminadas**
+   de los changelogs (DB desde cero, 2026-07-03).
 
 4. **Apps internas nunca llaman APIs externas directo**: toda llamada a un
-   tercero pasa por el hub (**Anti-Corruption Layer / Facade**). El hub mantiene
-   un **adaptador por proveedor externo** que traduce el contrato canónico
-   interno al del proveedor, gestiona **credenciales en Vault**, aplica
-   **resiliencia (resilience4j: timeout, retry, circuit breaker, bulkhead)**,
-   **caché (Redis cuando aplica)**, auditoría y medición. Agregar un proveedor =
-   nuevo adaptador, cero cambios en las apps internas.
+   tercero pasa por el hub (Anti-Corruption Layer). Un **adaptador por
+   proveedor** traduce el contrato canónico, gestiona credenciales en Vault y
+   aplica resiliencia (resilience4j: timeout, retry, circuit breaker, bulkhead)
+   y caché (Redis cuando aplica). Ejemplo vigente: `EfxRateAdapter`.
 
-5. **Secretos en Vault, idempotencia**: **todas** las credenciales de terceros se
-   almacenan en **Vault** (nunca en config ni código). Las operaciones expuestas
-   deben ser **idempotentes** (usar `idempotency_key`).
+5. **Secretos en Vault, idempotencia**: todas las credenciales de terceros se
+   almacenan en Vault (nunca en config ni código). Las operaciones de escritura
+   expuestas son idempotentes (`X-Idempotency-Key`).
 
-> **Nombres heredados — NO renombrar**: todos los identificadores del proyecto
-> base (`mdqr-*`, `bo.com.sintesis.mdqr.*`, `middleware_*`, realm `middleware-core`,
-> paths de Vault `mdqr-auth`/`mdqr-decode`) son **estables**. No renombrar
-> módulos, paquetes, bases de datos, nombres de Consul ni paths de Vault. El
-> decoupling de nombres es trabajo separado y documentado aparte; hasta que
-> ocurra, tratar estos nombres como inamovibles.
+6. **Agregar una API expuesta NO es programar**: es declarar su contrato y su
+   destino por configuración (ADR-0006/0007). No se crean controllers ni DTOs
+   por producto.
 
 ---
 
 ## Quick Start (arranque diario, perfil `local`)
 
 ```bash
-# 1. Levantar el stack Docker de tools (Keycloak, Consul, Vault, Redis, Postgres)
+# 1. Levantar el stack Docker de tools (Keycloak, Consul, Vault, Redis)
 deploy/scripts/tools.sh --up
 
 # 2. Arrancar servicios (cada uno en su terminal), perfil local
-./gradlew :mdqr-ms-auth:bootRun  --args='--spring.profiles.active=local'   # Terminal A → 8083
-./gradlew :mdqr-ms-base:bootRun  --args='--spring.profiles.active=local'   # Terminal B → 8081
-./gradlew :mdqr-gateway:bootRun  --args='--spring.profiles.active=local'   # Terminal C → 8080
+./gradlew :hub-ms-auth:bootRun  --args='--spring.profiles.active=local'   # Terminal A → 8083
+./gradlew :hub-ms-base:bootRun  --args='--spring.profiles.active=local'   # Terminal B → 8091 (local)
+./gradlew :hub-gateway:bootRun  --args='--spring.profiles.active=local'   # Terminal C → 8080
 
 # 3. Frontend (Angular, bun)
-cd mdqr-frontend && bun run start:admin   # o start:public
+cd hub-frontend && bun run start:admin   # o start:public
 ```
 
 Vault seed (solo en primer setup o tras limpiar volúmenes — ver sección Scripts):
 
 ```bash
-TOOLS_HOST=127.0.0.1 DB_NAME=mdqr_auth   deploy/scripts/vault-seed.sh --ns mdqr-auth   --kc-realm mdqr-admin
-TOOLS_HOST=127.0.0.1 DB_NAME=mdqr_decode deploy/scripts/vault-seed.sh --ns mdqr-decode --kc-realm mdqr-admin
+TOOLS_HOST=127.0.0.1 DB_NAME=hub_auth deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
+TOOLS_HOST=127.0.0.1 DB_NAME=hub_base deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
 ```
 
 ### Obtener tokens (local)
 
 ```bash
-# Token admin (realm mdqr-admin — APIs internas /services/**)
-ADMIN_TOKEN=$(curl -s http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
-  -d grant_type=client_credentials -d client_id=mdqradminservice \
-  -d client_secret=mdqradminservice-secret | jq -r .access_token)
+# Token admin (realm hub-admin — APIs internas /services/**)
+ADMIN_TOKEN=$(curl -s http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
+  -d grant_type=client_credentials -d client_id=hubadminservice \
+  -d client_secret=hubadminservice-secret | jq -r .access_token)
 
-# Token partner (vía gateway proxy — realm mdqr-partner — APIs externas /partner/**)
+# Token partner (vía gateway proxy — realm hub-partner — APIs externas /partner/**)
 PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
   -d grant_type=client_credentials -d client_id=unilink-api \
   -d client_secret=unilink-api-secret \
-  -d scope=https://api.sintesis.com.bo/qr.decode | jq -r .access_token)
+  -d scope=https://api.sintesis.com.bo/caso.penal | jq -r .access_token)
 ```
 
 ---
@@ -129,29 +129,28 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
 ```
                         ┌──────────────────────────────────────────────┐
    Partners (M2M) ──────┤                                               │
-   POST /oauth2/token   │           mdqr-gateway  (WebFlux)             │
+   POST /oauth2/token   │           hub-gateway  (WebFlux)              │
    /partner/v1/**       │              puerto 8080                      │
-                        │  Chain Order=1: partner  (realm mdqr-partner) │
-   SPA Admin / Public ──┤  Chain Order=2: admin    (realm mdqr-admin)   │
-   /services/**         │  Discovery locator (Consul) + LoadBalancer    │
+                        │  Chain Order=1: partner  (realm hub-partner)  │
+   SPA Admin / Public ──┤  Chain Order=2: admin    (realm hub-admin)    │
+   /services/**         │  mTLS + RFC 8705 + suscripción (filtros)      │
                         └───────┬──────────────────────┬────────────────┘
-                                │ lb://mdqrbaseservice  │ lb://mdqradminservice
+                                │ lb://hubbaseservice   │ lb://hubadminservice
                                 ▼                       ▼
               ┌─────────────────────────┐   ┌──────────────────────────┐
-              │  mdqr-ms-base  (MVC)    │   │  mdqr-ms-auth  (MVC)      │
-              │  puerto 8081            │   │  puerto 8083              │
-              │  Consul: mdqrbaseservice│   │  Consul: mdqradminservice │
-              │  QR decode + certs      │   │  Users/roles/menus/audit  │
-              │  DB mdqr_decode/public  │   │  DB mdqr_auth/admin        │
-              │  → Tuxedo API (Go,5050) │   │  → Keycloak Admin API     │
+              │  hub-ms-base  (MVC)     │   │  hub-ms-auth  (MVC)       │
+              │  8081 (local: 8091)     │   │  puerto 8083              │
+              │  Consul: hubbaseservice │   │  Consul: hubadminservice  │
+              │  Motor inbound genérico │   │  Users/roles/menus/audit  │
+              │  + adaptadores outbound │   │  → Keycloak Admin API     │
+              │  DB hub_base/public     │   │  DB hub_auth/admin        │
               └────────────┬────────────┘   └───────────┬──────────────┘
                            │  usa (in-process)          │ usa (in-process)
-                           │                            ▼
-                           │                 ┌──────────────────────────┐
-                           └────────────────►│  mdqr-audit-commons (lib) │
-                                             └──────────────────────────┘
+                           └──────────────►┌──────────────────────────┐
+                                           │  hub-audit-commons (lib)  │
+                                           └──────────────────────────┘
 
-   Infra (deploy/tools/, stack docker mdqr-tools):
+   Infra (deploy/tools/, stack docker hub-tools):
    Keycloak 8180 │ Consul 8500 │ Vault 8200 │ Redis 6379 │ PostgreSQL 5432 (host)
 ```
 
@@ -159,15 +158,14 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
 
 | Componente      | Puerto | Notas                                            |
 |-----------------|--------|--------------------------------------------------|
-| mdqr-gateway    | 8080   | Único punto de entrada público                   |
-| mdqr-ms-base    | 8081   | NO expuesto directo en prod (vía gateway)        |
-| mdqr-ms-auth    | 8083   | NO expuesto directo en prod (vía gateway)        |
+| hub-gateway     | 8080 (perfil local: **8082**) | Único punto de entrada público    |
+| hub-ms-base     | 8081 (perfil local: **8091**) | NO expuesto directo en prod (vía gateway) |
+| hub-ms-auth     | 8083   | NO expuesto directo en prod (vía gateway)        |
 | Keycloak        | 8180   | **NO 8080** — ése es el gateway                  |
 | Consul HTTP     | 8500   |                                                  |
 | Vault           | 8200   | dev mode, token `root`                           |
 | Redis           | 6379   |                                                  |
 | PostgreSQL      | 5432   | corre en el host, no en el stack tools           |
-| Tuxedo API (Go) | 5050   | servicio externo de certificados (no en repo)    |
 
 > En el servidor QA compartido (ssaqa001) los puertos difieren: Consul 8595,
 > Vault 8295, Redis 6480, Keycloak 8180. Ver memoria del proyecto / `qa_server.md`.
@@ -176,271 +174,191 @@ PARTNER_TOKEN=$(curl -s -X POST http://127.0.0.1:8080/oauth2/token \
 
 ## Realms Keycloak
 
-| Realm          | Uso                                     | Client (M2M)        | Chain gateway |
-|----------------|-----------------------------------------|---------------------|---------------|
-| `mdqr-admin`   | APIs internas + SPA admin               | `mdqradminservice`  | Order=2       |
-| `mdqr-partner` | APIs externas M2M (partners)            | `unilink-api`       | Order=1       |
+| Realm         | Uso                          | Client (M2M)      | Chain gateway |
+|---------------|------------------------------|-------------------|---------------|
+| `hub-admin`   | APIs internas + SPA admin    | `hubadminservice` | Order=2       |
+| `hub-partner` | APIs externas M2M (partners) | `unilink-api`     | Order=1       |
 
 - El **issuer del JWT** debe ser consistente: usar `127.0.0.1:8180` tanto al
   emitir tokens como en la config de los servicios (`external-url`). Si el
   issuer no coincide, la validación falla con 401.
-- `mdqradminservice` tiene roles `realm-management` (manage-users, view-users,
-  query-users, query-clients, view-realm, manage-realm) y se usa también como
+- Scope de producto vigente: `https://api.sintesis.com.bo/caso.penal`.
+- `hubadminservice` tiene roles `realm-management` y se usa también como
   cliente de la Keycloak Admin API desde ms-auth.
 
 ---
 
 ## Módulos
 
-### 1. `mdqr-gateway/` — API Gateway
+### 1. `hub-gateway/` — API Gateway
 
 - **Responsabilidad**: punto de entrada único. Enrutamiento vía Consul discovery
   locator + LoadBalancer, dos cadenas de seguridad (partner/admin), proxy del
-  token endpoint partner, agregación de Swagger, CORS, rate limit, IP/domain
-  whitelist, OIDC browser login.
-- **Stack**: Spring Boot 4 **WebFlux** (reactivo), Spring Cloud Gateway
-  (`spring-cloud-starter-gateway-server-webflux`), `oauth2-resource-server` +
-  `oauth2-client`, Spring Session Redis (reactive), Caffeine cache, Consul
-  discovery+config, Vault config, springdoc webflux UI.
-- **Puerto**: 8080.
-- **DB**: ninguna. Usa **Redis** (sesión + rate limit). Vault namespace
-  `mdqr-decode`.
-- **Dependencias**: enruta a `lb://mdqradminservice` y `lb://mdqrbaseservice`;
-  proxya al token endpoint de Keycloak realm `mdqr-partner`.
-- **Config**: `application.yml`, `application-local.yml`, `-dev.yml`, `-prod.yml`.
+  token endpoint partner, mTLS + binding RFC 8705, agregación de Swagger, CORS,
+  rate limit, IP/domain whitelist, OIDC browser login.
+- **Stack**: Spring Boot 4 **WebFlux**, Spring Cloud Gateway, oauth2-resource-server
+  + oauth2-client, Spring Session Redis (reactive), Caffeine, Consul, Vault config.
+- **Puerto**: 8080. **DB**: ninguna (Redis para sesión/rate limit). Vault ns `hub-base`.
 - **Clases clave**:
-  - `SecurityConfiguration.java` — define las dos chains y los decoders JWT
-    programáticos (`adminJwtDecoder` issuer mdqr-admin, `partnerJwtDecoder`
-    issuer mdqr-partner). No hay `spring.security.oauth2.resourceserver.jwt`
-    declarativo: los decoders se arman desde `ApplicationProperties`.
-  - `ConsulConfiguration.java` — declara `@Primary ConsulClient` manualmente.
-  - filtros: `IpWhitelistFilter`, `RateLimitFilter`, `DomainWhitelistFilter`,
+  - `SecurityConfiguration.java` — dos chains con decoders JWT programáticos
+    (`adminJwtDecoder` issuer hub-admin, `partnerJwtDecoder` issuer hub-partner).
+  - `security/filter/MtlsCertBindingFilter.java` (orden 10) — RFC 8705: thumbprint
+    del cert vs `cnf.x5t#S256`; propaga `X-Partner-Id`. En local/test acepta
+    thumbprint simulado por header (`hub.mtls.test-mode`).
+  - `security/filter/PartnerSubscriptionFilter.java` (orden 11) — scope del
+    producto = suscripción (PoC; TODO consulta real de suscripciones).
+  - `IpWhitelistFilter`, `RateLimitFilter`, `DomainWhitelistFilter`,
     `RequestIdFilter`, `AccessLogFilter`.
-- **Rutas relevantes** (definidas en `application.yml`):
-  - `POST /oauth2/token` → reescribe a `/realms/mdqr-partner/protocol/openid-connect/token` (token proxy partner). **Público.**
-  - `/partner/v1/**` → `lb://mdqrbaseservice` reescrito a `/api/**` (chain partner).
+- **Rutas relevantes** (`application.yml`):
+  - `POST /oauth2/token` → reescribe al token endpoint del realm `hub-partner`. **Público.**
+  - `/partner/v1/**` → `lb://hubbaseservice` reescrito a `/api/**` (chain partner).
   - `/services/<svc>/**` → `lb://<svc>` con `StripPrefix=2` (discovery locator).
-  - `/v3/api-docs/admin-service` y `/base-service` → agregación Swagger.
+- **mTLS en prod**: listener HTTPS con `client-auth: want` (`application-prod.yml`);
+  truststore = CA de la PKI de Vault.
 
-#### Cadenas de seguridad (gateway)
-- **Order=1 `partnerSecurityChain`**: matchea `/partner/**` y `/oauth2/token`.
-  Solo JWT Bearer (resource server), valida realm `mdqr-partner`. `/oauth2/token`
-  es público; `/partner/**` requiere autenticación.
-- **Order=2 `adminSecurityChain`**: todo lo demás. JWT Bearer (SPA keycloak-js)
-  **y** OIDC browser flow, valida realm `mdqr-admin`. Públicos: login/refresh/
-  logout de auth, health, swagger, callbacks OIDC. Resto de `/services/**`
-  requiere auth. Browsers (Accept text/html) → redirect a Keycloak login; clientes
-  API → 401 JSON.
+### 2. `hub-ms-auth/` — Microservicio de administración / IAM
 
-### 2. `mdqr-ms-auth/` — Microservicio de administración / IAM
+- **Responsabilidad**: usuarios, roles, menús, acciones, permisos (RBAC) y
+  auditoría admin. Fachada sobre la Keycloak Admin API + polling de eventos
+  LOGIN/LOGOUT. Persiste audit logs directamente (sink in-process).
+- **Stack**: Spring Boot 4 **MVC**, Data JPA + JDBC, Data Redis (+ commons-pool2),
+  Liquibase, `keycloak-admin-client:26.0.6`, audit-commons.
+- **Puerto**: 8083. **DB**: PostgreSQL `hub_auth`, schema `admin`. Vault ns `hub-auth`.
+- **Consul**: se registra como **`hubadminservice`**.
+- **Tablas v2** (identidad de partners): `partner`, `partner_certificate`,
+  `partner_subscription` — base para la verificación real de suscripciones que
+  hoy el gateway aproxima por scope (`PartnerSubscriptionFilter`, TODO).
+- **API** (prefijo `/admin`, vía gateway `/services/hubadminservice/admin/**`):
+  users, roles, menus, actions, permissions, audit, auth/{login,refresh,logout}.
 
-- **Responsabilidad**: gestión de usuarios, roles, menús, acciones, permisos
-  (RBAC) y **auditoría**. Fachada sobre la **Keycloak Admin API** (clientes,
-  usuarios, roles) + polling de eventos LOGIN/LOGOUT de Keycloak. Persiste audit
-  logs directamente (sink in-process).
-- **Stack**: Spring Boot 4 **MVC** (`spring-boot-starter-web`), Security +
-  oauth2-resource-server, Data JPA + JDBC, Data Redis (+ `commons-pool2`),
-  Liquibase, `keycloak-admin-client:26.0.6`, springdoc webmvc UI, audit-commons.
-- **Puerto**: 8083.
-- **DB**: PostgreSQL `mdqr_auth`, **schema `admin`** (Hibernate
-  `default_schema=admin`, Liquibase `default-schema`/`liquibase-schema=admin`).
-  Vault namespace `mdqr-auth`.
-- **Service discovery**: se registra en Consul como **`mdqradminservice`**
-  (no como `mdqr-ms-auth`) — el gateway y el frontend esperan ese nombre.
-- **Config**: `application.yml`, `application-local.yml`, `-dev.yml`, `-prod.yml`.
-- **Clases clave**: `LiquibaseConfiguration.java` (+ `CustomLiquibaseDependsOnPostProcessor`),
-  `KeycloakAdminConfiguration.java`, `KeycloakEventPoller.java`, `InProcessSink.java`,
-  `ConsulConfiguration.java`.
-- **API** (prefijo `/admin`, accesible vía gateway en `/services/mdqradminservice/admin/**`):
-  `/admin/users`, `/admin/roles`, `/admin/menus`, `/admin/actions`,
-  `/admin/roles/{name}/permissions`, `/admin/audit`, `/admin/auth/{login,refresh,logout}`,
-  `/admin/audit/keycloak` (webhook legacy).
-- **Auditoría**: `audit.sink-mode: in-process` → persiste directo, sin hop HTTP.
-  El polling de Keycloak (`application.audit.keycloak-poll`) está habilitado en
-  prod, **deshabilitado en local** (requiere admin client configurado).
+### 3. `hub-ms-base/` — Núcleo del hub (motor inbound + adaptadores outbound)
 
-### 3. `mdqr-ms-base/` — Microservicio base de desencriptación QR
+- **Responsabilidad**: motor genérico del hub (ADR-0006). Recibe transacciones
+  de partners, valida contra contrato declarado, hashea (RFC 8785 + SHA-256),
+  reenvía al backend interno (`InboundPort`), audita (cadena + firma) y escribe
+  outbox — todo transversal, sin lógica de negocio por producto. Además aloja
+  los adaptadores **outbound** a proveedores externos (ACL).
+- **Stack**: Spring Boot 4 **MVC**, Data JPA + JDBC, Data Redis, Liquibase,
+  resilience4j programático. Tests con Testcontainers + WireMock.
+- **Puerto**: 8081 (perfil `local`: **8091**). **DB**: PostgreSQL `hub_base`,
+  schema `public`. Vault ns `hub-base`. `ddl-auto=none` (Liquibase manda).
+- **Consul**: se registra como **`hubbaseservice`**.
+- **Motor inbound** (`hub.inbound.*`):
+  - `DispatcherController` — único controller: `POST /api/inbound/{product}/{version}`
+    y `PATCH /api/inbound/{product}/{version}/{id}` (inyecta el id del path en
+    el campo `resourceIdField` del contrato).
+  - `ContractRegistry` / `ContractDefinition` / `FieldRule` / `ContractValidator` —
+    validación por contrato declarado (no DTOs `@Valid`).
+  - `ForwardingGateway` → `InboundPort` (adaptador por producto;
+    `StubInboundAdapter` con `hub.inbound.stub-mode=true`).
+  - Productos vigentes: `CASO_PENAL/v1` (POST) y `CASO_PENAL_EDITAR/v1` (PATCH).
+    Hoy declarados en `InboundAutoConfiguration`; el ADR-0007 los mueve a YAML.
+- **Outbound** (`interop.outbound.*`): `EfxRateAdapter`/`EfxRateClient` — patrón
+  de referencia ACL: RestClient + Bulkhead→CircuitBreaker→Retry programático,
+  credencial desde Vault, caché Redis, auditoría vía `HubAuditService`.
+- **Auditoría** (`hub.*` + audit-commons): `HubAuditInterceptor` sobre
+  `/api/inbound/**` → `HubAuditService.record()` escribe en transacción única
+  `hub_audit_log` (particionada por mes, cadena de hashes por partner con
+  advisory lock) + `hub_audit_idempotency` + `outbox_event`. Firma Vault
+  Transit fuera de la tx.
+- **Tablas** (Liquibase `db/changelog/v2/`, DB desde cero 2026-07-03):
+  `hub_audit_log` (+particiones), `hub_audit_idempotency`, `outbox_event`.
+  Eliminadas: `hub_measurement` (sin facturación), `provider`/
+  `provider_credential_ref` (catálogo en YAML, ADR-0007), `caso` (Modelo A,
+  ADR-0006 §9). Próximas (ADR-0007 fases 3-5): `hub_audit_payload`,
+  `connector_call_log`, `payload_access_log`.
+- **Contrato de respuesta**: `web/rest/ApiResponse.java` (ADR-0005) — sobre
+  único para éxito y error, `correlation_id` obligatorio.
+- **Gotcha de seguridad**: `SecurityConfiguration` está en **MODO DESARROLLO**
+  (`permitAll`, JWT comentado). La protección real la aplica el gateway.
+  **Antes de prod**: habilitar JWT + roles (`API_CLIENT`, `ADMIN`, `AUDITOR`).
 
-- **Responsabilidad**: núcleo del negocio. Decodifica imágenes QR (ZXing),
-  desencripta el payload con RSA/BouncyCastle usando el certificado de la entidad
-  financiera, gestiona el ciclo de vida de certificados (upload/import/validate/
-  activate/revoke/replace, versiones) sincronizándolos desde la **Tuxedo API** (Go),
-  y registra logs de desencriptación + auditoría de certificados.
-- **Stack**: Spring Boot 4 **MVC**, Security + oauth2-resource-server, Data JPA +
-  JDBC, Data Redis (+ `commons-pool2`), Liquibase, **BouncyCastle**
-  (`bcprov`/`bcpkix-jdk18on:1.78`), **ZXing** (`core`+`javase:3.5.3`),
-  `mongodb:bson` (generación de IDs), springdoc webmvc UI. Tests con
-  Testcontainers (postgres, redis) + WireMock.
-- **Puerto**: 8081.
-- **DB**: PostgreSQL `mdqr_decode`, **schema `public`**. Vault namespace
-  `mdqr-decode`. Hibernate `ddl-auto=none` (Liquibase manda).
-- **Service discovery**: se registra en Consul como **`mdqrbaseservice`**.
-- **Config**: `application.yml`, `application-local.yml`, `-dev.yml`, `-prod.yml`,
-  test `application-test.yml`.
-- **Clases clave**: `QrDecryptionService`, `QrImageDecoderService`, `CryptoService`,
-  `CertificateService` / `CertificateVersionService` / `CertificateValidationService`,
-  `TuxedoApiClient`, `LiquibaseConfiguration.java`, `SecurityConfiguration.java`.
-- **API**:
-  - `POST /api/qr/decode` — JSON, `inputType` = `DECODED_DATA` (`ENCRYPTED_DATA|CERT_CODE`) o `BASE64_IMAGE`.
-  - `POST /api/qr/decode/file` — multipart (imagen JPG/PNG/GIF con QR).
-  - `GET /api/qr/audits` — logs de desencriptación con filtros + paginación (max size 100).
-  - `/api/certificates/**` — CRUD + upload-file/validate/{id}/pem/entity/{id}/expiring/{days}/activate/deactivate/revoke/replace/audits.
-  - Vía gateway partner: `/partner/v1/qr/decode` → `/api/qr/decode`.
-- **Gotcha de seguridad**: `SecurityConfiguration` está en **MODO DESARROLLO** —
-  `anyRequest().permitAll()`, OAuth2 JWT comentado, `@PreAuthorize` y
-  `@EnableMethodSecurity` deshabilitados. La protección real hoy la aplica el
-  gateway. **Antes de prod hay que habilitar la validación JWT y los roles**
-  (`API_CLIENT`, `ADMIN`, `AUDITOR`). El `KeycloakRealmRoleConverter` ya está
-  escrito (extrae `realm_access.roles` → `ROLE_*`).
-- **QR decryption config** (`application.qr.decryption`): cache en Redis habilitado,
-  TTL 1440 min (24h), auditoría habilitada.
-- **Certificate sync** (`application.certificate.sync`): cron horario en prod,
-  deshabilitado en local.
+### 4. `hub-audit-commons/` — Librería de auditoría compartida
 
-### 4. `mdqr-audit-commons/` — Librería de auditoría compartida
+- Librería plana (bootJar off). Define `@Auditable` + AOP, publisher con buffer,
+  sinks remote/in-process, y el **`HubAuditService`** (hash-chain + outbox
+  transaccional) usado por ms-base. Consumida por ms-auth (in-process) y ms-base.
 
-- **Responsabilidad**: instrumentación de auditoría reutilizable. Define
-  `@Auditable`, un aspecto AOP (`AuditAspect`), publisher con buffer + retry, y
-  dos sinks: `RemoteHttpSink` (POST a admin-service con token de service account)
-  o sink in-process (el host implementa `AuditEventSink`).
-- **Tipo**: **librería plana** (`bootJar` deshabilitado, `jar` habilitado; Jib y
-  native deshabilitados). Consumida vía `implementation project(':mdqr-audit-commons')`.
-- **Stack**: Spring Boot starter + `spring-aop`/`spring-aspects`/`aspectjweaver`
-  (Spring Boot 4 ya no trae `spring-boot-starter-aop`). Security/servlet/micrometer
-  son `compileOnly` (los provee el host) para no forzar stack servlet en consumers
-  reactivos como el gateway.
-- **Auto-config**: `AuditAutoConfiguration` (`@AutoConfiguration`), activa con
-  `audit.enabled=true` (default). Modo por `audit.sink-mode`: `remote` (default,
-  requiere `audit.oauth.token-uri`) o `in-process`. El `AuditAspect` solo se crea
-  si hay `HttpServletRequest` en classpath (consumers reactivos solo usan el publisher).
-- **Consumido por**: `mdqr-ms-auth` (modo in-process).
+### 5. `hub-frontend/` — Frontend Angular
 
-### 5. `mdqr-frontend/` — Frontend Angular (monorepo de apps)
-
-- **Responsabilidad**: SPA. Dos aplicaciones Angular en un workspace:
-  `apps/admin` (panel administrativo) y `apps/public` (cara pública).
-- **Stack**: **Angular 21**, **bun** como package manager (`bun@1.3.12`),
-  Tailwind 4, ngx-translate, keycloak-angular + keycloak-js 26, ApexCharts,
-  jsPDF, xlsx. Tests con Playwright + Vitest.
-- **Build Gradle**: no-op (`build.gradle` vacío) — se construye con bun/Angular CLI.
-- **Scripts** (`package.json`): `start:admin`/`start:public`, `build:admin`/
-  `build:public`/`build:all`, `watch:*`, `test`.
-- **Auth**: keycloak-js contra realm `mdqr-admin`; llama al gateway en `:8080`.
+- **Angular 21**, **bun**, Tailwind 4, keycloak-angular/keycloak-js 26 (realm
+  `hub-admin`), dos apps: `apps/admin` y `apps/public`. Scripts:
+  `start:admin`/`start:public`, `build:*`. Llama al gateway en `:8080`.
 
 ### 6. `deploy/` — Infraestructura y despliegue
 
-Ver secciones **Infraestructura** y **Scripts de despliegue**.
+Ver secciones **Infraestructura** y **Scripts**.
 
 ---
 
-## Infraestructura (`deploy/tools/`, stack docker `mdqr-tools`)
+## Infraestructura (`deploy/tools/`, stack docker `hub-tools`)
 
-Stack Docker aislado de las apps, gestionado por `deploy/scripts/tools.sh`
-(wrapper sobre `deploy/tools/docker-compose.yml`). Config en `deploy/tools/.env`
-(copiar desde `.env.example`).
+Stack Docker gestionado por `deploy/scripts/tools.sh` (config `deploy/tools/.env`).
 
-| Servicio   | Imagen                          | Puerto host (default) |
-|------------|---------------------------------|-----------------------|
-| Keycloak   | `quay.io/keycloak/keycloak:26.6`| 8180 (HTTP), 8443 (HTTPS) |
-| Consul     | `hashicorp/consul:1.22`         | 8500 (HTTP), 8300 (RPC), 8600/udp (DNS) |
-| Redis      | `redis:8.8`                     | 6379                  |
-| Vault      | `hashicorp/vault:1.21`          | 8200 (dev mode, token `root`) |
+| Servicio | Imagen                           | Puerto host (default) |
+|----------|----------------------------------|-----------------------|
+| Keycloak | `quay.io/keycloak/keycloak:26.6` | 8180 / 8443           |
+| Consul   | `hashicorp/consul:1.22`          | 8500 / 8300 / 8600udp |
+| Redis    | `redis:8.8`                      | 6379                  |
+| Vault    | `hashicorp/vault:1.21`           | 8200 (dev, token `root`) |
 
-- **Keycloak siempre on** (sin profile). Resto vía `COMPOSE_PROFILES` en `.env`:
-  - `single` (default): 1 redis + 1 consul + 1 vault (dev rápido).
-  - `cluster`: 3 consul (raft) + 3 masters/3 replicas redis + 3 vault (raft HA).
-    Tras `up` correr una vez `redis-cluster-init.sh` y `vault-cluster-init.sh`.
-- **PostgreSQL** corre en el **host**, no en el stack tools. DBs: `mdqr_auth`
-  (schema `admin`) y `mdqr_decode` (schema `public`).
-- Bind a `MDQR_TOOLS_BIND_IP` (default `127.0.0.1`). Red externa `mdqr-shared`
-  debe existir antes (`docker network create ... mdqr-shared`).
-- Keycloak 26 usa `KC_BOOTSTRAP_ADMIN_*` (los legacy `KEYCLOAK_ADMIN*` no
-  funcionan). Storage dev = `dev-file` (pierde datos al reiniciar) vs `postgres`
-  (prod).
+- Keycloak siempre on; resto vía `COMPOSE_PROFILES` (`single` default, `cluster`).
+- **PostgreSQL corre en el host**. DBs: `hub_auth` (schema `admin`) y `hub_base`
+  (schema `public`).
+- Red externa `hub-shared` debe existir antes (`docker network create hub-shared`).
+- Keycloak 26 usa `KC_BOOTSTRAP_ADMIN_*` (no los legacy `KEYCLOAK_ADMIN*`).
 
 ---
 
 ## Convenciones y gotchas (verificados en código)
 
-1. **Spring Boot 4 + Liquibase 5 — sin `LiquibaseAutoConfiguration`**: no existe
-   el módulo `spring-boot-liquibase`. Cada microservicio con DB declara el bean
-   `SpringLiquibase` a mano en `LiquibaseConfiguration.java`. Además ese bean
-   crea el schema (`CREATE SCHEMA IF NOT EXISTS`) **antes** de adquirir el lock,
-   para romper el catch-22 en BD limpia (relevante en ms-auth con schema `admin`).
-
-2. **`ConsulConfiguration` y perfil `local`**: el perfil local **deshabilita
-   Consul config** (`consul.config.enabled=false`) pero **habilita Consul
-   discovery** (`discovery.enabled=true`) para que el gateway resuelva `lb://`.
-   También `vault.enabled=false` y `config.import=""`. El gateway declara un
-   `@Primary ConsulClient` manualmente (`ConsulConfiguration.java`).
-
-3. **`commons-pool2`**: requerido por el connection pool de Redis Lettuce
-   (`spring.data.redis.lettuce.pool`). Está en `build.gradle` de ms-auth y
-   ms-base. Sin él, el pool de Lettuce no arranca.
-
-4. **Token endpoint partner expuesto en el gateway**: los partners hacen
-   `POST :8080/oauth2/token` (no directo a Keycloak). El gateway reescribe a
-   `/realms/mdqr-partner/protocol/openid-connect/token`. Endpoint público.
-
-5. **Keycloak en 8180** (no 8080 — ése es el gateway).
-
-6. **Dos cadenas de seguridad en el gateway**: Order=1 partner (externo, realm
-   `mdqr-partner`, `/partner/**`+`/oauth2/token`) y Order=2 admin (interno, realm
-   `mdqr-admin`, todo lo demás). Decoders JWT programáticos, no declarativos.
-
-7. **Vault namespaces**: `mdqr-auth` para ms-auth; `mdqr-decode` para ms-base y
-   gateway. Los `application.yml` leen `${VAULT_NS:...}` directamente. El bug de
-   `vault-seed.sh` (usa `KC_REALM=${NS}` por default) obliga a pasar
-   `--kc-realm mdqr-admin` explícitamente.
-
-8. **Nombres de servicio en Consul ≠ nombre del módulo**: ms-auth se registra
-   como `mdqradminservice`, ms-base como `mdqrbaseservice`. El gateway discovery
-   locator y el frontend dependen de esos nombres.
-
-9. **Issuer JWT consistente**: emitir y validar tokens con el mismo host
-   (`127.0.0.1:8180`). `external-url` es el issuer; `auth-server-url` es para JWKS.
-
-10. **management base-path**: ms-base y ms-auth usan `management.endpoints.web.base-path:
-    /management` (no el default `/actuator`). Health check de Consul apunta a
-    `/management/health/readiness`.
-
-11. **LoadBalancer cache TTL alto (1h) + Caffeine** en el gateway: tolera caídas
-    intermitentes de Consul (el default de 35s causa 503 "no instances available").
-
-12. **Seguridad de ms-base en MODO DESARROLLO**: `permitAll` total, JWT comentado.
-    La protección la da el gateway hoy. Habilitar antes de prod.
-
-13. **Filtros del gateway con `.onErrorResume`**: `IpWhitelistFilter` y
-    `RateLimitFilter` no provocan 500 si Redis cae.
-
-14. **AOT/native build**: la tarea `ProcessAot` deshabilita vault/consul/config
-    import vía jvmArgs (ver `build.gradle` raíz). audit-commons deshabilita
-    bootJar/jib/native/aot.
+1. **Spring Boot 4 + Liquibase 5 — sin auto-config**: cada microservicio declara
+   el bean `SpringLiquibase` a mano (`LiquibaseConfiguration.java`); el bean crea
+   el schema antes de adquirir el lock (relevante en ms-auth, schema `admin`).
+2. **Perfil `local`**: `config.import=""`, `vault.enabled=false`,
+   `consul.config.enabled=false` pero `discovery.enabled=true`; secretos
+   hardcodeados `*-secret`; logging DEBUG.
+3. **`commons-pool2`** requerido por el pool Lettuce de Redis (ms-auth y ms-base).
+4. **Token endpoint partner en el gateway**: `POST :8080/oauth2/token` (público),
+   reescrito al realm `hub-partner`. Los partners nunca hablan con Keycloak directo.
+5. **Keycloak en 8180** (8080 es el gateway).
+6. **Dos chains en el gateway**: Order=1 partner (`/partner/**`+`/oauth2/token`),
+   Order=2 admin (resto). Decoders JWT programáticos.
+7. **Vault namespaces**: `hub-auth` (ms-auth), `hub-base` (ms-base y gateway).
+   `vault-seed.sh` requiere `--kc-realm hub-admin` explícito.
+8. **Nombres Consul ≠ nombre de módulo**: `hubadminservice` / `hubbaseservice`.
+9. **Issuer JWT consistente**: emitir y validar con el mismo host (`127.0.0.1:8180`).
+10. **management base-path** en ms-base/ms-auth: `/management` (no `/actuator`);
+    health de Consul → `/management/health/readiness`.
+11. **LoadBalancer cache TTL 1h + Caffeine** en el gateway (tolera caídas de Consul).
+12. **Seguridad de ms-base en MODO DESARROLLO** (`permitAll`) — habilitar JWT+roles
+    antes de prod (prerequisito de la fase de payloads del ADR-0007).
+13. **Filtros del gateway con `.onErrorResume`** — no provocan 500 si Redis cae.
+14. **AOT/native**: `ProcessAot` deshabilita vault/consul/config-import por jvmArgs;
+    audit-commons deshabilita bootJar/jib/native/aot.
+15. **`hub_audit_log` particionada por mes** (particiones pre-creadas hasta 2027-12);
+    PK compuesta `(id, ts)`; cadena de hashes serializada por partner con
+    `pg_advisory_xact_lock`.
+16. **Renombramiento 2026-07-03**: no queda ninguna referencia al nombre del
+    proyecto base ni a QR en el código. Entornos locales previos requieren
+    recrear DBs, realms y seeds de Vault con los nombres nuevos.
 
 ---
 
 ## Scripts de despliegue (`deploy/scripts/`)
 
-| Script                       | Propósito |
-|------------------------------|-----------|
-| `tools.sh`                   | Gestiona el stack Docker de tools. Comandos: `--up`/`-u`, `--down`/`-d` (`-v` borra volúmenes), `--info`/`-i` (default, muestra URLs/puertos), `--logs`/`-l [svc]`, `--restart`/`-r [svc]`. |
-| `vault-seed.sh`              | Seedea Vault KV con secretos (`system/redis`, `system/database`, `keycloak/service-client`, `keycloak/admin-client`, `keycloak/partner-client`). Flags: `--ns <namespace>`, `--kc-realm <realm>` (¡pasar `mdqr-admin`!), `--external <VAULT_ADDR>`. Vars: `TOOLS_HOST`, `DB_NAME`, `TENANT_ID`. Idempotente. |
-| `keycloak-sync-admin.sh`     | Crea/sincroniza el realm `mdqr-admin` (clients, roles, scopes, service accounts) desde CSVs en `keycloak-seed/admin/`. |
-| `keycloak-sync-partner.sh`   | Crea/sincroniza el realm `mdqr-partner` (clients M2M) desde `keycloak-seed/partner/`. |
-| `keycloak-sync.sh`           | Sync genérico de Keycloak (base de los anteriores). |
-| `create-partner.sh`          | Da de alta un partner (client M2M) en `mdqr-partner`. |
-| `env-sync.sh`                | Sincroniza variables de entorno entre configs. |
-| `init-logs.sh`               | Inicializa directorios/archivos de logs. |
-| `keycloak-seed/`             | CSVs de seed (roles, clients, scopes, policies, permissions) divididos en `admin/` y `partner/`. Ver `KEYCLOAK_DEPLOYMENT.md`. |
+| Script                     | Propósito |
+|----------------------------|-----------|
+| `tools.sh`                 | Stack Docker de tools: `--up`/`-u`, `--down`/`-d` (`-v` borra volúmenes), `--info`/`-i`, `--logs`/`-l [svc]`, `--restart`/`-r [svc]`. |
+| `vault-seed.sh`            | Seedea Vault KV (`system/redis`, `system/database`, `keycloak/*-client`). Flags: `--ns <namespace>`, `--kc-realm <realm>` (¡pasar `hub-admin`!), `--external`. Vars: `TOOLS_HOST`, `DB_NAME`, `TENANT_ID`. Idempotente. |
+| `keycloak-sync-admin.sh`   | Crea/sincroniza el realm `hub-admin` desde CSVs en `keycloak-seed/admin/`. |
+| `keycloak-sync-partner.sh` | Crea/sincroniza el realm `hub-partner` desde `keycloak-seed/partner/`. |
+| `create-partner.sh`        | Alta de un partner (client M2M) en `hub-partner`. |
+| `create-pki.sh`            | PKI de Vault para certificados de partners (mTLS). |
+| `keycloak-seed/`           | CSVs de seed (roles, clients, scopes) en `admin/` y `partner/`. |
 
-Otros artefactos de deploy:
-- `deploy/tools/` — docker-compose del stack tools + `vault/*.hcl`, scripts de
-  init de cluster (`redis-cluster-init.sh`, `vault-cluster-init.sh`).
-- `deploy/services/` — compose por servicio (`001-gateway.yml`,
-  `002-decrypt-service.yml`, `003-admin-service.yml`, `100-admin-fe.yml`,
-  `101-public-fe.yml`).
-- `deploy/development/` y `deploy/production/` — docker-compose por ambiente +
-  `.env.example`.
+Otros: `deploy/tools/` (compose del stack), `deploy/services/` (compose por
+servicio), `deploy/development/` y `deploy/production/` (compose por ambiente).
 
 ---
 
@@ -451,7 +369,3 @@ KEYCLOAK_HOST: 127.0.0.1   KEYCLOAK_PORT: 8180
 DB_HOST: 127.0.0.1         DB_PORT: 5432
 REDIS_HOST: 127.0.0.1      REDIS_PORT: 6379
 ```
-
-El perfil local en todos los servicios: `config.import=""`, `vault.enabled=false`,
-`consul.config.enabled=false`, `consul.discovery.enabled=true`, secretos de
-Keycloak hardcodeados (clients/secrets `*-secret`), logging DEBUG.

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="000-1" author="hub" runInTransaction="false">
+        <comment>Ensure 'admin' schema exists before any other changelog runs</comment>
+        <sql>CREATE SCHEMA IF NOT EXISTS admin;</sql>
+    </changeSet>
+
+    <include file="changes/001-create-menu.xml" relativeToChangelogFile="true"/>
+    <include file="changes/002-create-action.xml" relativeToChangelogFile="true"/>
+    <include file="changes/003-create-role-menu-action.xml" relativeToChangelogFile="true"/>
+    <include file="changes/004-create-audit-log.xml" relativeToChangelogFile="true"/>
+    <include file="changes/005-audit-tenant.xml" relativeToChangelogFile="true"/>
+
+    <!-- Production seed (always runs): catalog of actions, menus, SUPER_ADMIN grants -->
+    <include file="changes/099-prod-seed-data.xml" relativeToChangelogFile="true"/>
+
+    <!-- Dev-only seed: OPERADOR + AUDITOR grants for local testing (context=dev) -->
+    <include file="changes/100-dev-seed-data.xml" relativeToChangelogFile="true"/>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         v2 — Hub Interoperabilidad: identidad de partners, certs PKI y
+         suscripciones a productos. Orden obligatorio por FK:
+           0001 partner (tabla raíz)
+           0002 partner_certificate (FK → partner)
+           0003 partner_subscription (FK → partner)
+         ═══════════════════════════════════════════════════════════════════ -->
+    <include file="v2/0001-partner.xml"               relativeToChangelogFile="true"/>
+    <include file="v2/0002-partner-certificate.xml"   relativeToChangelogFile="true"/>
+    <include file="v2/0003-partner-subscription.xml"  relativeToChangelogFile="true"/>
+
+</databaseChangeLog>

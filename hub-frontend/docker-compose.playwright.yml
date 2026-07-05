@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  playwright:
+    image: mcr.microsoft.com/playwright:v1.40.0-focal
+    container_name: hub-frontend-playwright
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /home/toribiov/proyect/genesis-c-cart/hub-frontend:/app
+    environment:
+      - NODE_VERSION=25
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
+    command: |
+      bash -c "
+        apt-get update > /dev/null 2>&1 &&
+        curl -fsSL https://deb.nodesource.com/setup_25.x | bash - > /dev/null 2>&1 &&
+        apt-get install -y nodejs > /dev/null 2>&1 &&
+        npm install > /dev/null 2>&1 &&
+        npx playwright test --reporter=html
+      "
+    depends_on:
+      - frontend
+
+  frontend:
+    image: node:25-alpine
+    container_name: hub-frontend-dev
+    working_dir: /app
+    volumes:
+      - /home/toribiov/proyect/genesis-c-cart/hub-frontend:/app
+    ports:
+      - "4200:4200"
+    command: npm start
+    environment:
+      - NODE_ENV=development

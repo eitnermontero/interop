@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Construye las imágenes Docker de los microservicios MDQR directamente en el servidor.
+# Construye las imágenes Docker de los microservicios HUB directamente en el servidor.
 #
 # Requiere: JDK 25 accesible en /tmp/gradle-9.2.1 (ver instrucciones) o
 #           como variable GRADLE_HOME. Si no está, se descarga Gradle 9.2.1.
@@ -10,9 +10,9 @@
 #   deploy/scripts/build-images.sh --tag 1.0.1        # tag alternativo
 #
 # Las imágenes quedan en el Docker daemon local con el prefijo:
-#   local/mdqr/mdqr-gateway:<tag>
-#   local/mdqr/mdqr-ms-base:<tag>
-#   local/mdqr/mdqr-ms-auth:<tag>
+#   local/hub/hub-gateway:<tag>
+#   local/hub/hub-ms-base:<tag>
+#   local/hub/hub-ms-auth:<tag>
 
 set -euo pipefail
 
@@ -21,7 +21,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 DOCKERFILE="$SCRIPT_DIR/../docker/Dockerfile.service"
 GRADLE_VERSION="9.2.1"
 GRADLE_HOME="${GRADLE_HOME:-/tmp/gradle-${GRADLE_VERSION}}"
-REGISTRY="${REGISTRY:-local/mdqr}"
+REGISTRY="${REGISTRY:-local/hub}"
 TAG="${TAG:-1.0.0}"
 
 BUILD_GATEWAY=true
@@ -62,9 +62,9 @@ fi
 header "Compilando y empaquetando (bootJar)"
 
 MODULES=""
-[[ "$BUILD_GATEWAY"  == true ]] && MODULES="$MODULES :mdqr-gateway:bootJar"
-[[ "$BUILD_MS_BASE"  == true ]] && MODULES="$MODULES :mdqr-ms-base:bootJar"
-[[ "$BUILD_MS_AUTH"  == true ]] && MODULES="$MODULES :mdqr-ms-auth:bootJar"
+[[ "$BUILD_GATEWAY"  == true ]] && MODULES="$MODULES :hub-gateway:bootJar"
+[[ "$BUILD_MS_BASE"  == true ]] && MODULES="$MODULES :hub-ms-base:bootJar"
+[[ "$BUILD_MS_AUTH"  == true ]] && MODULES="$MODULES :hub-ms-auth:bootJar"
 
 docker run --rm \
   -v "${REPO_ROOT}:/workspace" \
@@ -95,13 +95,13 @@ build_image() {
 header "Construyendo imágenes Docker"
 
 [[ "$BUILD_GATEWAY" == true ]] && \
-  build_image "$REPO_ROOT/mdqr-gateway/build/libs/mdqr-gateway-${TAG}.jar" "mdqr-gateway"
+  build_image "$REPO_ROOT/hub-gateway/build/libs/hub-gateway-${TAG}.jar" "hub-gateway"
 
 [[ "$BUILD_MS_BASE" == true ]] && \
-  build_image "$REPO_ROOT/mdqr-ms-base/build/libs/mdqr-ms-base-${TAG}.jar" "mdqr-ms-base"
+  build_image "$REPO_ROOT/hub-ms-base/build/libs/hub-ms-base-${TAG}.jar" "hub-ms-base"
 
 [[ "$BUILD_MS_AUTH" == true ]] && \
-  build_image "$REPO_ROOT/mdqr-ms-auth/build/libs/mdqr-ms-auth-${TAG}.jar" "mdqr-ms-auth"
+  build_image "$REPO_ROOT/hub-ms-auth/build/libs/hub-ms-auth-${TAG}.jar" "hub-ms-auth"
 
 header "Imágenes disponibles"
 docker images | grep "${REGISTRY}"

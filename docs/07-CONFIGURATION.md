@@ -1,8 +1,11 @@
 # 07 - Configuración de la Aplicación
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Visión General
 
-El sistema MDQR usa dos mecanismos de configuración según el perfil de Spring activo:
+El sistema HUB usa dos mecanismos de configuración según el perfil de Spring activo:
 
 | Perfil | Vault | Consul config | Consul discovery | Uso |
 |---|---|---|---|---|
@@ -62,7 +65,7 @@ spring:
           issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/<realm>
 ```
 
-Los módulos `mdqr-ms-auth` y `mdqr-ms-base` también deshabilitan el import-check de Spring Cloud:
+Los módulos `hub-ms-auth` y `hub-ms-base` también deshabilitan el import-check de Spring Cloud:
 
 ```yaml
 spring:
@@ -74,7 +77,7 @@ spring:
 
 ---
 
-## mdqr-gateway (puerto 8080)
+## hub-gateway (puerto 8080)
 
 ### application-local.yml — propiedades clave
 
@@ -104,8 +107,8 @@ El gateway define dos cadenas de seguridad con prioridad por `Order`:
 
 | Order | Paths cubiertos | Realm Keycloak | Uso |
 |---|---|---|---|
-| 1 (partner) | `/partner/**`, `/oauth2/token` | `mdqr-partner` | APIs externas M2M |
-| 2 (admin) | `/services/**`, Swagger, OIDC | `mdqr-admin` | APIs internas |
+| 1 (partner) | `/partner/**`, `/oauth2/token` | `hub-partner` | APIs externas M2M |
+| 2 (admin) | `/services/**`, Swagger, OIDC | `hub-admin` | APIs internas |
 
 ### Resolución de servicios via Consul
 
@@ -113,39 +116,39 @@ El gateway resuelve rutas con prefijo `lb://` a través del discovery de Consul:
 
 | URI del gateway | Nombre en Consul | Módulo |
 |---|---|---|
-| `lb://mdqradminservice` | `mdqradminservice` | `mdqr-ms-auth` |
-| `lb://mdqrbaseservice` | `mdqrbaseservice` | `mdqr-ms-base` |
+| `lb://hubadminservice` | `hubadminservice` | `hub-ms-auth` |
+| `lb://hubbaseservice` | `hubbaseservice` | `hub-ms-base` |
 
 Las rutas con `StripPrefix=2` eliminan el prefijo `/services/{nombre-servicio}` antes de reenviar al microservicio destino.
 
 ---
 
-## mdqr-ms-auth (puerto 8083)
+## hub-ms-auth (puerto 8083)
 
 ### Base de datos
 
-- Nombre: `mdqr_auth`
+- Nombre: `hub_auth`
 - Schema: `admin`
-- Vault NS: `mdqr-auth`
+- Vault NS: `hub-auth`
 
 ### application-local.yml — propiedades clave
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/mdqr_auth
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/hub_auth
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/mdqr-admin
+          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/hub-admin
 
 application:
   keycloak:
-    realm: mdqr-admin
-    client-id: mdqradminservice
+    realm: hub-admin
+    client-id: hubadminservice
   audit:
     keycloak-poll:
       enabled: false
@@ -155,41 +158,41 @@ El polling de eventos de Keycloak (`keycloak-poll`) se desactiva en local para e
 
 ### Registro en Consul
 
-El módulo se registra en Consul con el nombre `mdqradminservice`. Este nombre debe coincidir exactamente con la URI configurada en el gateway (`lb://mdqradminservice`).
+El módulo se registra en Consul con el nombre `hubadminservice`. Este nombre debe coincidir exactamente con la URI configurada en el gateway (`lb://hubadminservice`).
 
 ---
 
-## mdqr-ms-base (puerto 8081)
+## hub-ms-base (puerto 8081)
 
 ### Base de datos
 
-- Nombre: `mdqr_decode`
+- Nombre: `hub_base`
 - Schema: `public`
-- Vault NS: `mdqr-decode`
+- Vault NS: `hub-base`
 
 ### application-local.yml — propiedades clave
 
 ```yaml
 spring:
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/mdqr_decode
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/hub_base
     username: ${DB_USER:postgres}
     password: ${DB_PASSWORD:postgres}
   security:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/mdqr-admin
+          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/hub-admin
 
-application:
-  tuxedo:
-    api-url: http://${TUXEDO_HOST:127.0.0.1}:${TUXEDO_PORT:5050}
-  certificate:
-    sync:
-      enabled: false
-  qr:
-    decryption:
-      cache-enabled: true
+hub:
+  inbound:
+    # Activa el StubInboundAdapter para CASO_PENAL/v1 en lugar del adaptador real.
+    # NUNCA poner true en producción.
+    stub-mode: true
+  outbound:
+    efxrate:
+      url: http://localhost:8089           # WireMock en tests de integración
+      vault-path: hub-base/data/efxrate/api-key
 
 management:
   endpoints:
@@ -199,11 +202,13 @@ management:
 
 La propiedad `management.endpoints.web.base-path: /management` es requerida en ms-base. Sin ella, los health checks de Consul no funcionan correctamente porque el módulo no tiene el path `/actuator` por defecto.
 
-La sincronización de certificados (`certificate.sync.enabled`) se desactiva en local para no requerir conectividad con sistemas externos.
+> La configuración del producto QR anterior (`application.tuxedo`,
+> `application.certificate.sync`, `application.qr.decryption`) fue eliminada
+> junto con ese negocio (ADR-0004).
 
 ### Registro en Consul
 
-El módulo se registra en Consul con el nombre `mdqrbaseservice`.
+El módulo se registra en Consul con el nombre `hubbaseservice`.
 
 ---
 
@@ -250,18 +255,18 @@ El issuer URI configurado en cada servicio debe coincidir exactamente con el cla
 Ejemplo de obtención de token en local:
 
 ```bash
-# Token para realm mdqr-admin (APIs internas via ms-auth)
-curl -s http://127.0.0.1:8180/realms/mdqr-admin/protocol/openid-connect/token \
+# Token para realm hub-admin (APIs internas via ms-auth)
+curl -s http://127.0.0.1:8180/realms/hub-admin/protocol/openid-connect/token \
   -d "grant_type=client_credentials" \
-  -d "client_id=mdqradminservice" \
-  -d "client_secret=mdqradminservice-secret" | jq -r '.access_token'
+  -d "client_id=hubadminservice" \
+  -d "client_secret=hubadminservice-secret" | jq -r '.access_token'
 
-# Token para realm mdqr-partner (APIs externas via gateway)
+# Token para realm hub-partner (APIs externas via gateway)
 curl -s -X POST http://127.0.0.1:8080/oauth2/token \
   -d "grant_type=client_credentials" \
-  -d "client_id=unilink-api" \
-  -d "client_secret=unilink-api-secret" \
-  -d "scope=https://api.sintesis.com.bo/qr.decode" | jq -r '.access_token'
+  -d "client_id=fiscalia-bol-api" \
+  -d "client_secret=<secreto-del-partner>" \
+  -d "scope=https://api.sintesis.com.bo/caso.penal" | jq -r '.access_token'
 ```
 
 ---
@@ -270,9 +275,9 @@ curl -s -X POST http://127.0.0.1:8080/oauth2/token \
 
 | Archivo | Módulo | Descripción |
 |---|---|---|
-| `mdqr-gateway/src/main/resources/application.yml` | gateway | Configuración base del gateway |
-| `mdqr-gateway/src/main/resources/application-local.yml` | gateway | Perfil local (Redis + Keycloak hardcoded) |
-| `mdqr-ms-auth/src/main/resources/application.yml` | ms-auth | Configuración base de ms-auth |
-| `mdqr-ms-auth/src/main/resources/application-local.yml` | ms-auth | Perfil local de ms-auth |
-| `mdqr-ms-base/src/main/resources/application.yml` | ms-base | Configuración base de ms-base |
-| `mdqr-ms-base/src/main/resources/application-local.yml` | ms-base | Perfil local de ms-base |
+| `hub-gateway/src/main/resources/application.yml` | gateway | Configuración base del gateway |
+| `hub-gateway/src/main/resources/application-local.yml` | gateway | Perfil local (Redis + Keycloak hardcoded) |
+| `hub-ms-auth/src/main/resources/application.yml` | ms-auth | Configuración base de ms-auth |
+| `hub-ms-auth/src/main/resources/application-local.yml` | ms-auth | Perfil local de ms-auth |
+| `hub-ms-base/src/main/resources/application.yml` | ms-base | Configuración base de ms-base |
+| `hub-ms-base/src/main/resources/application-local.yml` | ms-base | Perfil local de ms-base |

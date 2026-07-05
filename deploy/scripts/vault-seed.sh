@@ -7,7 +7,7 @@ set -euo pipefail
 # unsealed, root token preseteado. No requiere operator init/unseal ni AppRole.
 # Este script solo escribe los KV. Idempotente (kv put sobreescribe).
 #
-# Secretos seedeados (secret/mdqr-auth[-<tenant>]/ o secret/mdqr-decode[-<tenant>]/...):
+# Secretos seedeados (secret/hub-auth[-<tenant>]/ o secret/hub-base[-<tenant>]/...):
 #   system/redis                host, port, password
 #   system/database             host, port, name, username, password
 #   keycloak/service-client     auth-server-url, realm, client-id, client-secret (admin realm)
@@ -19,8 +19,8 @@ set -euo pipefail
 
 # --- Defaults --------------------------------------------------------
 TENANT_ID="${TENANT_ID:-}"
-NAMESPACE_BASE="${NAMESPACE_BASE:-mdqr-decode}"
-VAULT_CONTAINER="${VAULT_CONTAINER:-mdqr-vault}"
+NAMESPACE_BASE="${NAMESPACE_BASE:-hub-base}"
+VAULT_CONTAINER="${VAULT_CONTAINER:-hub-vault}"
 VAULT_TOKEN="${VAULT_TOKEN:-root}"
 VAULT_ADDR="${VAULT_ADDR:-http://127.0.0.1:8200}"
 
@@ -43,22 +43,22 @@ REDIS_PASSWORD="${REDIS_PASSWORD:-}"
 
 DB_HOST="${DB_HOST:-$TOOLS_HOST}"
 DB_PORT="${DB_PORT:-5432}"
-DB_NAME="${DB_NAME:-mdqr}"
+DB_NAME="${DB_NAME:-hub}"
 DB_USER="${DB_USER:-postgres}"
 DB_PASSWORD="${DB_PASSWORD:-postgres}"
 
 # Keycloak URL desde las apps dentro del Docker network (host.docker.internal:8180)
 KC_URL="${KC_URL:-http://${TOOLS_HOST}:8180}"
-# Admin realm (mdqr-admin): cliente confidencial para ms-auth y ms-base
-KC_SERVICE_CLIENT="${KC_SERVICE_CLIENT:-mdqradminservice}"
-KC_SERVICE_SECRET="${KC_SERVICE_SECRET:-mdqradminservice-secret}"
-# Admin API client: mismo cliente (mdqradminservice tiene realm-management roles)
-KC_ADMIN_CLIENT="${KC_ADMIN_CLIENT:-mdqradminservice}"
-KC_ADMIN_SECRET="${KC_ADMIN_SECRET:-mdqradminservice-secret}"
-# Partner realm (mdqr-partner): para gateway → keycloak token proxy (partner-chain)
+# Admin realm (hub-admin): cliente confidencial para ms-auth y ms-base
+KC_SERVICE_CLIENT="${KC_SERVICE_CLIENT:-hubadminservice}"
+KC_SERVICE_SECRET="${KC_SERVICE_SECRET:-hubadminservice-secret}"
+# Admin API client: mismo cliente (hubadminservice tiene realm-management roles)
+KC_ADMIN_CLIENT="${KC_ADMIN_CLIENT:-hubadminservice}"
+KC_ADMIN_SECRET="${KC_ADMIN_SECRET:-hubadminservice-secret}"
+# Partner realm (hub-partner): para gateway → keycloak token proxy (partner-chain)
 KC_PARTNER_CLIENT="${KC_PARTNER_CLIENT:-unilink-api}"
 KC_PARTNER_SECRET="${KC_PARTNER_SECRET:-unilink-api-secret}"
-KC_PARTNER_REALM="${KC_PARTNER_REALM:-mdqr-partner}"
+KC_PARTNER_REALM="${KC_PARTNER_REALM:-hub-partner}"
 
 # Shared secret del webhook Keycloak -> admin-service (X-Keycloak-Secret header).
 AUDIT_KC_SECRET="${AUDIT_KC_SECRET:-dev-keycloak-secret}"
@@ -85,10 +85,10 @@ Seed Vault KV (single/dev mode) with the secrets apps read at startup.
 
 Options:
   --ns <namespace>  Override completo del namespace (ignora NAMESPACE_BASE y --tenant).
-                    Ej: --ns mdqr-auth  --ns mdqr-decode
+                    Ej: --ns hub-auth  --ns hub-base
   --kc-realm <realm> Realm de Keycloak en keycloak/service-client (default: mismo que --ns).
                     Usar cuando el servicio valida JWTs de un realm distinto a su namespace.
-                    Ej: --ns mdqr-decode --kc-realm mdqr-admin
+                    Ej: --ns hub-base --kc-realm hub-admin
   --tenant <id>     Tenant ID. Namespace = ${NAMESPACE_BASE}-<tenant>. Vacio = single.
   --host <host>     Host por el que las apps alcanzan tools/postgres
                     (default: host.docker.internal)
@@ -99,7 +99,7 @@ Options:
 
 Environment overrides:
   VAULT_MODE        exec (default, container local) | run (externo efimero)
-  VAULT_CONTAINER   Vault container name        (default: mdqr-vault)  [modo exec]
+  VAULT_CONTAINER   Vault container name        (default: hub-vault)  [modo exec]
   VAULT_IMAGE       Imagen vault efimera        (default: hashicorp/vault:1.18) [modo run]
   VAULT_RUN_NETWORK Red docker del container efimero (default: bridge) [modo run]
   VAULT_ADDR        Vault address               (default: http://127.0.0.1:8200)
@@ -112,7 +112,7 @@ Environment overrides:
   AUDIT_KC_SECRET
 
 Examples:
-  # dev single-tenant (container local mdqr-vault, token root)
+  # dev single-tenant (container local hub-vault, token root)
   $(basename "${BASH_SOURCE[0]}")
   $(basename "${BASH_SOURCE[0]}") --tenant alpha
 
@@ -148,8 +148,8 @@ else
   NS="${NAMESPACE_BASE}"
 fi
 
-# Realm de Keycloak para keycloak/service-client: --kc-realm override > mdqr-admin
-KC_REALM="${KC_REALM_OVERRIDE:-mdqr-admin}"
+# Realm de Keycloak para keycloak/service-client: --kc-realm override > hub-admin
+KC_REALM="${KC_REALM_OVERRIDE:-hub-admin}"
 
 v() {
   if [ "$VAULT_MODE" = "run" ]; then
@@ -166,7 +166,7 @@ v() {
 main() {
   echo -e "${BOLD}"
   echo "+-----------------------------------------------+"
-  echo "|        Vault Seed (single/dev) - MDQR         |"
+  echo "|        Vault Seed (single/dev) - HUB         |"
   echo "+-----------------------------------------------+"
   echo -e "${NC}"
   if [ "$VAULT_MODE" = "run" ]; then

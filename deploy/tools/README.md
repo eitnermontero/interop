@@ -1,6 +1,6 @@
 # Stack de Tools (Consul, Redis, Vault, Keycloak)
 
-Tools aisladas del stack de aplicacion. Las apps (`mdqr-gateway`, `mdqr-cart-service`, `mdqr-report-service`) conectan aca via IP del host (`MDQR_HOST_IP`).
+Tools aisladas del stack de aplicacion. Las apps (`hub-gateway`, `hub-cart-service`, `hub-report-service`) conectan aca via IP del host (`HUB_HOST_IP`).
 
 ## Modos
 
@@ -19,13 +19,13 @@ Keycloak es **always-on** (sin profile).
 cd deploy/tools
 
 # Crear red compartida una sola vez
-docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 mdqr-shared
+docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 hub-shared
 
 # Copiar y editar .env
 cp .env.example .env
-# Editar: setear MDQR_TOOLS_BIND_IP=0.0.0.0
+# Editar: setear HUB_TOOLS_BIND_IP=0.0.0.0
 #
-# MDQR_HOST_IP: SOLO requerido en cluster mode (Redis cluster-announce-ip y Vault
+# HUB_HOST_IP: SOLO requerido en cluster mode (Redis cluster-announce-ip y Vault
 # api_addr). En single mode no se usa — dejalo sin setear. Lo validan
 # redis-cluster-init.sh / vault-cluster-init.sh al formar el cluster.
 ```
@@ -38,8 +38,8 @@ docker compose up -d
 
 Compose lee `COMPOSE_PROFILES` del `.env` y arranca el set correspondiente.
 
-En **single mode** no necesitas `MDQR_HOST_IP`: los servicios cluster no se crean y el
-compose usa `${MDQR_HOST_IP:-}` para no romper el parse.
+En **single mode** no necesitas `HUB_HOST_IP`: los servicios cluster no se crean y el
+compose usa `${HUB_HOST_IP:-}` para no romper el parse.
 
 ## Cluster: init + validacion
 
@@ -77,26 +77,26 @@ Re-unseal tras reinicio:
 
 ```bash
 # Single Redis:
-docker run --rm redis:8.8 redis-cli -h $MDQR_HOST_IP -p 6379 ping
+docker run --rm redis:8.8 redis-cli -h $HUB_HOST_IP -p 6379 ping
 
 # Cluster Redis:
-docker run --rm redis:8.8 redis-cli -h $MDQR_HOST_IP -p 6379 -c set hello world
-docker run --rm redis:8.8 redis-cli -h $MDQR_HOST_IP -p 6379 cluster info | grep cluster_state
+docker run --rm redis:8.8 redis-cli -h $HUB_HOST_IP -p 6379 -c set hello world
+docker run --rm redis:8.8 redis-cli -h $HUB_HOST_IP -p 6379 cluster info | grep cluster_state
 
 # Consul:
-curl -fsS http://$MDQR_HOST_IP:8500/v1/status/leader
-curl -fsS http://$MDQR_HOST_IP:8500/v1/catalog/nodes | jq
+curl -fsS http://$HUB_HOST_IP:8500/v1/status/leader
+curl -fsS http://$HUB_HOST_IP:8500/v1/catalog/nodes | jq
 
 # Vault single:
-curl -fsS http://$MDQR_HOST_IP:8200/v1/sys/health | jq
+curl -fsS http://$HUB_HOST_IP:8200/v1/sys/health | jq
 
 # Vault cluster (cualquier nodo):
-curl -fsS http://$MDQR_HOST_IP:8200/v1/sys/health | jq
-curl -fsS http://$MDQR_HOST_IP:8210/v1/sys/health | jq
-curl -fsS http://$MDQR_HOST_IP:8220/v1/sys/health | jq
+curl -fsS http://$HUB_HOST_IP:8200/v1/sys/health | jq
+curl -fsS http://$HUB_HOST_IP:8210/v1/sys/health | jq
+curl -fsS http://$HUB_HOST_IP:8220/v1/sys/health | jq
 
 # Keycloak:
-curl -fsS http://$MDQR_HOST_IP:8080/realms/master/.well-known/openid-configuration | head -c 200
+curl -fsS http://$HUB_HOST_IP:8080/realms/master/.well-known/openid-configuration | head -c 200
 ```
 
 ## Apps conectandose

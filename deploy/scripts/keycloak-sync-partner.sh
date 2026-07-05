@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# keycloak-sync-partner.sh — Realm mdqr-partner (clientes externos / M2M)
+# keycloak-sync-partner.sh — Realm hub-partner (clientes externos / M2M)
 #
 # Idempotente: crea recursos faltantes, omite los existentes.
 # Solo usa client_credentials — sin usuarios, sin SPA.
@@ -11,14 +11,14 @@
 #
 # Variables de entorno:
 #   KC_URL       URL de Keycloak  (default: http://localhost:8180)
-#   KC_REALM     Nombre del realm (default: mdqr-partner)
+#   KC_REALM     Nombre del realm (default: hub-partner)
 #   KC_USERNAME  Admin de master  (default: admin)
 #   KC_PASSWORD  Password admin   (default: admin)
 # =============================================================================
 set -euo pipefail
 
 KC_URL="${KC_URL:-http://localhost:8180}"
-KC_REALM="${KC_REALM:-mdqr-partner}"
+KC_REALM="${KC_REALM:-hub-partner}"
 KC_USERNAME="${KC_USERNAME:-admin}"
 KC_PASSWORD="${KC_PASSWORD:-admin}"
 SEED_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/keycloak-seed/partner" && pwd)"
@@ -40,7 +40,7 @@ while [ $# -gt 0 ]; do
       echo "Usage: $(basename "$0") [--yes-to-all]"
       echo "       $(basename "$0") --add-client <clientId> <description> <secret>"
       echo ""
-      echo "Syncs the mdqr-partner Keycloak realm for external API partners (M2M)."
+      echo "Syncs the hub-partner Keycloak realm for external API partners (M2M)."
       echo ""
       echo "To add a new partner client:"
       echo "  1. Add a line to keycloak-seed/partner/clients.csv"
@@ -225,7 +225,7 @@ sync_partner_clients() {
 main() {
   echo -e "${BOLD}"
   echo "╔═══════════════════════════════════════════════════╗"
-  echo "║  Keycloak Sync — Realm: mdqr-partner              ║"
+  echo "║  Keycloak Sync — Realm: hub-partner              ║"
   echo "╚═══════════════════════════════════════════════════╝"
   echo -e "${NC}"
   echo -e "  Server: ${CYAN}${KC_URL}${NC}"
@@ -247,7 +247,7 @@ main() {
     get_token
     sync_client_scopes
     create_partner_client "$ADD_CLIENT_ID" "$ADD_CLIENT_DESC" \
-      "https://api.sintesis.com.bo/qr.decode" "$ADD_CLIENT_SECRET"
+      "https://api.sintesis.com.bo/caso.penal" "$ADD_CLIENT_SECRET"
     echo ""
     echo -e "${BOLD}${GREEN}═══ Client added ═══${NC}"
     return
@@ -266,15 +266,15 @@ main() {
   sync_partner_clients
 
   echo ""
-  echo -e "${BOLD}${GREEN}═══ mdqr-partner sync complete ═══${NC}"
+  echo -e "${BOLD}${GREEN}═══ hub-partner sync complete ═══${NC}"
   echo ""
   echo -e "  ${BOLD}Token endpoint (via gateway):${NC}"
   echo -e "  ${CYAN}POST http://localhost:8080/oauth2/token${NC}"
   echo -e "  grant_type=client_credentials"
-  echo -e "  scope=https://api.sintesis.com.bo/qr.decode"
+  echo -e "  scope=https://api.sintesis.com.bo/caso.penal"
   echo ""
-  echo -e "  ${BOLD}QR decode API (via gateway):${NC}"
-  echo -e "  ${CYAN}POST http://localhost:8080/partner/v1/qr/decode${NC}"
+  echo -e "  ${BOLD}Inbound — Caso Penal (via gateway):${NC}"
+  echo -e "  ${CYAN}POST http://localhost:8080/partner/v1/inbound/CASO_PENAL/v1${NC}"
 }
 
 main "$@"

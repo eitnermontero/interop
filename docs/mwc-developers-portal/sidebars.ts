@@ -5,8 +5,8 @@ const sidebars: SidebarsConfig = {
     'intro',
     {
       type: 'category',
-      label: 'MDQR – QR Decrypt API',
-      items: ['mdqr', 'mdqr-partner'],
+      label: 'HUB – QR Decrypt API',
+      items: ['hub', 'hub-partner'],
     },
     {
       type: 'category',

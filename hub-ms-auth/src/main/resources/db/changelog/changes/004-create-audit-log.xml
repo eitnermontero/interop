@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <changeSet id="004-1" author="hub">
+        <createSequence sequenceName="audit_log_seq" startValue="1" incrementBy="50"/>
+        <createTable tableName="audit_log">
+            <column name="id" type="bigint">
+                <constraints primaryKey="true" nullable="false"/>
+            </column>
+            <column name="event_time" type="TIMESTAMP WITH TIME ZONE">
+                <constraints nullable="false"/>
+            </column>
+            <column name="event_type" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="module" type="VARCHAR(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="option_code" type="VARCHAR(100)"/>
+            <column name="user_id" type="VARCHAR(100)"/>
+            <column name="username" type="VARCHAR(100)"/>
+            <column name="full_name" type="VARCHAR(200)"/>
+            <column name="roles" type="TEXT[]" defaultValue="{}">
+                <constraints nullable="false"/>
+            </column>
+            <column name="ip_address" type="VARCHAR(50)"/>
+            <column name="user_agent" type="VARCHAR(500)"/>
+            <column name="service_name" type="VARCHAR(50)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="http_method" type="VARCHAR(10)"/>
+            <column name="endpoint" type="VARCHAR(255)"/>
+            <column name="response_status" type="INT"/>
+            <column name="duration_ms" type="INT"/>
+            <column name="details" type="jsonb"/>
+            <column name="created_date" type="TIMESTAMP WITH TIME ZONE" defaultValueComputed="NOW()">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="004-2" author="hub">
+        <createIndex tableName="audit_log" indexName="idx_audit_event_time">
+            <column name="event_time" descending="true"/>
+        </createIndex>
+        <createIndex tableName="audit_log" indexName="idx_audit_username">
+            <column name="username"/>
+        </createIndex>
+        <createIndex tableName="audit_log" indexName="idx_audit_event_type">
+            <column name="event_type"/>
+        </createIndex>
+        <createIndex tableName="audit_log" indexName="idx_audit_module">
+            <column name="module"/>
+        </createIndex>
+        <createIndex tableName="audit_log" indexName="idx_audit_service_name">
+            <column name="service_name"/>
+        </createIndex>
+    </changeSet>
+
+    <changeSet id="004-3" author="hub">
+        <comment>GIN index for JSONB details to support full-text search on payloads</comment>
+        <sql>CREATE INDEX idx_audit_details ON admin.audit_log USING GIN (details);</sql>
+    </changeSet>
+
+</databaseChangeLog>

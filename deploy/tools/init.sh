@@ -4,7 +4,7 @@
 
 set -e
 
-echo "🚀 Inicializando MDQR Tools Stack..."
+echo "🚀 Inicializando HUB Tools Stack..."
 echo ""
 
 # 1. Crear .env si no existe
@@ -18,13 +18,13 @@ fi
 
 # 2. Crear red compartida si no existe
 echo ""
-echo "🌐 Verificando red compartida mdqr_shared..."
-if ! docker network inspect mdqr_shared >/dev/null 2>&1; then
-  echo "   Creando red mdqr_shared..."
-  docker network create --driver bridge mdqr_shared
-  echo "   ✅ Red mdqr_shared creada"
+echo "🌐 Verificando red compartida hub_shared..."
+if ! docker network inspect hub_shared >/dev/null 2>&1; then
+  echo "   Creando red hub_shared..."
+  docker network create --driver bridge hub_shared
+  echo "   ✅ Red hub_shared creada"
 else
-  echo "   ✅ Red mdqr_shared ya existe"
+  echo "   ✅ Red hub_shared ya existe"
 fi
 
 # 3. Levantar contenedores

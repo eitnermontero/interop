@@ -1,2 +1,2 @@
 name,description,assignToClient,assignType
-audit:write,Permite publicar eventos de auditoría al admin service,mdqradminservice,default
+audit:write,Permite publicar eventos de auditoría al admin service,hubadminservice,default

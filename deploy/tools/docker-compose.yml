@@ -5,95 +5,95 @@
 #   COMPOSE_PROFILES=single   -> 1 redis + 1 consul + 1 vault (fast dev)
 #   COMPOSE_PROFILES=cluster  -> 3 consul + 6 redis + 3 vault (raft HA, prod-like)
 #
-# Binds to 0.0.0.0 (MDQR_TOOLS_BIND_IP) to be reachable from other Docker stacks
-# (apps mdqr-gateway, mdqr-decode-service, etc.) and from the LAN network (browser).
-name: ${MDQR_TOOLS_STACK_NAME:-mdqr-tools}
+# Binds to 0.0.0.0 (HUB_TOOLS_BIND_IP) to be reachable from other Docker stacks
+# (apps hub-gateway, hub-base-service, etc.) and from the LAN network (browser).
+name: ${HUB_TOOLS_STACK_NAME:-hub-tools}
 
 # External shared network - must exist BEFORE bringing up the stack.
 # Create it once with:
-#   docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 mdqr-shared
-# Override the name with MDQR_SHARED_NETWORK in .env.
+#   docker network create --driver bridge --opt com.docker.network.driver.mtu=1500 hub-shared
+# Override the name with HUB_SHARED_NETWORK in .env.
 networks:
-  mdqr_tools_net:
-    name: ${MDQR_TOOLS_NETWORK_NAME:-mdqr-tools-net}
+  hub_tools_net:
+    name: ${HUB_TOOLS_NETWORK_NAME:-hub-tools-net}
     driver: bridge
-  mdqr_shared:
-    name: ${MDQR_SHARED_NETWORK:-mdqr-shared}
+  hub_shared:
+    name: ${HUB_SHARED_NETWORK:-hub-shared}
     external: true
 
 volumes:
-  mdqr_keycloak_data:
+  hub_keycloak_data:
   # Single mode
-  mdqr_consul_data:
-  mdqr_redis_data:
-  mdqr_vault_data:
+  hub_consul_data:
+  hub_redis_data:
+  hub_vault_data:
   # Cluster mode
-  mdqr_consul_s1_data:
-  mdqr_consul_s2_data:
-  mdqr_consul_s3_data:
-  mdqr_redis_m1_data:
-  mdqr_redis_m2_data:
-  mdqr_redis_m3_data:
-  mdqr_redis_r1_data:
-  mdqr_redis_r2_data:
-  mdqr_redis_r3_data:
-  mdqr_vault_1_data:
-  mdqr_vault_2_data:
-  mdqr_vault_3_data:
+  hub_consul_s1_data:
+  hub_consul_s2_data:
+  hub_consul_s3_data:
+  hub_redis_m1_data:
+  hub_redis_m2_data:
+  hub_redis_m3_data:
+  hub_redis_r1_data:
+  hub_redis_r2_data:
+  hub_redis_r3_data:
+  hub_vault_1_data:
+  hub_vault_2_data:
+  hub_vault_3_data:
 
 # === Centralized images - change each component version in ONE place here ===
-# (overrideable via env: MDQR_REDIS_IMAGE / MDQR_CONSUL_IMAGE / MDQR_VAULT_IMAGE / KEYCLOAK_IMAGE)
+# (overrideable via env: HUB_REDIS_IMAGE / HUB_CONSUL_IMAGE / HUB_VAULT_IMAGE / KEYCLOAK_IMAGE)
 x-keycloak-image: &keycloak-image "${KEYCLOAK_IMAGE:-quay.io/keycloak/keycloak:26.6}"
-x-consul-image:   &consul-image   "${MDQR_CONSUL_IMAGE:-hashicorp/consul:1.22}"
-x-redis-image:    &redis-image    "${MDQR_REDIS_IMAGE:-redis:8.8}"
-x-vault-image:    &vault-image    "${MDQR_VAULT_IMAGE:-hashicorp/vault:1.21}"
+x-consul-image:   &consul-image   "${HUB_CONSUL_IMAGE:-hashicorp/consul:1.22}"
+x-redis-image:    &redis-image    "${HUB_REDIS_IMAGE:-redis:8.8}"
+x-vault-image:    &vault-image    "${HUB_VAULT_IMAGE:-hashicorp/vault:1.21}"
 
 # === Shared resource limits via YAML anchors =================================
 x-consul-deploy: &consul-deploy
   resources:
     limits:
-      memory: ${MDQR_CONSUL_MEM_LIMIT:-256M}
-      cpus: "${MDQR_CONSUL_CPU_LIMIT:-0.5}"
+      memory: ${HUB_CONSUL_MEM_LIMIT:-256M}
+      cpus: "${HUB_CONSUL_CPU_LIMIT:-0.5}"
     reservations:
-      memory: ${MDQR_CONSUL_MEM_RESERVATION:-128M}
-      cpus: "${MDQR_CONSUL_CPU_RESERVATION:-0.1}"
+      memory: ${HUB_CONSUL_MEM_RESERVATION:-128M}
+      cpus: "${HUB_CONSUL_CPU_RESERVATION:-0.1}"
 
 x-redis-deploy: &redis-deploy
   resources:
     limits:
-      memory: ${MDQR_REDIS_MEM_LIMIT:-256M}
-      cpus: "${MDQR_REDIS_CPU_LIMIT:-0.5}"
+      memory: ${HUB_REDIS_MEM_LIMIT:-256M}
+      cpus: "${HUB_REDIS_CPU_LIMIT:-0.5}"
     reservations:
-      memory: ${MDQR_REDIS_MEM_RESERVATION:-64M}
-      cpus: "${MDQR_REDIS_CPU_RESERVATION:-0.1}"
+      memory: ${HUB_REDIS_MEM_RESERVATION:-64M}
+      cpus: "${HUB_REDIS_CPU_RESERVATION:-0.1}"
 
 x-vault-deploy: &vault-deploy
   resources:
     limits:
-      memory: ${MDQR_VAULT_MEM_LIMIT:-256M}
-      cpus: "${MDQR_VAULT_CPU_LIMIT:-0.5}"
+      memory: ${HUB_VAULT_MEM_LIMIT:-256M}
+      cpus: "${HUB_VAULT_CPU_LIMIT:-0.5}"
     reservations:
-      memory: ${MDQR_VAULT_MEM_RESERVATION:-64M}
-      cpus: "${MDQR_VAULT_CPU_RESERVATION:-0.1}"
+      memory: ${HUB_VAULT_MEM_RESERVATION:-64M}
+      cpus: "${HUB_VAULT_CPU_RESERVATION:-0.1}"
 
 x-redis-healthcheck: &redis-healthcheck
   test: ["CMD-SHELL", "redis-cli -p 6379 ping | grep -q PONG"]
-  interval: ${MDQR_HC_REDIS_INTERVAL:-10s}
-  timeout: ${MDQR_HC_REDIS_TIMEOUT:-5s}
-  retries: ${MDQR_HC_REDIS_RETRIES:-12}
+  interval: ${HUB_HC_REDIS_INTERVAL:-10s}
+  timeout: ${HUB_HC_REDIS_TIMEOUT:-5s}
+  retries: ${HUB_HC_REDIS_RETRIES:-12}
 
 x-consul-healthcheck: &consul-healthcheck
   test: ["CMD", "consul", "members"]
-  interval: ${MDQR_HC_CONSUL_INTERVAL:-10s}
-  timeout: ${MDQR_HC_CONSUL_TIMEOUT:-5s}
-  retries: ${MDQR_HC_CONSUL_RETRIES:-12}
+  interval: ${HUB_HC_CONSUL_INTERVAL:-10s}
+  timeout: ${HUB_HC_CONSUL_TIMEOUT:-5s}
+  retries: ${HUB_HC_CONSUL_RETRIES:-12}
 
 # Vault: exit 0 = unsealed/active, 2 = sealed/standby (both = "alive"). 1 = down.
 x-vault-healthcheck: &vault-healthcheck
   test: ["CMD-SHELL", "vault status > /dev/null 2>&1 || [ $$? -eq 2 ]"]
-  interval: ${MDQR_HC_VAULT_INTERVAL:-10s}
-  timeout: ${MDQR_HC_VAULT_TIMEOUT:-5s}
-  retries: ${MDQR_HC_VAULT_RETRIES:-12}
+  interval: ${HUB_HC_VAULT_INTERVAL:-10s}
+  timeout: ${HUB_HC_VAULT_TIMEOUT:-5s}
+  retries: ${HUB_HC_VAULT_RETRIES:-12}
 
 services:
 
@@ -102,17 +102,17 @@ services:
   # ===========================================================================
 
   keycloak:
-    container_name: ${MDQR_KEYCLOAK_NAME:-mdqr-keycloak}
+    container_name: ${HUB_KEYCLOAK_NAME:-hub-keycloak}
     image: *keycloak-image
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: ${MDQR_KEYCLOAK_MEM_LIMIT:-768M}
-          cpus: "${MDQR_KEYCLOAK_CPU_LIMIT:-1.0}"
+          memory: ${HUB_KEYCLOAK_MEM_LIMIT:-768M}
+          cpus: "${HUB_KEYCLOAK_CPU_LIMIT:-1.0}"
         reservations:
-          memory: ${MDQR_KEYCLOAK_MEM_RESERVATION:-384M}
-          cpus: "${MDQR_KEYCLOAK_CPU_RESERVATION:-0.25}"
+          memory: ${HUB_KEYCLOAK_MEM_RESERVATION:-384M}
+          cpus: "${HUB_KEYCLOAK_CPU_RESERVATION:-0.25}"
     command: "${KEYCLOAK_COMMAND:-start-dev}"
     environment:
       # Storage backend: 'dev-file' (dev, in-memory, pierde datos al reiniciar),
@@ -133,7 +133,7 @@ services:
       KC_HEALTH_ENABLED: ${KEYCLOAK_HEALTH_ENABLED:-true}
       KC_HTTP_MANAGEMENT_PORT: ${KEYCLOAK_MANAGEMENT_PORT:-9990}
       # Producción: hostname público que Keycloak embebe en el JWT iss y en los redirects.
-      # Debe coincidir con MDQR_KEYCLOAK_URL en los servicios.
+      # Debe coincidir con HUB_KEYCLOAK_URL en los servicios.
       KC_HOSTNAME: ${KEYCLOAK_HOSTNAME:-}
       KC_HOSTNAME_STRICT: ${KEYCLOAK_HOSTNAME_STRICT:-false}
       # Proxy headers — solo setear si hay reverse proxy (nginx/traefik) delante.
@@ -148,14 +148,14 @@ services:
       KC_SPI_X509CERT_LOOKUP_NGINX_SSL_CLIENT_CERT: ${KEYCLOAK_X509_HEADER:-X-SSL-Client-Cert}
       KC_SPI_X509CERT_LOOKUP_NGINX_CERTIFICATE_CHAIN_LENGTH: "0"
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${KEYCLOAK_HTTP_PORT:-8180}:${KEYCLOAK_INTERNAL_HTTP_PORT:-9080}"
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${KEYCLOAK_HTTPS_PORT:-8443}:${KEYCLOAK_INTERNAL_HTTPS_PORT:-9443}"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${KEYCLOAK_HTTP_PORT:-8180}:${KEYCLOAK_INTERNAL_HTTP_PORT:-9080}"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${KEYCLOAK_HTTPS_PORT:-8443}:${KEYCLOAK_INTERNAL_HTTPS_PORT:-9443}"
     volumes:
       - ./keycloak/health-check.sh:/opt/keycloak/health-check.sh:ro
-      - mdqr_keycloak_data:/opt/keycloak/data
+      - hub_keycloak_data:/opt/keycloak/data
     healthcheck:
       test: ["CMD-SHELL", "bash /opt/keycloak/health-check.sh"]
       interval: 5s
@@ -171,68 +171,68 @@ services:
 
   consul:
     profiles: ["single"]
-    container_name: ${MDQR_CONSUL_NAME:-mdqr-consul}
+    container_name: ${HUB_CONSUL_NAME:-hub-consul}
     image: *consul-image
     restart: unless-stopped
     deploy: *consul-deploy
-    command: ["agent", "-dev", "-ui", "-client=0.0.0.0", "-log-level=${MDQR_CONSUL_LOG_LEVEL:-INFO}"]
+    command: ["agent", "-dev", "-ui", "-client=0.0.0.0", "-log-level=${HUB_CONSUL_LOG_LEVEL:-INFO}"]
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_consul_data:/consul/data
+      - hub_consul_data:/consul/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${MDQR_CONSUL_HTTP_PORT:-8500}:8500"
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${MDQR_CONSUL_RPC_PORT:-8300}:8300"
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${MDQR_CONSUL_DNS_PORT:-8600}:8600/udp"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${HUB_CONSUL_HTTP_PORT:-8500}:8500"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${HUB_CONSUL_RPC_PORT:-8300}:8300"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${HUB_CONSUL_DNS_PORT:-8600}:8600/udp"
     healthcheck: *consul-healthcheck
 
   redis:
     profiles: ["single"]
-    container_name: ${MDQR_REDIS_NAME:-mdqr-redis}
+    container_name: ${HUB_REDIS_NAME:-hub-redis}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
-    command: ["redis-server", "--appendonly", "${MDQR_REDIS_APPENDONLY:-yes}", "--notify-keyspace-events", "Ex"]
+    command: ["redis-server", "--appendonly", "${HUB_REDIS_APPENDONLY:-yes}", "--notify-keyspace-events", "Ex"]
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_data:/data
+      - hub_redis_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${MDQR_REDIS_PORT:-6379}:6379"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${HUB_REDIS_PORT:-6379}:6379"
     healthcheck: *redis-healthcheck
 
-  # Vault single - dev mode: unsealed + root token = MDQR_VAULT_DEV_ROOT_TOKEN.
+  # Vault single - dev mode: unsealed + root token = HUB_VAULT_DEV_ROOT_TOKEN.
   # DO NOT use in prod. Data is lost on restart (in-memory storage).
   vault:
     profiles: ["single"]
-    container_name: ${MDQR_VAULT_NAME:-mdqr-vault}
+    container_name: ${HUB_VAULT_NAME:-hub-vault}
     image: *vault-image
     restart: unless-stopped
     deploy: *vault-deploy
     cap_add:
       - IPC_LOCK
     environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${MDQR_VAULT_DEV_ROOT_TOKEN:-root}
+      VAULT_DEV_ROOT_TOKEN_ID: ${HUB_VAULT_DEV_ROOT_TOKEN:-root}
       VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
       VAULT_ADDR: http://127.0.0.1:8200
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_vault_data:/vault/data
+      - hub_vault_data:/vault/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-127.0.0.1}:${MDQR_VAULT_PORT:-8200}:8200"
+      - "${HUB_TOOLS_BIND_IP:-127.0.0.1}:${HUB_VAULT_PORT:-8200}:8200"
     healthcheck: *vault-healthcheck
 
   # ===========================================================================
   # CLUSTER MODE (profile "cluster") - prod-like HA, failover, slot rebalance
   # ===========================================================================
   # Consul: 3 servers, bootstrap-expect=3 (waits for quorum), retry-join between all.
-  # Redis:  3 masters + 3 replicas. cluster-announce-ip = $MDQR_HOST_IP (REQUIRED
+  # Redis:  3 masters + 3 replicas. cluster-announce-ip = $HUB_HOST_IP (REQUIRED
   #         in cluster) so external clients can reach nodes via MOVED. Uses
-  #         ${MDQR_HOST_IP:-} (not ':?') to avoid parse errors in single mode, where
+  #         ${HUB_HOST_IP:-} (not ':?') to avoid parse errors in single mode, where
   #         these services are not created; in cluster mode redis/vault-cluster-init.sh validates it.
   # Vault:  3 nodes with integrated raft storage + auto-join. After up requires init + unseal:
   #           scripts/vault-cluster-init.sh
@@ -242,7 +242,7 @@ services:
 
   consul-server-1:
     profiles: ["cluster"]
-    container_name: ${MDQR_CONSUL_S1_NAME:-mdqr-consul-server-1}
+    container_name: ${HUB_CONSUL_S1_NAME:-hub-consul-server-1}
     image: *consul-image
     restart: unless-stopped
     deploy: *consul-deploy
@@ -253,25 +253,25 @@ services:
         exec consul agent \
           -server -ui -client=0.0.0.0 \
           -bind='{{ GetInterfaceIP "eth0" }}' \
-          -node=${MDQR_CONSUL_S1_NAME:-mdqr-consul-server-1} \
-          -datacenter=${MDQR_CONSUL_DATACENTER:-dc-mdqr-prod} \
+          -node=${HUB_CONSUL_S1_NAME:-hub-consul-server-1} \
+          -datacenter=${HUB_CONSUL_DATACENTER:-dc-hub-prod} \
           -bootstrap-expect=3 \
           -data-dir=/consul/data \
-          -log-level=${MDQR_CONSUL_LOG_LEVEL:-INFO} \
-          -retry-join=${MDQR_CONSUL_S2_NAME:-mdqr-consul-server-2} \
-          -retry-join=${MDQR_CONSUL_S3_NAME:-mdqr-consul-server-3}
+          -log-level=${HUB_CONSUL_LOG_LEVEL:-INFO} \
+          -retry-join=${HUB_CONSUL_S2_NAME:-hub-consul-server-2} \
+          -retry-join=${HUB_CONSUL_S3_NAME:-hub-consul-server-3}
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_consul_s1_data:/consul/data
+      - hub_consul_s1_data:/consul/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_CONSUL_S1_HTTP_PORT:-8500}:8500"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_CONSUL_S1_HTTP_PORT:-8500}:8500"
     healthcheck: *consul-healthcheck
 
   consul-server-2:
     profiles: ["cluster"]
-    container_name: ${MDQR_CONSUL_S2_NAME:-mdqr-consul-server-2}
+    container_name: ${HUB_CONSUL_S2_NAME:-hub-consul-server-2}
     image: *consul-image
     restart: unless-stopped
     deploy: *consul-deploy
@@ -282,25 +282,25 @@ services:
         exec consul agent \
           -server -ui -client=0.0.0.0 \
           -bind='{{ GetInterfaceIP "eth0" }}' \
-          -node=${MDQR_CONSUL_S2_NAME:-mdqr-consul-server-2} \
-          -datacenter=${MDQR_CONSUL_DATACENTER:-dc-mdqr-prod} \
+          -node=${HUB_CONSUL_S2_NAME:-hub-consul-server-2} \
+          -datacenter=${HUB_CONSUL_DATACENTER:-dc-hub-prod} \
           -bootstrap-expect=3 \
           -data-dir=/consul/data \
-          -log-level=${MDQR_CONSUL_LOG_LEVEL:-INFO} \
-          -retry-join=${MDQR_CONSUL_S1_NAME:-mdqr-consul-server-1} \
-          -retry-join=${MDQR_CONSUL_S3_NAME:-mdqr-consul-server-3}
+          -log-level=${HUB_CONSUL_LOG_LEVEL:-INFO} \
+          -retry-join=${HUB_CONSUL_S1_NAME:-hub-consul-server-1} \
+          -retry-join=${HUB_CONSUL_S3_NAME:-hub-consul-server-3}
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_consul_s2_data:/consul/data
+      - hub_consul_s2_data:/consul/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_CONSUL_S2_HTTP_PORT:-8501}:8500"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_CONSUL_S2_HTTP_PORT:-8501}:8500"
     healthcheck: *consul-healthcheck
 
   consul-server-3:
     profiles: ["cluster"]
-    container_name: ${MDQR_CONSUL_S3_NAME:-mdqr-consul-server-3}
+    container_name: ${HUB_CONSUL_S3_NAME:-hub-consul-server-3}
     image: *consul-image
     restart: unless-stopped
     deploy: *consul-deploy
@@ -311,25 +311,25 @@ services:
         exec consul agent \
           -server -ui -client=0.0.0.0 \
           -bind='{{ GetInterfaceIP "eth0" }}' \
-          -node=${MDQR_CONSUL_S3_NAME:-mdqr-consul-server-3} \
-          -datacenter=${MDQR_CONSUL_DATACENTER:-dc-mdqr-prod} \
+          -node=${HUB_CONSUL_S3_NAME:-hub-consul-server-3} \
+          -datacenter=${HUB_CONSUL_DATACENTER:-dc-hub-prod} \
           -bootstrap-expect=3 \
           -data-dir=/consul/data \
-          -log-level=${MDQR_CONSUL_LOG_LEVEL:-INFO} \
-          -retry-join=${MDQR_CONSUL_S1_NAME:-mdqr-consul-server-1} \
-          -retry-join=${MDQR_CONSUL_S2_NAME:-mdqr-consul-server-2}
+          -log-level=${HUB_CONSUL_LOG_LEVEL:-INFO} \
+          -retry-join=${HUB_CONSUL_S1_NAME:-hub-consul-server-1} \
+          -retry-join=${HUB_CONSUL_S2_NAME:-hub-consul-server-2}
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_consul_s3_data:/consul/data
+      - hub_consul_s3_data:/consul/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_CONSUL_S3_HTTP_PORT:-8502}:8500"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_CONSUL_S3_HTTP_PORT:-8502}:8500"
     healthcheck: *consul-healthcheck
 
   redis-master-1:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_M1_NAME:-mdqr-redis-master-1}
+    container_name: ${HUB_REDIS_M1_NAME:-hub-redis-master-1}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -339,24 +339,24 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_M1_PORT:-6379} \
-          --cluster-announce-bus-port ${MDQR_REDIS_M1_BUS_PORT:-16379} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_M1_PORT:-6379} \
+          --cluster-announce-bus-port ${HUB_REDIS_M1_BUS_PORT:-16379} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_m1_data:/data
+      - hub_redis_m1_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M1_PORT:-6379}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M1_BUS_PORT:-16379}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M1_PORT:-6379}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M1_BUS_PORT:-16379}:16379"
     healthcheck: *redis-healthcheck
 
   redis-master-2:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_M2_NAME:-mdqr-redis-master-2}
+    container_name: ${HUB_REDIS_M2_NAME:-hub-redis-master-2}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -366,24 +366,24 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_M2_PORT:-6380} \
-          --cluster-announce-bus-port ${MDQR_REDIS_M2_BUS_PORT:-16380} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_M2_PORT:-6380} \
+          --cluster-announce-bus-port ${HUB_REDIS_M2_BUS_PORT:-16380} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_m2_data:/data
+      - hub_redis_m2_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M2_PORT:-6380}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M2_BUS_PORT:-16380}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M2_PORT:-6380}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M2_BUS_PORT:-16380}:16379"
     healthcheck: *redis-healthcheck
 
   redis-master-3:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_M3_NAME:-mdqr-redis-master-3}
+    container_name: ${HUB_REDIS_M3_NAME:-hub-redis-master-3}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -393,24 +393,24 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_M3_PORT:-6381} \
-          --cluster-announce-bus-port ${MDQR_REDIS_M3_BUS_PORT:-16381} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_M3_PORT:-6381} \
+          --cluster-announce-bus-port ${HUB_REDIS_M3_BUS_PORT:-16381} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_m3_data:/data
+      - hub_redis_m3_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M3_PORT:-6381}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_M3_BUS_PORT:-16381}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M3_PORT:-6381}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_M3_BUS_PORT:-16381}:16379"
     healthcheck: *redis-healthcheck
 
   redis-replica-1:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_R1_NAME:-mdqr-redis-replica-1}
+    container_name: ${HUB_REDIS_R1_NAME:-hub-redis-replica-1}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -420,24 +420,24 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_R1_PORT:-6382} \
-          --cluster-announce-bus-port ${MDQR_REDIS_R1_BUS_PORT:-16382} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_R1_PORT:-6382} \
+          --cluster-announce-bus-port ${HUB_REDIS_R1_BUS_PORT:-16382} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_r1_data:/data
+      - hub_redis_r1_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R1_PORT:-6382}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R1_BUS_PORT:-16382}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R1_PORT:-6382}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R1_BUS_PORT:-16382}:16379"
     healthcheck: *redis-healthcheck
 
   redis-replica-2:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_R2_NAME:-mdqr-redis-replica-2}
+    container_name: ${HUB_REDIS_R2_NAME:-hub-redis-replica-2}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -447,24 +447,24 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_R2_PORT:-6383} \
-          --cluster-announce-bus-port ${MDQR_REDIS_R2_BUS_PORT:-16383} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_R2_PORT:-6383} \
+          --cluster-announce-bus-port ${HUB_REDIS_R2_BUS_PORT:-16383} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_r2_data:/data
+      - hub_redis_r2_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R2_PORT:-6383}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R2_BUS_PORT:-16383}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R2_PORT:-6383}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R2_BUS_PORT:-16383}:16379"
     healthcheck: *redis-healthcheck
 
   redis-replica-3:
     profiles: ["cluster"]
-    container_name: ${MDQR_REDIS_R3_NAME:-mdqr-redis-replica-3}
+    container_name: ${HUB_REDIS_R3_NAME:-hub-redis-replica-3}
     image: *redis-image
     restart: unless-stopped
     deploy: *redis-deploy
@@ -474,29 +474,29 @@ services:
       - |
         exec redis-server --bind 0.0.0.0 --port 6379 \
           --cluster-enabled yes --cluster-config-file /data/nodes.conf \
-          --cluster-node-timeout ${MDQR_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
-          --cluster-announce-ip ${MDQR_HOST_IP:-} \
-          --cluster-announce-port ${MDQR_REDIS_R3_PORT:-6384} \
-          --cluster-announce-bus-port ${MDQR_REDIS_R3_BUS_PORT:-16384} \
+          --cluster-node-timeout ${HUB_REDIS_CLUSTER_NODE_TIMEOUT_MS:-10000} \
+          --cluster-announce-ip ${HUB_HOST_IP:-} \
+          --cluster-announce-port ${HUB_REDIS_R3_PORT:-6384} \
+          --cluster-announce-bus-port ${HUB_REDIS_R3_BUS_PORT:-16384} \
           --appendonly yes --protected-mode no
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_redis_r3_data:/data
+      - hub_redis_r3_data:/data
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R3_PORT:-6384}:6379"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_REDIS_R3_BUS_PORT:-16384}:16379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R3_PORT:-6384}:6379"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_REDIS_R3_BUS_PORT:-16384}:16379"
     healthcheck: *redis-healthcheck
 
   # Vault cluster - 3 nodes with integrated raft storage + auto-join.
   # After up requires init + unseal: scripts/vault-cluster-init.sh
-  # api_addr/cluster_addr use MDQR_HOST_IP so the rest of the cluster
+  # api_addr/cluster_addr use HUB_HOST_IP so the rest of the cluster
   # and external clients can reach each node.
 
   vault-1:
     profiles: ["cluster"]
-    container_name: ${MDQR_VAULT_1_NAME:-mdqr-vault-1}
+    container_name: ${HUB_VAULT_1_NAME:-hub-vault-1}
     image: *vault-image
     restart: unless-stopped
     deploy: *vault-deploy
@@ -504,29 +504,29 @@ services:
       - IPC_LOCK
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
-      VAULT_API_ADDR: http://${MDQR_HOST_IP:-}:${MDQR_VAULT_1_PORT:-8200}
+      VAULT_API_ADDR: http://${HUB_HOST_IP:-}:${HUB_VAULT_1_PORT:-8200}
       # cluster_addr uses internal DNS between containers (raft peers) - the host LAN
       # IP is not reachable from a container to the same host by default.
-      VAULT_CLUSTER_ADDR: http://${MDQR_VAULT_1_NAME:-mdqr-vault-1}:8201
+      VAULT_CLUSTER_ADDR: http://${HUB_VAULT_1_NAME:-hub-vault-1}:8201
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         chown -R vault:vault /vault/data 2>/dev/null || true
         exec docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_vault_1_data:/vault/data
+      - hub_vault_1_data:/vault/data
       - ./vault/vault-1.hcl:/vault/config/vault.hcl:ro
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_1_PORT:-8200}:8200"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_1_CLUSTER_PORT:-8201}:8201"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_1_PORT:-8200}:8200"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_1_CLUSTER_PORT:-8201}:8201"
     healthcheck: *vault-healthcheck
 
   vault-2:
     profiles: ["cluster"]
-    container_name: ${MDQR_VAULT_2_NAME:-mdqr-vault-2}
+    container_name: ${HUB_VAULT_2_NAME:-hub-vault-2}
     image: *vault-image
     restart: unless-stopped
     deploy: *vault-deploy
@@ -534,27 +534,27 @@ services:
       - IPC_LOCK
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
-      VAULT_API_ADDR: http://${MDQR_HOST_IP:-}:${MDQR_VAULT_2_PORT:-8210}
-      VAULT_CLUSTER_ADDR: http://${MDQR_VAULT_2_NAME:-mdqr-vault-2}:8201
+      VAULT_API_ADDR: http://${HUB_HOST_IP:-}:${HUB_VAULT_2_PORT:-8210}
+      VAULT_CLUSTER_ADDR: http://${HUB_VAULT_2_NAME:-hub-vault-2}:8201
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         chown -R vault:vault /vault/data 2>/dev/null || true
         exec docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_vault_2_data:/vault/data
+      - hub_vault_2_data:/vault/data
       - ./vault/vault-2.hcl:/vault/config/vault.hcl:ro
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_2_PORT:-8210}:8200"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_2_CLUSTER_PORT:-8211}:8201"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_2_PORT:-8210}:8200"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_2_CLUSTER_PORT:-8211}:8201"
     healthcheck: *vault-healthcheck
 
   vault-3:
     profiles: ["cluster"]
-    container_name: ${MDQR_VAULT_3_NAME:-mdqr-vault-3}
+    container_name: ${HUB_VAULT_3_NAME:-hub-vault-3}
     image: *vault-image
     restart: unless-stopped
     deploy: *vault-deploy
@@ -562,20 +562,20 @@ services:
       - IPC_LOCK
     environment:
       VAULT_ADDR: http://127.0.0.1:8200
-      VAULT_API_ADDR: http://${MDQR_HOST_IP:-}:${MDQR_VAULT_3_PORT:-8220}
-      VAULT_CLUSTER_ADDR: http://${MDQR_VAULT_3_NAME:-mdqr-vault-3}:8201
+      VAULT_API_ADDR: http://${HUB_HOST_IP:-}:${HUB_VAULT_3_PORT:-8220}
+      VAULT_CLUSTER_ADDR: http://${HUB_VAULT_3_NAME:-hub-vault-3}:8201
     entrypoint: ["/bin/sh", "-ec"]
     command:
       - |
         chown -R vault:vault /vault/data 2>/dev/null || true
         exec docker-entrypoint.sh vault server -config=/vault/config/vault.hcl
     networks:
-      - mdqr_tools_net
-      - mdqr_shared
+      - hub_tools_net
+      - hub_shared
     volumes:
-      - mdqr_vault_3_data:/vault/data
+      - hub_vault_3_data:/vault/data
       - ./vault/vault-3.hcl:/vault/config/vault.hcl:ro
     ports:
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_3_PORT:-8220}:8200"
-      - "${MDQR_TOOLS_BIND_IP:-0.0.0.0}:${MDQR_VAULT_3_CLUSTER_PORT:-8221}:8201"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_3_PORT:-8220}:8200"
+      - "${HUB_TOOLS_BIND_IP:-0.0.0.0}:${HUB_VAULT_3_CLUSTER_PORT:-8221}:8201"
     healthcheck: *vault-healthcheck

@@ -1,8 +1,8 @@
 FROM eclipse-temurin:25-jre-alpine
-RUN addgroup -S mdqr && adduser -S -G mdqr mdqr
+RUN addgroup -S hub && adduser -S -G hub hub
 WORKDIR /app
-COPY --chown=mdqr:mdqr mdqr-ms-auth/build/libs/mdqr-ms-auth-*.jar /app/app.jar
-USER mdqr
+COPY --chown=hub:hub hub-ms-auth/build/libs/hub-ms-auth-*.jar /app/app.jar
+USER hub
 EXPOSE 8083
 ENTRYPOINT ["java", \
     "--enable-native-access=ALL-UNNAMED", \

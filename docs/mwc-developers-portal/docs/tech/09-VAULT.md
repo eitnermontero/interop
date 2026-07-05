@@ -2,7 +2,7 @@
 
 ## Visión General
 
-Vault centraliza todos los secretos del sistema MDQR: credenciales de bases de datos, Redis y Keycloak. Se accede a él desde cada microservicio via Spring Cloud Vault al momento de arranque.
+Vault centraliza todos los secretos del sistema HUB: credenciales de bases de datos, Redis y Keycloak. Se accede a él desde cada microservicio via Spring Cloud Vault al momento de arranque.
 
 En el perfil `local` Vault está desactivado y los valores se toman de variables de entorno con defaults. En staging y producción, Vault es la única fuente de credenciales.
 
@@ -12,8 +12,8 @@ Cada módulo usa un namespace (path) independiente dentro del engine KV de Vault
 
 | Namespace | Módulo | Base de datos |
 |---|---|---|
-| `mdqr-auth` | `mdqr-ms-auth` | `mdqr_auth` |
-| `mdqr-decode` | `mdqr-ms-base` | `mdqr_decode` |
+| `hub-auth` | `hub-ms-auth` | `hub_auth` |
+| `hub-base` | `hub-ms-base` | `hub_base` |
 
 ## Estructura de secretos
 
@@ -30,7 +30,7 @@ secret/<namespace>/
 
 | Campo | Descripción |
 |---|---|
-| `url` | URL JDBC completa (ej: `jdbc:postgresql://localhost:5432/mdqr_auth`) |
+| `url` | URL JDBC completa (ej: `jdbc:postgresql://localhost:5432/hub_auth`) |
 | `username` | Usuario de la base de datos |
 | `password` | Password del usuario |
 | `driver` | Clase del driver (ej: `org.postgresql.Driver`) |
@@ -62,8 +62,8 @@ El script `deploy/scripts/vault-seed.sh` siembra todos los secretos de un namesp
 
 | Parámetro | Obligatorio | Descripción |
 |---|---|---|
-| `--ns <namespace>` | Si | Namespace de Vault: `mdqr-auth` o `mdqr-decode` |
-| `--kc-realm <realm>` | Si | Realm de Keycloak. Siempre usar `mdqr-admin` |
+| `--ns <namespace>` | Si | Namespace de Vault: `hub-auth` o `hub-base` |
+| `--kc-realm <realm>` | Si | Realm de Keycloak. Siempre usar `hub-admin` |
 
 ### Variables de entorno del script
 
@@ -75,26 +75,26 @@ El script `deploy/scripts/vault-seed.sh` siembra todos los secretos de un namesp
 
 ### Advertencia critica: parametro `--kc-realm`
 
-Si se omite `--kc-realm`, el script usa el nombre del namespace como realm por defecto. Para el namespace `mdqr-decode`, esto resulta en que Vault almacena el realm `mdqr-decode` en lugar de `mdqr-admin`. Los servicios fallan al arrancar con un error de issuer JWT porque el realm no existe en Keycloak.
+Si se omite `--kc-realm`, el script usa el nombre del namespace como realm por defecto. Para el namespace `hub-base`, esto resulta en que Vault almacena el realm `hub-base` en lugar de `hub-admin`. Los servicios fallan al arrancar con un error de issuer JWT porque el realm no existe en Keycloak.
 
-**Siempre especificar `--kc-realm mdqr-admin` explicitamente.**
+**Siempre especificar `--kc-realm hub-admin` explicitamente.**
 
 ---
 
 ## Comandos de seed
 
-### ms-auth (namespace `mdqr-auth`)
+### ms-auth (namespace `hub-auth`)
 
 ```bash
-DB_NAME=mdqr_auth DB_HOST=localhost \
-  deploy/scripts/vault-seed.sh --ns mdqr-auth --kc-realm mdqr-admin
+DB_NAME=hub_auth DB_HOST=localhost \
+  deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
 ```
 
-### ms-base (namespace `mdqr-decode`)
+### ms-base (namespace `hub-base`)
 
 ```bash
-DB_NAME=mdqr_decode DB_HOST=localhost \
-  deploy/scripts/vault-seed.sh --ns mdqr-decode --kc-realm mdqr-admin
+DB_NAME=hub_base DB_HOST=localhost \
+  deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
 ```
 
 ### Nota sobre `TOOLS_HOST` en WSL2
@@ -102,8 +102,8 @@ DB_NAME=mdqr_decode DB_HOST=localhost \
 En entornos WSL2, `host.docker.internal` no es alcanzable desde las aplicaciones Spring que corren en la terminal (fuera de Docker). Para Redis y otros servicios que corren en Docker, usar `TOOLS_HOST=127.0.0.1`:
 
 ```bash
-TOOLS_HOST=127.0.0.1 DB_NAME=mdqr_auth \
-  deploy/scripts/vault-seed.sh --ns mdqr-auth --kc-realm mdqr-admin
+TOOLS_HOST=127.0.0.1 DB_NAME=hub_auth \
+  deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
 ```
 
 ---
@@ -114,27 +114,27 @@ Verificar que los secretos quedaron correctamente sembrados:
 
 ```bash
 # Verificar keycloak de ms-auth
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv get secret/mdqr-auth/keycloak
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv get secret/hub-auth/keycloak
 
 # Verificar database de ms-auth
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv get secret/mdqr-auth/database
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv get secret/hub-auth/database
 
 # Verificar redis de ms-auth
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv get secret/mdqr-auth/redis
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv get secret/hub-auth/redis
 
 # Verificar keycloak de ms-base
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv get secret/mdqr-decode/keycloak
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv get secret/hub-base/keycloak
 
 # Verificar database de ms-base
-docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 mdqr-vault \
-  vault kv get secret/mdqr-decode/database
+docker exec -e VAULT_TOKEN=root -e VAULT_ADDR=http://127.0.0.1:8200 hub-vault \
+  vault kv get secret/hub-base/database
 ```
 
-Confirmar que el campo `realm` en el path `keycloak` de ambos namespaces es `mdqr-admin`. Si aparece el nombre del namespace como realm, el seed se ejecuto sin `--kc-realm` y debe corregirse.
+Confirmar que el campo `realm` en el path `keycloak` de ambos namespaces es `hub-admin`. Si aparece el nombre del namespace como realm, el seed se ejecuto sin `--kc-realm` y debe corregirse.
 
 ---
 
@@ -166,21 +166,21 @@ spring:
         default-context: <namespace>
 ```
 
-Reemplazar `<namespace>` con `mdqr-auth` para ms-auth o `mdqr-decode` para ms-base.
+Reemplazar `<namespace>` con `hub-auth` para ms-auth o `hub-base` para ms-base.
 
 ### Mapeo de secretos a properties de Spring
 
-Spring Cloud Vault mapea los campos del path KV a properties con el formato `<path>.<campo>`. Ejemplos para el namespace `mdqr-auth`:
+Spring Cloud Vault mapea los campos del path KV a properties con el formato `<path>.<campo>`. Ejemplos para el namespace `hub-auth`:
 
 | Path en Vault | Campo | Property en Spring |
 |---|---|---|
-| `secret/mdqr-auth/database` | `username` | `database.username` |
-| `secret/mdqr-auth/database` | `password` | `database.password` |
-| `secret/mdqr-auth/database` | `url` | `database.url` |
-| `secret/mdqr-auth/redis` | `host` | `redis.host` |
-| `secret/mdqr-auth/redis` | `password` | `redis.password` |
-| `secret/mdqr-auth/keycloak` | `realm` | `keycloak.realm` |
-| `secret/mdqr-auth/keycloak` | `client-secret` | `keycloak.client-secret` |
+| `secret/hub-auth/database` | `username` | `database.username` |
+| `secret/hub-auth/database` | `password` | `database.password` |
+| `secret/hub-auth/database` | `url` | `database.url` |
+| `secret/hub-auth/redis` | `host` | `redis.host` |
+| `secret/hub-auth/redis` | `password` | `redis.password` |
+| `secret/hub-auth/keycloak` | `realm` | `keycloak.realm` |
+| `secret/hub-auth/keycloak` | `client-secret` | `keycloak.client-secret` |
 
 ---
 

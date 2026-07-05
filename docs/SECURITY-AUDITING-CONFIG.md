@@ -1,5 +1,8 @@
 # Configuración de Seguridad y Auditoría JPA
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## 📋 Problema Encontrado
 
 Al intentar crear certificados con el endpoint `POST /api/certificates`, se obtenía el siguiente error:

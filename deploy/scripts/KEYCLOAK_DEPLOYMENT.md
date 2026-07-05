@@ -8,8 +8,8 @@ When you run `dev-up.sh`, it automatically:
 1. **Starts infrastructure** (Postgres, Redis, Consul, Vault, Keycloak)
 2. **Waits for Keycloak** to be ready (port 8180)
 3. **Runs `keycloak-sync.sh --yes-to-all`** to create:
-   - Realm: `mdqr`
-   - Service Client: `mdqr-api`
+   - Realm: `hub`
+   - Service Client: `hub-api`
    - Partner Clients: `cartcore_stage_demo01`, `mwc-admin-service`
    - SPA Clients: `mwc-public-fe`, `mwc-admin-fe`
    - Users: admin (admin/admin), soboce-test (soboce-test/soboce123)
@@ -37,7 +37,7 @@ If Keycloak already exists in production:
 
 ```bash
 export KC_URL="https://sso.sintesis.com.bo"
-export KC_REALM="mdqr"
+export KC_REALM="hub"
 export KC_USERNAME="keycloak-admin"
 export KC_PASSWORD="<secure-password-from-vault>"
 
@@ -77,7 +77,7 @@ deploy-keycloak:
     - name: Sync Keycloak Realm
       env:
         KC_URL: https://sso.sintesis.com.bo
-        KC_REALM: mdqr
+        KC_REALM: hub
         KC_USERNAME: keycloak-admin
         KC_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
       run: bash deploy/scripts/keycloak-sync.sh --yes-to-all
@@ -93,12 +93,12 @@ KC_URL="http://localhost:8180"              # Dev
 KC_URL="https://sso.sintesis.com.bo"        # Prod
 
 # Realm & Admin
-KC_REALM="mdqr"
+KC_REALM="hub"
 KC_USERNAME="admin"
 KC_PASSWORD="admin"                          # Use from vault in prod
 
 # Service Client
-KC_SERVICE_CLIENT="mdqr-api"      # Manages authorization
+KC_SERVICE_CLIENT="hub-api"      # Manages authorization
 
 # Test User
 KC_SOBOCE_TEST_USER="soboce-test"
@@ -157,7 +157,7 @@ After deployment, verify clients exist:
 
 ```bash
 export KC_URL="http://localhost:8180"
-export KC_REALM="mdqr"
+export KC_REALM="hub"
 export KC_USERNAME="admin"
 export KC_PASSWORD="admin"
 
@@ -171,7 +171,7 @@ curl -s -H "Authorization: Bearer $(curl -sf \
 
 Expected output:
 ```
-mdqr-api
+hub-api
 cartcore_stage_demo01
 mwc-admin-service
 mwc-public-fe

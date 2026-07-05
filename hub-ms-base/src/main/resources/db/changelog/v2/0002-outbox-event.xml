@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ═══════════════════════════════════════════════════════════════════
+        Tabla: outbox_event  (schema public)
+        Patrón Outbox Transaccional: los servicios escriben eventos en esta
+        tabla dentro de la misma transacción de negocio. Un proceso relay
+        (Debezium CDC o polling job) lee los eventos PENDING y los publica
+        en el bus de mensajes (Kafka, RabbitMQ, etc.).
+
+        Garantías:
+          - El evento se persiste si y solo si la transacción de negocio comete.
+          - idempotency_key UNIQUE evita duplicados en el relay.
+          - La columna payload es jsonb; NO almacenar PII en claro; cifrar
+            con Vault Transit si el evento contiene datos sensibles.
+
+        Locks: ACCESS EXCLUSIVE en CREATE TABLE. Objeto nuevo, seguro con
+               tráfico activo.
+        Rollback: DROP TABLE + DROP SEQUENCE.
+        ═══════════════════════════════════════════════════════════════════
+    -->
+
+    <changeSet id="v2-base-010" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="outbox_event" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear secuencia para outbox_event</comment>
+        <createSequence sequenceName="outbox_event_seq"
+                        schemaName="public"
+                        startValue="1"
+                        incrementBy="50"/>
+        <rollback>
+            <dropSequence sequenceName="outbox_event_seq" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-base-011" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="outbox_event" schemaName="public"/></not>
+        </preConditions>
+        <comment>Crear tabla outbox_event — patrón outbox transaccional</comment>
+        <createTable tableName="outbox_event" schemaName="public">
+
+            <column name="id" type="bigint" defaultValueSequenceNext="outbox_event_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_outbox_event" nullable="false"/>
+            </column>
+
+            <!--
+                Tipo del agregado que originó el evento.
+                Ejemplo: "HUB_TRANSACTION", "PARTNER_SUBSCRIPTION".
+            -->
+            <column name="aggregate_type" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- ID del agregado específico (UUID o bigint serializado como texto) -->
+            <column name="aggregate_id" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Tipo de evento de dominio.
+                Ejemplo: "CASO_PENAL_CREATED", "PARTNER_ACTIVATED".
+                Convención: SNAKE_UPPER_CASE.
+            -->
+            <column name="event_type" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                Clave de idempotencia: garantiza que el relay no procese
+                el mismo evento dos veces aunque reintente.
+                Generada por la aplicación (UUID v4/v7 recomendado).
+            -->
+            <column name="idempotency_key" type="varchar(128)">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uk_outbox_idempotency_key"/>
+            </column>
+
+            <!--
+                Payload del evento en JSON.
+                Si contiene PII: cifrar con Vault Transit y almacenar el
+                ciphertext + referencia a la clave (vault_key_ref).
+            -->
+            <column name="payload" type="jsonb">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Referencia opcional a la clave Vault Transit si el payload está cifrado -->
+            <column name="vault_key_ref" type="text"/>
+
+            <!-- Estado del evento en el relay: PENDING / SENT / FAILED -->
+            <column name="status" type="varchar(20)" defaultValue="PENDING">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Número de intentos de publicación realizados por el relay -->
+            <column name="attempts" type="integer" defaultValueNumeric="0">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Último error del relay (para diagnóstico) -->
+            <column name="last_error" type="text"/>
+
+            <!-- Fecha de creación del evento (= momento de la transacción de negocio) -->
+            <column name="created_date" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Fecha en que el relay publicó exitosamente el evento -->
+            <column name="processed_date" type="timestamptz"/>
+        </createTable>
+
+        <!-- CHECK de status -->
+        <sql>
+            ALTER TABLE public.outbox_event
+            ADD CONSTRAINT chk_outbox_status
+            CHECK (status IN ('PENDING', 'SENT', 'FAILED'));
+        </sql>
+
+        <!-- CHECK de attempts no negativo -->
+        <sql>
+            ALTER TABLE public.outbox_event
+            ADD CONSTRAINT chk_outbox_attempts
+            CHECK (attempts >= 0);
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE public.outbox_event DROP CONSTRAINT IF EXISTS chk_outbox_status;</sql>
+            <sql>ALTER TABLE public.outbox_event DROP CONSTRAINT IF EXISTS chk_outbox_attempts;</sql>
+            <dropTable tableName="outbox_event" schemaName="public"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-base-012" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="outbox_event" schemaName="public"/>
+            <not><indexExists indexName="idx_outbox_status_created" schemaName="public"/></not>
+        </preConditions>
+        <comment>Índices para outbox_event</comment>
+
+        <!--
+            idx_outbox_status_created: hot-path del relay.
+            El relay hace: WHERE status = 'PENDING' ORDER BY created_date ASC LIMIT N.
+            Índice parcial sobre PENDING: como la mayoría de filas están en SENT,
+            el índice parcial es mucho más pequeño y eficiente.
+        -->
+        <sql splitStatements="false">
+            CREATE INDEX IF NOT EXISTS idx_outbox_status_created
+                ON public.outbox_event (created_date ASC)
+                WHERE status = 'PENDING';
+        </sql>
+
+        <!--
+            idx_outbox_aggregate: lookup de eventos por agregado (debugging, replay manual).
+        -->
+        <createIndex tableName="outbox_event"
+                     schemaName="public"
+                     indexName="idx_outbox_aggregate">
+            <column name="aggregate_type"/>
+            <column name="aggregate_id"/>
+        </createIndex>
+
+        <!--
+            idx_outbox_event_type: filtrar por tipo de evento para suscriptores selectivos.
+        -->
+        <createIndex tableName="outbox_event"
+                     schemaName="public"
+                     indexName="idx_outbox_event_type">
+            <column name="event_type"/>
+        </createIndex>
+
+        <rollback>
+            <sql>DROP INDEX IF EXISTS public.idx_outbox_status_created;</sql>
+            <dropIndex tableName="outbox_event" schemaName="public" indexName="idx_outbox_aggregate"/>
+            <dropIndex tableName="outbox_event" schemaName="public" indexName="idx_outbox_event_type"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

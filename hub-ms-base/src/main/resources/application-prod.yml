@@ -1,0 +1,17 @@
+logging:
+  level:
+    bo.com.sintesis.hub: INFO
+    org.hibernate.SQL: WARN
+
+spring:
+  liquibase:
+    contexts: prod
+
+  jpa:
+    show-sql: false
+
+springdoc:
+  swagger-ui:
+    enabled: true
+  api-docs:
+    enabled: true

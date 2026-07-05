@@ -7,7 +7,7 @@ plugins {
 }
 
 allprojects {
-    group = 'bo.com.sintesis.mdqr'
+    group = 'bo.com.sintesis.hub'
 
     repositories {
         mavenLocal()
@@ -50,7 +50,7 @@ subprojects {
     }
 
     ext {
-        set('dockerRegistry', findProperty('dockerRegistry') ?: 'cr.sintesis.com.bo/mdqr-dev')
+        set('dockerRegistry', findProperty('dockerRegistry') ?: 'cr.sintesis.com.bo/hub-dev')
     }
 
     dependencyManagement {
@@ -76,7 +76,7 @@ subprojects {
                 '-XX:MaxRAMPercentage=75.0',
                 '-Djava.security.egd=file:/dev/./urandom'
             ]
-            ports = [project.name == 'mdqr-gateway' ? '8080' : project.name == 'mdqr-report-service' ? '8082' : '8081']
+            ports = [project.name == 'hub-gateway' ? '8080' : project.name == 'hub-report-service' ? '8082' : '8081']
             user = '1000:1000'
             creationTime = 'USE_CURRENT_TIMESTAMP'
             format = 'OCI'

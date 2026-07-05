@@ -72,7 +72,7 @@
                   "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
                   "token_type": "Bearer",
                   "expires_in": 300,
-                  "scope": "https://api.sintesis.com.bo/qr.decode"
+                  "scope": "https://api.sintesis.com.bo/caso.penal"
                 }
               }
             }
@@ -319,7 +319,7 @@
           },
           "scope": {
             "type": "string",
-            "example": "https://api.sintesis.com.bo/qr.decode"
+            "example": "https://api.sintesis.com.bo/caso.penal"
           }
         }
       },

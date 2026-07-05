@@ -10,7 +10,7 @@
 #   6. Write/read distribuido: SET en master, GET por otro nodo (sigue MOVED)
 #
 # Lee config del .env del dir padre (deploy/tools/.env).
-# Override puntual: MDQR_HOST_IP=otra-ip ./scripts/redis-cluster-check.sh
+# Override puntual: HUB_HOST_IP=otra-ip ./scripts/redis-cluster-check.sh
 #
 # Exit code: 0 si todo OK, 1 si algun check falla.
 set -euo pipefail
@@ -24,10 +24,10 @@ if [ -f "${ENV_FILE}" ]; then
   set +a
 fi
 
-MDQR_HOST_IP="${MDQR_HOST_IP:-${1:-}}"
-if [ -z "${MDQR_HOST_IP}" ]; then
-  echo "[error] MDQR_HOST_IP no esta definido."
-  echo "        Setealo en ${ENV_FILE} o pasalo como var: MDQR_HOST_IP=192.168.0.12 $0"
+HUB_HOST_IP="${HUB_HOST_IP:-${1:-}}"
+if [ -z "${HUB_HOST_IP}" ]; then
+  echo "[error] HUB_HOST_IP no esta definido."
+  echo "        Setealo en ${ENV_FILE} o pasalo como var: HUB_HOST_IP=192.168.0.12 $0"
   exit 1
 fi
 
@@ -37,28 +37,28 @@ if [ -n "${COMPOSE_PROFILES:-}" ] && ! echo "${COMPOSE_PROFILES}" | grep -q 'clu
   exit 1
 fi
 
-MDQR_REDIS_IMAGE="${MDQR_REDIS_IMAGE:-redis:8.0.0}"
-MDQR_REDIS_M1_PORT="${MDQR_REDIS_M1_PORT:-6379}"
-MDQR_REDIS_M2_PORT="${MDQR_REDIS_M2_PORT:-6380}"
-MDQR_REDIS_M3_PORT="${MDQR_REDIS_M3_PORT:-6381}"
-MDQR_REDIS_R1_PORT="${MDQR_REDIS_R1_PORT:-6382}"
-MDQR_REDIS_R2_PORT="${MDQR_REDIS_R2_PORT:-6383}"
-MDQR_REDIS_R3_PORT="${MDQR_REDIS_R3_PORT:-6384}"
+HUB_REDIS_IMAGE="${HUB_REDIS_IMAGE:-redis:8.0.0}"
+HUB_REDIS_M1_PORT="${HUB_REDIS_M1_PORT:-6379}"
+HUB_REDIS_M2_PORT="${HUB_REDIS_M2_PORT:-6380}"
+HUB_REDIS_M3_PORT="${HUB_REDIS_M3_PORT:-6381}"
+HUB_REDIS_R1_PORT="${HUB_REDIS_R1_PORT:-6382}"
+HUB_REDIS_R2_PORT="${HUB_REDIS_R2_PORT:-6383}"
+HUB_REDIS_R3_PORT="${HUB_REDIS_R3_PORT:-6384}"
 
 NODES=(
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M1_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M2_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_M3_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R1_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R2_PORT}"
-  "${MDQR_HOST_IP}:${MDQR_REDIS_R3_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M1_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M2_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_M3_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R1_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R2_PORT}"
+  "${HUB_HOST_IP}:${HUB_REDIS_R3_PORT}"
 )
 
 ENTRY_HOST="${NODES[0]%:*}"
 ENTRY_PORT="${NODES[0]##*:}"
 
 run_redis_cli() {
-  docker run --rm --network host "${MDQR_REDIS_IMAGE}" redis-cli "$@"
+  docker run --rm --network host "${HUB_REDIS_IMAGE}" redis-cli "$@"
 }
 
 FAIL=0
@@ -141,9 +141,9 @@ if run_redis_cli -c -h "${ENTRY_HOST}" -p "${ENTRY_PORT}" SET "${TEST_KEY}" "${T
 else
   fail "SET fallo"
 fi
-GOT=$(run_redis_cli -c -h "${MDQR_HOST_IP}" -p "${MDQR_REDIS_R3_PORT}" GET "${TEST_KEY}" 2>/dev/null || echo "")
+GOT=$(run_redis_cli -c -h "${HUB_HOST_IP}" -p "${HUB_REDIS_R3_PORT}" GET "${TEST_KEY}" 2>/dev/null || echo "")
 if [ "${GOT}" = "${TEST_VAL}" ]; then
-  ok "GET ${TEST_KEY} = ${TEST_VAL} desde nodo distinto (${MDQR_HOST_IP}:${MDQR_REDIS_R3_PORT})"
+  ok "GET ${TEST_KEY} = ${TEST_VAL} desde nodo distinto (${HUB_HOST_IP}:${HUB_REDIS_R3_PORT})"
 else
   fail "GET retorno '${GOT}' (esperado '${TEST_VAL}')"
 fi

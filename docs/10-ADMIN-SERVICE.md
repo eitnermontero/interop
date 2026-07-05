@@ -1,8 +1,11 @@
-# 10 - Admin Service (mdqr-ms-auth)
+# 10 - Admin Service (hub-ms-auth)
+
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
 
 ## Responsabilidad
 
-El módulo `mdqr-ms-auth` (puerto 8083) gestiona tres dominios interrelacionados:
+El módulo `hub-ms-auth` (puerto 8083) gestiona tres dominios interrelacionados:
 
 1. **Autenticación**: delegar login, refresh y logout a Keycloak, devolver tokens al cliente.
 2. **RBAC granular**: mapeo de roles Keycloak a menús de aplicación y acciones atómicas.
@@ -13,9 +16,9 @@ El módulo `mdqr-ms-auth` (puerto 8083) gestiona tres dominios interrelacionados
 
 ## Keycloak
 
-- **Realm**: `mdqr-admin`
-- **Client**: `mdqradminservice`
-- **Client secret**: `mdqradminservice-secret`
+- **Realm**: `hub-admin`
+- **Client**: `hubadminservice`
+- **Client secret**: `hubadminservice-secret`
 - **Tipo**: `confidential`, `service-accounts-enabled: true`
 - Los usuarios viven en Keycloak, no en la base de datos local.
 - El servicio obtiene un token de service account para llamar a la Keycloak Admin API.
@@ -24,10 +27,10 @@ El módulo `mdqr-ms-auth` (puerto 8083) gestiona tres dominios interrelacionados
 
 ## Modelo de Datos
 
-Base de datos: `mdqr_auth`, schema: `admin`.
+Base de datos: `hub_auth`, schema: `admin`.
 
 ```
-KEYCLOAK (Realm: mdqr-admin)
+KEYCLOAK (Realm: hub-admin)
   User                         Role (Realm Role)
   ─────                        ─────────────────
   id (UUID)                    name (e.g. "ADMIN")
@@ -102,7 +105,7 @@ AUDITORIA             /auditoria
 
 ## Endpoints
 
-Todos los endpoints se exponen vía gateway bajo `/services/mdqradminservice/admin/**` con JWT del realm `mdqr-admin`.
+Todos los endpoints se exponen vía gateway bajo `/services/hubadminservice/admin/**` con JWT del realm `hub-admin`.
 
 ### Autenticacion
 
@@ -277,15 +280,15 @@ El `PermissionService` extrae los roles del claim `realm_access.roles` del JWT y
 Cliente (navegador)
     │
     ├─ 1. POST /admin/auth/login { username, password }
-    │       └─► mdqr-gateway
-    │               └─► mdqr-ms-auth
+    │       └─► hub-gateway
+    │               └─► hub-ms-auth
     │                       └─► Keycloak token endpoint (grant_type=password)
-    │                              realm mdqr-admin
+    │                              realm hub-admin
     │                       ←── { access_token, refresh_token, expires_in }
     │
     ├─ 2. GET /admin/auth/me/permissions
     │   Authorization: Bearer {access_token}
-    │       └─► mdqr-ms-auth
+    │       └─► hub-ms-auth
     │               ├─► Extrae realm_access.roles del JWT
     │               ├─► SELECT desde role_menu_action WHERE keycloak_role_name IN (...)
     │               └─► Construye arbol de menus + acciones
@@ -301,9 +304,9 @@ Cliente (navegador)
 
 Cuando se crea un usuario, el servicio ejecuta en secuencia:
 
-1. `POST /admin/realms/mdqr-admin/users` — crear el usuario
-2. `PUT /admin/realms/mdqr-admin/users/{id}/reset-password` — establecer contrasena temporal
-3. `POST /admin/realms/mdqr-admin/users/{id}/role-mappings/realm` — asignar roles
+1. `POST /admin/realms/hub-admin/users` — crear el usuario
+2. `PUT /admin/realms/hub-admin/users/{id}/reset-password` — establecer contrasena temporal
+3. `POST /admin/realms/hub-admin/users/{id}/role-mappings/realm` — asignar roles
 
 Cuando se reasignan roles:
 
@@ -311,7 +314,7 @@ Cuando se reasignan roles:
 2. Calcula el diff (a remover, a agregar)
 3. Llama `DELETE` y `POST` sobre `/role-mappings/realm`
 
-El service account del cliente `mdqradminservice` requiere los siguientes roles de `realm-management` en Keycloak:
+El service account del cliente `hubadminservice` requiere los siguientes roles de `realm-management` en Keycloak:
 
 - `manage-users`
 - `view-users`
@@ -329,9 +332,9 @@ server:
 
 spring:
   application:
-    name: mdqradminservice
+    name: hubadminservice
   datasource:
-    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/mdqr_auth
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/hub_auth
   jpa:
     properties:
       hibernate:
@@ -340,24 +343,24 @@ spring:
     oauth2:
       resourceserver:
         jwt:
-          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/mdqr-admin
+          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/hub-admin
 
 keycloak:
   admin:
     server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
-    realm: mdqr-admin
-    client-id: mdqradminservice
-    client-secret: mdqradminservice-secret
+    realm: hub-admin
+    client-id: hubadminservice
+    client-secret: hubadminservice-secret
 ```
 
 ---
 
 ## Acceso via Gateway
 
-El gateway expone el servicio bajo `/services/mdqradminservice/**` (StripPrefix=2) usando discovery de Consul. El nombre registrado en Consul es `mdqradminservice`.
+El gateway expone el servicio bajo `/services/hubadminservice/**` (StripPrefix=2) usando discovery de Consul. El nombre registrado en Consul es `hubadminservice`.
 
 ```bash
 # Ejemplo de llamada via gateway con token admin
 curl -H "Authorization: Bearer $ADMIN_TOKEN" \
-  http://127.0.0.1:8080/services/mdqradminservice/admin/auth/me
+  http://127.0.0.1:8080/services/hubadminservice/admin/auth/me
 ```

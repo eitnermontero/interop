@@ -1,0 +1,96 @@
+server:
+  port: 8093
+
+spring:
+  # IMPORTANTE: Deshabilitar completamente config.import
+  config:
+    import: ""
+
+  cloud:
+    # Deshabilitar Vault para desarrollo local
+    vault:
+      enabled: false
+      config:
+        lifecycle:
+          enabled: false
+    # Consul config deshabilitado; discovery habilitado para que el gateway resuelva lb://
+    consul:
+      enabled: true
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        enabled: true
+
+  # Configuración de base de datos local
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5432}/hub_auth
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: none  # Dejar que Liquibase maneje el schema
+    show-sql: true
+    properties:
+      hibernate:
+        format_sql: true
+        default_schema: admin
+
+  # Liquibase para crear tablas
+  liquibase:
+    enabled: true
+    change-log: classpath:db/changelog/db.changelog-master.xml
+    drop-first: false
+    default-schema: admin
+    liquibase-schema: admin
+    database-change-log-table: databasechangelog
+    database-change-log-lock-table: databasechangeloglock
+
+  # Configuración de Redis local
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      database: 0
+
+  # Seguridad OAuth2 - Keycloak local
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/hub-admin
+          jwk-set-uri: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}/realms/hub-admin/protocol/openid-connect/certs
+
+# Configuración de la aplicación
+application:
+  gateway-url: http://localhost:8080
+  keycloak:
+    auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    external-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    realm: hub-admin
+    client-id: hubadminservice
+    credentials:
+      secret: hubadminservice-secret
+    admin:
+      auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+      realm: hub-admin
+      client-id: hubadminservice
+      client-secret: hubadminservice-secret
+      grant-type: client_credentials
+  audit:
+    keycloak-secret: dev-keycloak-secret
+    export-max-rows: 50000
+    keycloak-poll:
+      enabled: false  # Desactivado en local: requiere admin client configurado en Keycloak
+
+# Logging más verboso en local
+logging:
+  level:
+    bo.com.sintesis.hub.auth: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.web: DEBUG
+    org.springframework.jdbc: DEBUG
+    liquibase: DEBUG

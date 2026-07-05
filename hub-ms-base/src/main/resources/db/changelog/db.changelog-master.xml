@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         v2 — Hub Interoperabilidad (DB desde cero, 2026-07-03):
+           0001 hub_audit_log        (tabla particionada + tabla de idempotencia)
+           0002 outbox_event         (propagación de eventos; sin facturación)
+
+         Decisiones:
+         - ADR-0006 §9.3 (Modelo A): el hub no persiste campos de dominio de los
+           productos — sin tabla caso.
+         - Sin facturación (2026-07-03): los reportes por cliente salen de
+           hub_audit_log; hub_measurement eliminada.
+         - ADR-0007: el catálogo de conectores vive en YAML (plano de control) —
+           provider/provider_credential_ref eliminadas. Las tablas de payloads y
+           telemetría (hub_audit_payload, connector_call_log, payload_access_log)
+           se agregan en las fases 3-5 del ADR-0007.
+         ═══════════════════════════════════════════════════════════════════ -->
+    <include file="v2/0001-hub-audit-log.xml"   relativeToChangelogFile="true"/>
+    <include file="v2/0002-outbox-event.xml"    relativeToChangelogFile="true"/>
+
+</databaseChangeLog>

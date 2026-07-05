@@ -11,10 +11,10 @@
 # <env> = development | production
 #
 # Que crea (cada path es ${LOG_DIR}${TENANT_ID:+-}${TENANT_ID}/<svc>/):
-#   - gateway/        (logs mdqr-gateway)
-#   - decrypt-service/   (logs mdqr-decode-service)
-#   - admin-service/  (logs mdqr-admin-service)
-#   - auth-service/ (logs mdqr-auth-service)
+#   - gateway/        (logs hub-gateway)
+#   - base-service/      (logs hub-base-service)
+#   - admin-service/  (logs hub-admin-service)
+#   - auth-service/ (logs hub-auth-service)
 #
 # Permisos: 0775 con chown a uid del container si hay privilegios, sino 0777.
 set -euo pipefail
@@ -58,7 +58,7 @@ while IFS='=' read -r key val; do
   esac
 done < <(grep -E '^[A-Z_]+=' "$ENV_FILE" || true)
 
-LOG_DIR="${LOG_DIR:-$HOME/logs/mdqr}"
+LOG_DIR="${LOG_DIR:-$HOME/logs/hub}"
 LOG_DIR="${LOG_DIR/#\~/$HOME}"
 LOG_DIR="${LOG_DIR/\$HOME/$HOME}"
 
@@ -85,7 +85,7 @@ ensure_traversal() {
 ensure_traversal "$BASE"
 
 # Permisos sobre la raiz del tenant — los subdirs heredan por rolling policy del logback.
-SUBDIRS=(gateway decrypt-service admin-service auth-service)
+SUBDIRS=(gateway base-service admin-service auth-service)
 for sub in "${SUBDIRS[@]}"; do
   d="$BASE/$sub"
   if [ -d "$d" ]; then

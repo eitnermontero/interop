@@ -1,0 +1,140 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+    xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+        https://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-latest.xsd">
+
+    <!--
+        ═══════════════════════════════════════════════════════════════════
+        Tabla: partner  (schema admin)
+        Identidad lógica de cada partner del hub de interoperabilidad.
+        La columna keycloak_client_id es el "azp" del JWT emitido por
+        Keycloak realm hub-partner; relaciona al partner con su client M2M.
+        ═══════════════════════════════════════════════════════════════════
+        Locks: ACCESS EXCLUSIVE durante CREATE TABLE / CREATE SEQUENCE.
+                 Duración esperada: < 1 s en tabla nueva (no hay readers).
+                 Seguro con tráfico activo: SÍ (objeto nuevo, nadie la usa).
+        Rollback: DROP TABLE + DROP SEQUENCE (sin dependencias al crear).
+        ═══════════════════════════════════════════════════════════════════
+    -->
+
+    <changeSet id="v2-auth-001" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="partner" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Crear secuencia para partner</comment>
+        <createSequence sequenceName="partner_seq"
+                        schemaName="admin"
+                        startValue="1"
+                        incrementBy="1"/>
+        <rollback>
+            <dropSequence sequenceName="partner_seq" schemaName="admin"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-auth-002" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <not><tableExists tableName="partner" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Crear tabla partner — identidad lógica del partner del hub</comment>
+        <createTable tableName="partner" schemaName="admin">
+
+            <!-- Clave primaria -->
+            <column name="id" type="bigint" defaultValueSequenceNext="partner_seq">
+                <constraints primaryKey="true" primaryKeyName="pk_partner" nullable="false"/>
+            </column>
+
+            <!-- Código corto único (slug), ej: "unilink", "bnb" -->
+            <column name="code" type="text">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uk_partner_code"/>
+            </column>
+
+            <!-- Nombre comercial del partner -->
+            <column name="name" type="text">
+                <constraints nullable="false"/>
+            </column>
+
+            <!--
+                keycloak_client_id: el "azp" (authorized party) del JWT
+                emitido por realm hub-partner para este partner.
+                Es UNIQUE porque un client Keycloak corresponde a un solo partner.
+            -->
+            <column name="keycloak_client_id" type="text">
+                <constraints nullable="false"
+                             unique="true"
+                             uniqueConstraintName="uk_partner_keycloak_client_id"/>
+            </column>
+
+            <!-- Estado del partner: ACTIVE / SUSPENDED / INACTIVE -->
+            <column name="status" type="varchar(20)" defaultValue="ACTIVE">
+                <constraints nullable="false"/>
+            </column>
+
+            <!-- Datos de contacto -->
+            <column name="contact_name" type="text"/>
+            <column name="contact_email" type="text"/>
+            <column name="contact_phone" type="varchar(30)"/>
+
+            <!-- Metadatos adicionales en JSON libre -->
+            <column name="metadata" type="jsonb"/>
+
+            <!-- Campos de auditoría estándar del proyecto -->
+            <column name="created_by" type="varchar(100)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="created_date" type="timestamptz" defaultValueComputed="CURRENT_TIMESTAMP">
+                <constraints nullable="false"/>
+            </column>
+            <column name="last_modified_by" type="varchar(100)"/>
+            <column name="last_modified_date" type="timestamptz"/>
+        </createTable>
+
+        <!-- CHECK constraint: solo valores permitidos en status -->
+        <sql>
+            ALTER TABLE admin.partner
+            ADD CONSTRAINT chk_partner_status
+            CHECK (status IN ('ACTIVE', 'SUSPENDED', 'INACTIVE'));
+        </sql>
+
+        <rollback>
+            <sql>ALTER TABLE admin.partner DROP CONSTRAINT IF EXISTS chk_partner_status;</sql>
+            <dropTable tableName="partner" schemaName="admin"/>
+        </rollback>
+    </changeSet>
+
+    <changeSet id="v2-auth-003" author="hub-interop">
+        <preConditions onFail="MARK_RAN">
+            <tableExists tableName="partner" schemaName="admin"/>
+            <not><indexExists indexName="idx_partner_status" schemaName="admin"/></not>
+        </preConditions>
+        <comment>Índices para partner: búsqueda por status y keycloak_client_id</comment>
+
+        <!--
+            idx_partner_keycloak_client_id: lookup O(1) por azp del JWT.
+            Patrón de acceso: cada llamada API valida el partner por su client_id.
+        -->
+        <createIndex tableName="partner"
+                     schemaName="admin"
+                     indexName="idx_partner_keycloak_client_id">
+            <column name="keycloak_client_id"/>
+        </createIndex>
+
+        <!--
+            idx_partner_status: filtros de listado en panel admin.
+        -->
+        <createIndex tableName="partner"
+                     schemaName="admin"
+                     indexName="idx_partner_status">
+            <column name="status"/>
+        </createIndex>
+
+        <rollback>
+            <dropIndex tableName="partner" schemaName="admin" indexName="idx_partner_keycloak_client_id"/>
+            <dropIndex tableName="partner" schemaName="admin" indexName="idx_partner_status"/>
+        </rollback>
+    </changeSet>
+
+</databaseChangeLog>

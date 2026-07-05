@@ -1,8 +1,11 @@
 # 12 - Arquitectura Frontend
 
+> ⚠️ **Documento parcialmente desactualizado** (contiene contenido legacy pre-ADR-0004/rename 2026-07-03).
+> Fuente de verdad actual: `CLAUDE.md` y `docs/adr/` (ADR-0005/0006/0007).
+
 ## Contexto
 
-El sistema MDQR no tiene frontend implementado. Este documento define la arquitectura recomendada para construirlo desde cero.
+El sistema HUB no tiene frontend implementado. Este documento define la arquitectura recomendada para construirlo desde cero.
 
 El acceso al sistema es exclusivamente interno (operadores y administradores de Sintesis). No existe un portal publico para clientes externos en el alcance actual.
 
@@ -13,7 +16,7 @@ El acceso al sistema es exclusivamente interno (operadores y administradores de 
 Monorepo Angular con una app principal y paquetes compartidos:
 
 ```
-mdqr-frontend/
+hub-frontend/
 ├── apps/
 │   └── admin/               # App interna (operaciones y administracion)
 │       ├── src/
@@ -40,8 +43,8 @@ mdqr-frontend/
 
 ### Autenticacion
 
-- Realm Keycloak: `mdqr-admin`
-- Client: `mdqradminservice`
+- Realm Keycloak: `hub-admin`
+- Client: `hubadminservice`
 - Flow: `POST /admin/auth/login` con `{ username, password }` → obtener tokens → almacenar en memoria.
 - Los tokens nunca se guardan en `localStorage` ni `sessionStorage`.
 - Refresh automatico via interceptor antes de que expire el `access_token`.
@@ -50,8 +53,8 @@ mdqr-frontend/
 ### Comunicacion con APIs
 
 - Base URL en dev: `http://localhost:8080` (vía proxy Angular)
-- Admin APIs: `GET /services/mdqradminservice/admin/...` — requiere JWT mdqr-admin
-- Base APIs: `GET /services/mdqrbaseservice/api/...` — requiere JWT mdqr-admin
+- Admin APIs: `GET /services/hubadminservice/admin/...` — requiere JWT hub-admin
+- Base APIs: `GET /services/hubbaseservice/api/...` — requiere JWT hub-admin
 - Todas las peticiones incluyen header `Authorization: Bearer <token>`
 
 ---
@@ -177,7 +180,7 @@ interface ProblemDetail {
 
 ### 7. Gestion de Usuarios
 
-- CRUD de usuarios en Keycloak via `/services/mdqradminservice/admin/users`.
+- CRUD de usuarios en Keycloak via `/services/hubadminservice/admin/users`.
 - Asignacion de roles.
 - Activar/desactivar, reset de contrasena.
 
@@ -185,7 +188,7 @@ interface ProblemDetail {
 
 - Tabla visual de roles x menus x acciones.
 - Edicion inline del mapeo rol → menu → accion.
-- Refleja en tiempo real el sistema RBAC del `mdqr-ms-auth`.
+- Refleja en tiempo real el sistema RBAC del `hub-ms-auth`.
 
 ---
 
@@ -195,12 +198,12 @@ interface ProblemDetail {
 {
   "compilerOptions": {
     "paths": {
-      "@mdqr/ui":    ["packages/ui/src/public-api.ts"],
-      "@mdqr/ui/*":  ["packages/ui/src/lib/*"],
-      "@mdqr/sdk":   ["packages/sdk/src/public-api.ts"],
-      "@mdqr/auth":  ["packages/auth/src/public-api.ts"],
-      "@mdqr/theme": ["packages/theme/src/public-api.ts"],
-      "@mdqr/utils": ["packages/utils/src/public-api.ts"]
+      "@hub/ui":    ["packages/ui/src/public-api.ts"],
+      "@hub/ui/*":  ["packages/ui/src/lib/*"],
+      "@hub/sdk":   ["packages/sdk/src/public-api.ts"],
+      "@hub/auth":  ["packages/auth/src/public-api.ts"],
+      "@hub/theme": ["packages/theme/src/public-api.ts"],
+      "@hub/utils": ["packages/utils/src/public-api.ts"]
     }
   }
 }
@@ -255,13 +258,13 @@ ng test sdk
 
 | Pantalla | Servicio | Ruta via gateway |
 |---|---|---|
-| Login | ms-auth | `POST /services/mdqradminservice/admin/auth/login` |
-| Permisos | ms-auth | `GET /services/mdqradminservice/admin/auth/me/permissions` |
-| Usuarios | ms-auth | `/services/mdqradminservice/admin/users/**` |
-| Roles | ms-auth | `/services/mdqradminservice/admin/roles/**` |
-| Menus | ms-auth | `/services/mdqradminservice/admin/menus/**` |
-| Auditoria admin | ms-auth | `GET /services/mdqradminservice/admin/audit` |
-| Certificados | ms-base | `/services/mdqrbaseservice/api/certificates/**` |
-| Desencriptacion QR | ms-base | `POST /services/mdqrbaseservice/api/qr/decode` |
-| Auditoria QR | ms-base | `GET /services/mdqrbaseservice/api/qr/audits` |
-| Auditoria certificados | ms-base | `GET /services/mdqrbaseservice/api/certificates/audits` |
+| Login | ms-auth | `POST /services/hubadminservice/admin/auth/login` |
+| Permisos | ms-auth | `GET /services/hubadminservice/admin/auth/me/permissions` |
+| Usuarios | ms-auth | `/services/hubadminservice/admin/users/**` |
+| Roles | ms-auth | `/services/hubadminservice/admin/roles/**` |
+| Menus | ms-auth | `/services/hubadminservice/admin/menus/**` |
+| Auditoria admin | ms-auth | `GET /services/hubadminservice/admin/audit` |
+| Certificados | ms-base | `/services/hubbaseservice/api/certificates/**` |
+| Desencriptacion QR | ms-base | `POST /services/hubbaseservice/api/qr/decode` |
+| Auditoria QR | ms-base | `GET /services/hubbaseservice/api/qr/audits` |
+| Auditoria certificados | ms-base | `GET /services/hubbaseservice/api/certificates/audits` |

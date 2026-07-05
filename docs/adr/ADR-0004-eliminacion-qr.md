@@ -6,19 +6,19 @@
 
 ## Contexto
 
-El negocio del hub cambió radicalmente. El producto original (`middleware-decode-qr`)
+El negocio del hub cambió radicalmente. El producto original (`hub-interop`)
 desencriptaba códigos QR cifrados por entidades financieras (RSA inverso + certificados
 X.509). Ese negocio ya **no existe**: el hub evoluciona a **interoperabilidad de casos
 penales (POL/FELCN ↔ MP)** (ver `docs/adr/Ficha_Tecnica_Interoperabilidad_MP_POL_FELCN.md`).
 
 Todo el código de desencriptación QR y de gestión de certificados pasa a ser **legacy**
-y debe eliminarse. Sin embargo, el módulo `mdqr-ms-base` contiene **dos cuerpos de código
+y debe eliminarse. Sin embargo, el módulo `hub-ms-base` contiene **dos cuerpos de código
 entrelazados**:
 
 1. **Negocio QR (a eliminar)**: decode de imágenes, criptografía RSA, ciclo de vida de
    certificados, sincronización con Tuxedo API, logs de desencriptación.
 2. **Andamiaje del hub (a conservar)**: pipeline inbound de auditoría con cadena de hashes
-   (`HubAuditInterceptor`, `HubWebMvcConfig`), librería `mdqr-audit-commons`, tablas hub
+   (`HubAuditInterceptor`, `HubWebMvcConfig`), librería `hub-audit-commons`, tablas hub
    (`hub_audit_log`, `hub_audit_idempotency`, `outbox_event`), y el adaptador outbound de
    ejemplo `EfxRate*`.
 
@@ -42,8 +42,8 @@ andamiaje compartido, y deja un orden de eliminación seguro.
 
 Se eliminará **todo el dominio, servicios, controllers, DTOs, changelogs, tests y
 dependencias exclusivos de desencriptación QR y gestión de certificados** del módulo
-`mdqr-ms-base`. Se **conserva intacto** el andamiaje del hub: `mdqr-audit-commons`
-(completo), `mdqr-ms-auth` (completo), el pipeline inbound de auditoría, las tablas hub
+`hub-ms-base`. Se **conserva intacto** el andamiaje del hub: `hub-audit-commons`
+(completo), `hub-ms-auth` (completo), el pipeline inbound de auditoría, las tablas hub
 y el adaptador `EfxRate*`.
 
 Los tres puntos de acoplamiento se resuelven así:
@@ -61,9 +61,9 @@ Los tres puntos de acoplamiento se resuelven así:
 
 ## Inventario de eliminación
 
-### A. Clases de dominio (mdqr-ms-base)
+### A. Clases de dominio (hub-ms-base)
 
-Paquete `bo.com.sintesis.mdqr.base.domain`.
+Paquete `bo.com.sintesis.hub.base.domain`.
 
 | Clase | Archivo | Referencias entrantes | ¿Rompe andamiaje hub? |
 |---|---|---|---|
@@ -71,11 +71,11 @@ Paquete `bo.com.sintesis.mdqr.base.domain`.
 | `CertificateVersion` (+ enum `ChangeType`) | `domain/CertificateVersion.java` | `CertificateVersionService`, `CertificateService`, `CertificateVersionRepository` | No |
 | `CertificateAuditLog` (+ enum `AuditAction`) | `domain/CertificateAuditLog.java` | `CertificateAuditService`, `CertificateAuditLogRepository`, `CertificateResource` | No |
 | `DecryptionLog` | `domain/DecryptionLog.java` | `AuditService`, `DecryptionLogRepository`, `QrResource` | No |
-| `AdminAuditLog` | `domain/AdminAuditLog.java` | `AuditService`, `AdminAuditLogRepository` | No. Auditoría administrativa legacy de ms-base; la auditoría del hub es `hub_audit_log`. La auditoría admin/IAM real vive en `mdqr-ms-auth` |
+| `AdminAuditLog` | `domain/AdminAuditLog.java` | `AuditService`, `AdminAuditLogRepository` | No. Auditoría administrativa legacy de ms-base; la auditoría del hub es `hub_audit_log`. La auditoría admin/IAM real vive en `hub-ms-auth` |
 | `FinancialEntity` | `domain/FinancialEntity.java` | `FinancialEntityRepository` (sin más usuarios en código Java) | No. Mapea tabla `entity` (ex `trx_entity_code`), catálogo de bancos para QR |
 | `AbstractAuditingEntity<T>` | `domain/AbstractAuditingEntity.java` | Solo `Certificate` extiende esta clase | No. Compartida en teoría, pero su único consumidor es `Certificate`. Va a eliminación al quedar huérfana. **Verificar** que `AuditingConfiguration`/`@EnableJpaAuditing` sigue teniendo al menos una entidad auditada antes de borrar (si no queda ninguna, `AuditingConfiguration` también queda sin uso funcional) |
 
-### B. Servicios y componentes (mdqr-ms-base)
+### B. Servicios y componentes (hub-ms-base)
 
 | Clase | Archivo | Referencias entrantes | ¿Rompe andamiaje hub? |
 |---|---|---|---|
@@ -86,7 +86,7 @@ Paquete `bo.com.sintesis.mdqr.base.domain`.
 | `CertificateVersionService` | `service/CertificateVersionService.java` | `CertificateService` | No |
 | `CertificateValidationService` (+ inner `CertificateMetadata`) | `service/CertificateValidationService.java` | `CertificateService` | No |
 | `CertificateAuditService` | `service/CertificateAuditService.java` | `CertificateService` | No |
-| `AuditService` | `service/AuditService.java` | `QrResource`, `QrDecryptionService` | No. Es la auditoría legacy QR (DecryptionLog/AdminAuditLog), distinta de `HubAuditService` (que está en `mdqr-audit-commons` y se conserva) |
+| `AuditService` | `service/AuditService.java` | `QrResource`, `QrDecryptionService` | No. Es la auditoría legacy QR (DecryptionLog/AdminAuditLog), distinta de `HubAuditService` (que está en `hub-audit-commons` y se conserva) |
 | `LocalCertificateLoader` (+ inner `CertificateInfo`) | `service/LocalCertificateLoader.java` | Ninguna inyección encontrada; `@Service` con `@PostConstruct` que escanea disco | No. Eliminar |
 | `TuxedoApiClient` (+ DTOs internos) | `client/TuxedoApiClient.java` | Inyecta `ApplicationProperties.getTuxedo()` | No directamente, pero ver nota en sección H sobre `ApplicationProperties.Tuxedo` (se conserva la config, se elimina el client) |
 | `CertificateMapper` | `service/mapper/CertificateMapper.java` | `CertificateResource` | No |
@@ -178,7 +178,7 @@ Changelogs **CONSERVADOS** (hub):
 
 ### F. Tests
 
-Archivos en `src/test/java/bo/com/sintesis/mdqr/base/`.
+Archivos en `src/test/java/bo/com/sintesis/hub/base/`.
 
 | Archivo | Motivo de eliminación | ¿Afecta cobertura del hub? |
 |---|---|---|
@@ -199,7 +199,7 @@ Tests **CONSERVADOS** (hub):
 | `interop/outbound/efxrate/EfxRateAdapterTest.java` | Adaptador outbound EfxRate |
 | `interop/outbound/efxrate/EfxRateClientIT.java` | Client EfxRate (WireMock) |
 
-### G. Dependencias de build (build.gradle de mdqr-ms-base)
+### G. Dependencias de build (build.gradle de hub-ms-base)
 
 | Artefacto | Motivo | ¿Usado por algo del hub? |
 |---|---|---|
@@ -207,12 +207,12 @@ Tests **CONSERVADOS** (hub):
 | `org.bouncycastle:bcpkix-jdk18on:1.78` | Solo `CryptoService` (PEM parsing) | No |
 | `com.google.zxing:core:3.5.3` | Solo `QrImageDecoderService` (decode imagen QR) | No |
 | `com.google.zxing:javase:3.5.3` | Solo `QrImageDecoderService` (`BufferedImageLuminanceSource`) | No |
-| `org.mongodb:bson:5.6.0` | Solo `QrDecryptionService#generateLogId()` (`ObjectId`). **Verificar** que `HubAuditService`/`mdqr-audit-commons` use `UUID` (sí: el interceptor usa `UUID.randomUUID()`) antes de quitar | No (verificado: el hub usa `java.util.UUID`) |
+| `org.mongodb:bson:5.6.0` | Solo `QrDecryptionService#generateLogId()` (`ObjectId`). **Verificar** que `HubAuditService`/`hub-audit-commons` use `UUID` (sí: el interceptor usa `UUID.randomUUID()`) antes de quitar | No (verificado: el hub usa `java.util.UUID`) |
 
 Dependencias **NO tocar** (las usa el hub o son infra base): `spring-cloud-starter-vault-config`
 (Vault para firma/secretos), `spring-boot-starter-data-redis` + `commons-pool2` (caché EfxRate),
 `resilience4j-*` (pipeline outbound), `spring-boot-starter-data-jpa`/`jdbc`, `liquibase-core`,
-`postgresql`, Jackson, `project(':mdqr-audit-commons')`, Testcontainers/WireMock/awaitility.
+`postgresql`, Jackson, `project(':hub-audit-commons')`, Testcontainers/WireMock/awaitility.
 
 > El `wiremock-standalone` se conserva: lo usa `EfxRateClientIT`.
 
@@ -229,22 +229,22 @@ Dependencias **NO tocar** (las usa el hub o son infra base): `spring-cloud-start
 | `OpenApiConfiguration` (título/descr. "QR Decryption Service", roles QR, formato QR) | `config/OpenApiConfiguration.java` | No rompe, pero **actualizar** textos (no eliminar la clase: define el esquema `bearer-jwt` y servidores) |
 | `HubAuditInterceptor` constantes `PRODUCT="QR_DECODE"`, `ENDPOINT="/api/qr/decode"` | `hub/HubAuditInterceptor.java` | **SÍ — re-apuntar**. No eliminar la clase; cambiar constantes al nuevo endpoint penal |
 | `HubWebMvcConfig` `addPathPatterns("/api/qr/decode")`, `addUrlPatterns("/api/qr/decode")` | `hub/HubWebMvcConfig.java` | **SÍ — re-apuntar**. No eliminar la clase; cambiar patrones al nuevo endpoint |
-| Ruta gateway `partner-qr-api` (`/partner/v1/** → lb://mdqrbaseservice /api/**`) | `gateway/application.yml` (149-160) | No rompe el chain (es genérica `/partner/v1/**`). El comentario "Partner QR decode API" y el `id: partner-qr-api` son cosméticos; **renombrar** al nuevo dominio. La reescritura `/partner/v1/(segment)→/api/(segment)` se conserva |
+| Ruta gateway `partner-qr-api` (`/partner/v1/** → lb://hubbaseservice /api/**`) | `gateway/application.yml` (149-160) | No rompe el chain (es genérica `/partner/v1/**`). El comentario "Partner QR decode API" y el `id: partner-qr-api` son cosméticos; **renombrar** al nuevo dominio. La reescritura `/partner/v1/(segment)→/api/(segment)` se conserva |
 
 > El gateway **no tiene filtros ni clases Java exclusivas de QR**. Solo la ruta `partner-qr-api`
 > con naming QR (cosmético) y los comentarios. No hay nada que eliminar en
-> `mdqr-gateway/src/main/java`. El token proxy, las dos chains de seguridad, IP/rate/domain
+> `hub-gateway/src/main/java`. El token proxy, las dos chains de seguridad, IP/rate/domain
 > filters y la agregación Swagger se conservan íntegros.
 
 ## Lo que se CONSERVA (no tocar)
 
 **Módulos completos:**
-- `mdqr-audit-commons/` íntegro: `HubAuditService`, `ChainHashCalculator`, `PayloadHasher`,
+- `hub-audit-commons/` íntegro: `HubAuditService`, `ChainHashCalculator`, `PayloadHasher`,
   `AuditSigner`/`NoOpAuditSigner`, `HubAuditCommand`, `IdempotencyKeyConflictException`,
   patrón outbox.
-- `mdqr-ms-auth/` íntegro (IAM, usuarios, roles, auditoría admin/IAM real).
+- `hub-ms-auth/` íntegro (IAM, usuarios, roles, auditoría admin/IAM real).
 
-**En `mdqr-ms-base`:**
+**En `hub-ms-base`:**
 - Pipeline inbound: `hub/HubAuditInterceptor.java`, `hub/HubWebMvcConfig.java`
   (se conservan; se re-apuntan al nuevo endpoint, no se borran).
 - Adaptador outbound de ejemplo: paquete completo
@@ -256,7 +256,7 @@ Dependencias **NO tocar** (las usa el hub o son infra base): `spring-cloud-start
 - `config/RedisConfiguration.java`, `config/AsyncConfiguration.java`,
   `config/LiquibaseConfiguration.java`, `config/SecurityConfiguration.java`,
   `config/OpenApiConfiguration.java` (actualizar textos), `config/AuditingConfiguration.java`
-  (revisar si queda sin entidades auditadas), `MdqrMsBaseApplication.java`.
+  (revisar si queda sin entidades auditadas), `HubMsBaseApplication.java`.
 - `web/rest/errors/GlobalExceptionHandler.java` (quitar solo handlers QR).
 - Changelogs `v2/0001`..`v2/0004` y tablas `hub_audit_log`, `hub_audit_idempotency`,
   `outbox_event`, `hub_measurement`, `provider`, `provider_credential_ref`.
@@ -328,5 +328,5 @@ Cada paso debe dejar el proyecto compilando.
 - `AbstractAuditingEntity` y `AuditingConfiguration` (`@EnableJpaAuditing`) quedan sin
   entidades que auditar; revisar si se eliminan o se reutilizan para futuras entidades del
   negocio penal.
-- Nombres heredados estables (`mdqr-*`, `mdqrbaseservice`, Vault `mdqr-decode`, realms): este
+- Nombres heredados estables (`hub-*`, `hubbaseservice`, Vault `hub-base`, realms): este
   ADR **no** los renombra (regla del proyecto). El decoupling de nombres es trabajo aparte.

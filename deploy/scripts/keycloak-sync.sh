@@ -3,11 +3,11 @@ set -euo pipefail
 
 # --- Defaults --------------------------------------------------------
 KC_URL="${KC_URL:-http://localhost:8080}"
-KC_REALM_BASE="${KC_REALM_BASE:-mdqr}"
+KC_REALM_BASE="${KC_REALM_BASE:-hub}"
 TENANT_ID="${TENANT_ID:-}"
 KC_USERNAME="${KC_USERNAME:-admin}"
 KC_PASSWORD="${KC_PASSWORD:-admin}"
-KC_SERVICE_CLIENT="${KC_SERVICE_CLIENT:-mdqr-api}"
+KC_SERVICE_CLIENT="${KC_SERVICE_CLIENT:-hub-api}"
 KC_SOBOCE_TEST_USER="${KC_SOBOCE_TEST_USER:-soboce-test}"
 KC_SOBOCE_TEST_PASSWORD="${KC_SOBOCE_TEST_PASSWORD:-soboce123}"
 KC_REDIRECT_URIS="${KC_REDIRECT_URIS:-http://localhost:8080/*,http://localhost:8081/*}"
@@ -31,15 +31,15 @@ Idempotent Keycloak realm sync — creates missing resources, skips existing one
 
 Options:
   --tenant <id>  Tenant ID. Si se setea, realm = <KC_REALM_BASE>-<tenant>
-                 (ej. mdqr-alpha). Sin sufijo si vacio.
+                 (ej. hub-alpha). Sin sufijo si vacio.
   -h, --help     Show this help message
 
 Environment variables:
   KC_URL              Keycloak server URL          (default: http://localhost:8080)
-  KC_REALM_BASE       Base realm name              (default: mdqr)
+  KC_REALM_BASE       Base realm name              (default: hub)
   TENANT_ID           Tenant ID (puede ser env o --tenant)
   KC_REALM            Override directo del realm (ignora KC_REALM_BASE/TENANT_ID)
-  KC_SERVICE_CLIENT   Service client ID            (default: mdqr-api)
+  KC_SERVICE_CLIENT   Service client ID            (default: hub-api)
   KC_USERNAME              Admin username           (default: admin)
   KC_PASSWORD              Admin password           (default: admin)
   KC_SOBOCE_TEST_USER      SOBOCE test username     (default: soboce-test)
@@ -51,10 +51,10 @@ Environment variables:
   env vars needed here. Configure poll interval via APPLICATION_AUDIT_KEYCLOAK_POLL_INTERVAL_MS.
 
 Examples:
-  # single-tenant — realm: mdqr
+  # single-tenant — realm: hub
   $(basename "${BASH_SOURCE[0]}")
 
-  # tenant alpha — realm: mdqr-alpha
+  # tenant alpha — realm: hub-alpha
   $(basename "${BASH_SOURCE[0]}") --tenant alpha
 
   # override completo
@@ -335,11 +335,11 @@ client_json() {
   cat <<JSON
 {
   "clientId": "${KC_SERVICE_CLIENT}",
-  "name": "MDQR API",
+  "name": "HUB API",
   "enabled": true,
   "protocol": "openid-connect",
   "publicClient": false,
-  "secret": "mdqr-api",
+  "secret": "hub-api",
   "serviceAccountsEnabled": true,
   "authorizationServicesEnabled": true,
   "directAccessGrantsEnabled": true,
@@ -369,8 +369,8 @@ create_service_client() {
 
     local current_secret
     current_secret=$(kc_get "/clients/${SVC_CLIENT_ID}/client-secret" | jq -r '.value // empty')
-    if [ "$current_secret" != "mdqr-api" ]; then
-      info "Resetting client secret to 'mdqr-api'"
+    if [ "$current_secret" != "hub-api" ]; then
+      info "Resetting client secret to 'hub-api'"
       set_client_secret "$SVC_CLIENT_ID"
     fi
     return
@@ -380,7 +380,7 @@ create_service_client() {
   SVC_CLIENT_ID=$(kc_post_get_id "/clients" "$(client_json)")
   info "Created with ID: ${SVC_CLIENT_ID}"
 
-  info "Setting client secret to 'mdqr-api'"
+  info "Setting client secret to 'hub-api'"
   set_client_secret "$SVC_CLIENT_ID"
 }
 
@@ -625,9 +625,9 @@ create_admin_user() {
   local user_id
   user_id=$(kc_post_get_id "/users" "$(jq -n '{
     username: "admin",
-    email: "admin@mdqr.local",
+    email: "admin@hub.local",
     firstName: "Admin",
-    lastName: "MDQR",
+    lastName: "HUB",
     enabled: true,
     emailVerified: true,
     credentials: [{type: "password", value: "admin", temporary: false}]
@@ -895,7 +895,7 @@ create_soboce_test_user() {
     --arg password "$KC_SOBOCE_TEST_PASSWORD" \
     '{
       username: $username,
-      email: ($username + "@mdqr.local"),
+      email: ($username + "@hub.local"),
       firstName: "SOBOCE",
       lastName: "Test",
       enabled: true,
@@ -977,7 +977,7 @@ sync_events_config() {
 main() {
   echo -e "${BOLD}"
   echo "╔═══════════════════════════════════════════════╗"
-  echo "║       Keycloak Realm Sync — MDQR              ║"
+  echo "║       Keycloak Realm Sync — HUB              ║"
   echo "╚═══════════════════════════════════════════════╝"
   echo -e "${NC}"
   echo -e "  Server:         ${CYAN}${KC_URL}${NC}"

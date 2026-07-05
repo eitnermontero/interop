@@ -1,2 +1,2 @@
 clientId,description,secret
-mdqradminservice,Admin Service — fachada de Keycloak Admin API,mdqradminservice-secret
+hubadminservice,Admin Service — fachada de Keycloak Admin API,hubadminservice-secret

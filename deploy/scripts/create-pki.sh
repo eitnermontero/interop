@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Genera la PKI para mTLS del gateway MDQR.
+# Genera la PKI para mTLS del gateway HUB.
 #
 # Produce en deploy/certs/:
 #   ca.crt              — Certificado raíz de la CA (importar en clientes/browsers)
@@ -17,7 +17,7 @@
 #
 # Opciones de entorno:
 #   SERVER_CN          — CN del server cert  (default: 172.16.76.20)
-#   CA_CN              — CN de la CA         (default: MDQR Root CA)
+#   CA_CN              — CN de la CA         (default: HUB Root CA)
 #   CA_ORG             — Organización CA     (default: Sintesis)
 #   CA_DAYS            — Validez CA en días  (default: 3650 = 10 años)
 #   CERT_DAYS          — Validez certs       (default: 825 = ~2 años, máx iOS)
@@ -43,7 +43,7 @@ warn()   { echo -e "${YELLOW}[!]${NC} $1"; }
 header() { echo -e "\n${BOLD}${CYAN}=== $1 ===${NC}"; }
 
 SERVER_CN="${SERVER_CN:-172.16.76.20}"
-CA_CN="${CA_CN:-MDQR Root CA}"
+CA_CN="${CA_CN:-HUB Root CA}"
 CA_ORG="${CA_ORG:-Sintesis}"
 CA_COUNTRY="${CA_COUNTRY:-BO}"
 CA_DAYS="${CA_DAYS:-3650}"
@@ -157,8 +157,8 @@ else
     -in "$CERTS_DIR/ca.crt" \
     -out "$CERTS_DIR/truststore.p12" \
     -passout "pass:${TRUSTSTORE_PASSWORD}" \
-    -name mdqr-ca 2>/dev/null
-  info "Truststore: $CERTS_DIR/truststore.p12 (alias=mdqr-ca)"
+    -name hub-ca 2>/dev/null
+  info "Truststore: $CERTS_DIR/truststore.p12 (alias=hub-ca)"
 fi
 
 # ─── 4. Certificado de cliente (partner) ─────────────────────────────────────
@@ -225,4 +225,4 @@ info "PKI lista. Pasos siguientes:"
 echo "  1. Configurar SSL_KEYSTORE_PASSWORD y SSL_TRUSTSTORE_PASSWORD en deploy/production/.env"
 echo "  2. Importar ca.crt en los navegadores/sistemas de los admins"
 echo "  3. Entregar partners/<nombre>.p12 al partner (password = KEYSTORE_PASSWORD)"
-echo "  4. Configurar X.509 client auth en Keycloak (realm mdqr-partner)"
+echo "  4. Configurar X.509 client auth en Keycloak (realm hub-partner)"

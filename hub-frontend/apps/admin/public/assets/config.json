@@ -1,0 +1,10 @@
+{
+  "apiUrl": "http://localhost:8080",
+  "appName": "HUB Admin",
+  "basePath": "/",
+  "keycloak": {
+    "url": "http://127.0.0.1:8180",
+    "realm": "hub-admin",
+    "clientId": "hub-admin-fe"
+  }
+}

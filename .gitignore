@@ -60,3 +60,12 @@ CLAUDE.local.md
 *.swp
 *.swo
 *~
+
+# PKI — material privado nunca al repo (los .crt públicos sí se versionan)
+deploy/certs/*.key
+deploy/certs/*.p12
+deploy/certs/*.srl
+deploy/certs/partners/*.key
+deploy/certs/partners/*.p12
+# Paquetes de imágenes para transporte sin registry
+deploy/dist/

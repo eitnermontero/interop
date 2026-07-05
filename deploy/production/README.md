@@ -1,6 +1,6 @@
 # Stack de Production
 
-Stack de aplicacion: `mdqr-gateway`, `mdqr-decode-service`. Diseñado para deploy **multi-host** + **multi-tenant**.
+Stack de aplicación: `hub-gateway`, `hub-base-service`, `hub-admin-service`. Diseñado para deploy **multi-host** + **multi-tenant**.
 
 A diferencia del `deploy/development/`:
 
@@ -15,13 +15,13 @@ A diferencia del `deploy/development/`:
 ## Pre-requisitos
 
 - Docker + Docker Compose v2 en cada host del cluster.
-- Red overlay/bridge `mdqr-prod-net` (se crea sola).
+- Red overlay/bridge `hub-prod-net` (se crea sola).
 - **Tools externos accesibles**:
-  - Consul cluster (3+ nodos) — endpoint via `MDQR_CONSUL_HOST`
-  - Redis (single o cluster) — endpoint via `MDQR_REDIS_HOST`
-  - Vault con AppRole habilitado por servicio — endpoint via `MDQR_VAULT_HOST`
-  - Keycloak con realms `mdqr[-<tenant>]` listos — endpoint via `MDQR_KEYCLOAK_URL`
-- **PostgreSQL externo** con DBs `mdqr[-<tenant>]` creadas.
+  - Consul cluster (3+ nodos) — endpoint via `HUB_CONSUL_HOST`
+  - Redis (single o cluster) — endpoint via `HUB_REDIS_HOST`
+  - Vault con AppRole habilitado por servicio — endpoint via `HUB_VAULT_HOST`
+  - Keycloak con realms `hub[-<tenant>]` listos — endpoint via `HUB_KEYCLOAK_URL`
+- **PostgreSQL externo** con DBs `hub[-<tenant>]` creadas.
 - **Balanceador externo** (nginx, HAProxy, ALB) frente a los gateways de cada host.
 
 ---
@@ -33,10 +33,10 @@ A diferencia del `deploy/development/`:
 Desde el root del repo:
 
 ```bash
-# Push a registry prod (cr.sintesis.com.bo/mdqr/...:<ver>)
+# Push a registry prod (cr.sintesis.com.bo/hub/...:<ver>)
 ./build.sh -p -j -as
 
-# O dev registry (cr.sintesis.com.bo/mdqr-dev/...) si se usa para staging
+# O dev registry (cr.sintesis.com.bo/hub-dev/...) si se usa para staging
 ./build.sh -d -j -as
 ```
 
@@ -54,24 +54,24 @@ Mínimo a setear en cada `.env`:
 ```env
 TENANT_ID=tenant1                 # o vacio para single-tenant
 NODE_INDEX=1                      # diferente por host (1, 2, 3...)
-MDQR_GATEWAY_IMAGE=cr.sintesis.com.bo/mdqr/mdqr-gateway
-MDQR_GATEWAY_VERSION=1.0.5
-MDQR_CART_IMAGE=cr.sintesis.com.bo/mdqr/mdqr-decode-service
-MDQR_CART_VERSION=1.0.5
+HUB_GATEWAY_IMAGE=cr.sintesis.com.bo/hub/hub-gateway
+HUB_GATEWAY_VERSION=1.0.5
+HUB_BASE_IMAGE=cr.sintesis.com.bo/hub/hub-base-service
+HUB_BASE_VERSION=1.0.5
 
-MDQR_CONSUL_HOST=consul.prod.local
-MDQR_REDIS_HOST=redis.prod.local
-MDQR_VAULT_HOST=vault.prod.local
-MDQR_VAULT_AUTHENTICATION=APPROLE
-MDQR_VAULT_ROLE_ID=<approle-role-id>
-MDQR_VAULT_SECRET_ID=<approle-secret-id>
+HUB_CONSUL_HOST=consul.prod.local
+HUB_REDIS_HOST=redis.prod.local
+HUB_VAULT_HOST=vault.prod.local
+HUB_VAULT_AUTHENTICATION=APPROLE
+HUB_VAULT_ROLE_ID=<approle-role-id>
+HUB_VAULT_SECRET_ID=<approle-secret-id>
 
-MDQR_KEYCLOAK_URL=https://auth.midominio.com
-MDQR_GATEWAY_CORS_ALLOWED_ORIGINS=https://app.midominio.com
+HUB_KEYCLOAK_URL=https://auth.midominio.com
+HUB_GATEWAY_CORS_ALLOWED_ORIGINS=https://app.midominio.com
 
-MDQR_CART_DB_URL=jdbc:postgresql://db.prod.local:5432/mdqr_tenant1
-MDQR_CART_DB_USER=mdqr_app
-MDQR_CART_DB_PASSWORD=<rotar-en-vault>
+HUB_BASE_DB_URL=jdbc:postgresql://db.prod.local:5432/hub_tenant1
+HUB_BASE_DB_USER=hub_app
+HUB_BASE_DB_PASSWORD=<rotar-en-vault>
 ```
 
 ### 3. Crear dirs de logs
@@ -97,13 +97,13 @@ Necesitas un `VAULT_TOKEN` con permiso de **write** (no el AppRole read-only de 
 ```bash
 VAULT_TOKEN=<write-token> \
   TOOLS_HOST=redis.prod.local \
-  DB_HOST=db.prod.local DB_NAME=mdqr_tenant1 DB_USER=mdqr_app DB_PASSWORD=*** \
+  DB_HOST=db.prod.local DB_NAME=hub_tenant1 DB_USER=hub_app DB_PASSWORD=*** \
   KC_URL=https://auth.midominio.com KC_SERVICE_SECRET=*** KC_ADMIN_SECRET=*** \
   deploy/scripts/vault-seed.sh --tenant tenant1 \
     --external https://vault.prod.local:8200
 ```
 
-Escribe bajo `secret/mdqr[-<tenant>]/`. Si el Vault solo es alcanzable
+Escribe bajo `secret/hub[-<tenant>]/`. Si el Vault solo es alcanzable
 desde una red docker concreta, agrega `VAULT_RUN_NETWORK=<red>`. Los partners
 (genesis + client secret) se crean aparte con `create-partner.sh`.
 
@@ -124,7 +124,7 @@ docker compose --env-file .env.tenant2 up -d
 curl -fsS http://<host>:8080/management/health
 
 # Auth end-to-end via load balancer
-curl -s -X POST https://<lb-host>/services/mdqrcartservice/api/v1/auth/token \
+curl -s -X POST https://<lb-host>/services/hubbaseservice/api/v1/auth/token \
   -H 'Content-Type: application/json' \
   -d '{"clientId":"<client>","clientSecret":"<secret>"}'
 ```
@@ -135,16 +135,16 @@ curl -s -X POST https://<lb-host>/services/mdqrcartservice/api/v1/auth/token \
 
 Cada host ejecuta su propio `docker compose` con un `NODE_INDEX` distinto. Los containers se llaman:
 
-| Host | NODE_INDEX | Container gateway | Container cart-service |
+| Host | NODE_INDEX | Container gateway | Container base-service |
 |---|---|---|---|
-| server1 | 1 | `mdqr-gateway-1` | `mdqr-decode-service-1` |
-| server2 | 2 | `mdqr-gateway-2` | `mdqr-decode-service-2` |
-| server3 | 3 | `mdqr-gateway-3` | `mdqr-decode-service-3` |
+| server1 | 1 | `hub-gateway-1` | `hub-base-service-1` |
+| server2 | 2 | `hub-gateway-2` | `hub-base-service-2` |
+| server3 | 3 | `hub-gateway-3` | `hub-base-service-3` |
 
 Con tenant:
-| server1 + tenant1 | 1 | `mdqr-gateway-tenant1-1` | `mdqr-decode-service-tenant1-1` |
+| server1 + tenant1 | 1 | `hub-gateway-tenant1-1` | `hub-base-service-tenant1-1` |
 
-En Consul, todos comparten **el mismo service-name** (`mdqrgateway[-tenant]`, `mdqrcartservice[-tenant]`) — el LB interno del gateway descubre todas las replicas y rota entre ellas.
+En Consul, todos comparten **el mismo service-name** (`hubgateway[-tenant]`, `hubbaseservice[-tenant]`) — el LB interno del gateway descubre todas las replicas y rota entre ellas.
 
 ---
 
@@ -156,13 +156,13 @@ Para correr un segundo nodo del mismo servicio en un host (sin agregar hardware)
 # .env del host
 NODE_INDEX=1
 NODE_INDEX_GATEWAY_EXTRA=11      # gateway extra usa este indice
-NODE_INDEX_CART_EXTRA=11
-COMPOSE_PROFILES=gateway-extra,cart-extra
-MDQR_GATEWAY_PORT=8080
-MDQR_GATEWAY_PORT_EXTRA=8086      # puerto distinto al principal
+NODE_INDEX_BASE_EXTRA=11
+COMPOSE_PROFILES=gateway-extra,base-extra
+HUB_GATEWAY_PORT=8080
+HUB_GATEWAY_PORT_EXTRA=8086      # puerto distinto al principal
 ```
 
-Resultado: 2 containers de gateway (`mdqr-gateway-1` + `mdqr-gateway-11`) + 2 de cart-service en el mismo host, ambos registrados en Consul.
+Resultado: 2 containers de gateway (`hub-gateway-1` + `hub-gateway-11`) + 2 de base-service en el mismo host, ambos registrados en Consul.
 
 ---
 
@@ -172,12 +172,12 @@ Resultado: 2 containers de gateway (`mdqr-gateway-1` + `mdqr-gateway-11`) + 2 de
 
 | Recurso | Patron |
 |---|---|
-| Container names | `mdqr-gateway-<tenant>-<NODE_INDEX>` |
-| Consul service-name | `mdqrgateway-<tenant>`, `mdqrcartservice-<tenant>` |
-| Postgres DB | `mdqr_<tenant>` |
-| Keycloak realm | `mdqr-<tenant>` |
-| Vault namespace | `secret/mdqr-<tenant>/...` |
-| Log dir | `~/logs/mdqr-<tenant>/{gateway,cart-service}/` |
+| Container names | `hub-gateway-<tenant>-<NODE_INDEX>` |
+| Consul service-name | `hubgateway-<tenant>`, `hubbaseservice-<tenant>` |
+| Postgres DB | `hub_<tenant>` |
+| Keycloak realm | `hub-<tenant>` |
+| Vault namespace | `secret/hub-<tenant>/...` |
+| Log dir | `~/logs/hub-<tenant>/{gateway,base-service}/` |
 
 Un compose por tenant — corriendo en paralelo:
 
@@ -192,7 +192,7 @@ docker compose --env-file .env.tenant2 up -d
 
 Mismo pattern que `development/` (Logstash JSON file + console con `[traceId=... spanId=... reqId=... clientIp=...]`).
 
-Archivos en host: `${LOG_DIR}${TENANT_ID:+-}${TENANT_ID}/{gateway,cart-service}/<service>-<NODE_INDEX>.log`.
+Archivos en host: `${LOG_DIR}${TENANT_ID:+-}${TENANT_ID}/{gateway,base-service}/<service>-<NODE_INDEX>.log`.
 
 Recomendación prod: que un agente externo (Filebeat, Vector, Promtail) lea esos JSON y los ingieste a Elastic/Loki.
 
@@ -206,8 +206,8 @@ Cambio de version sin downtime (rolling):
 2. Subir un host a la vez:
    ```bash
    # Host 1
-   sed -i 's/^MDQR_GATEWAY_VERSION=.*/MDQR_GATEWAY_VERSION=1.0.6/' .env
-   sed -i 's/^MDQR_CART_VERSION=.*/MDQR_CART_VERSION=1.0.6/' .env
+   sed -i 's/^HUB_GATEWAY_VERSION=.*/HUB_GATEWAY_VERSION=1.0.6/' .env
+   sed -i 's/^HUB_CART_VERSION=.*/HUB_CART_VERSION=1.0.6/' .env
    docker compose --env-file .env up -d --force-recreate
    # esperar health UP, validar trafico, repetir en host 2, etc.
    ```
@@ -225,7 +225,7 @@ Cada `NODE_INDEX` debe ser unico globalmente — el `instance-id` en Consul lo l
 El AppRole de prod tiene `secret_id_ttl` finito (lo define infra al crear el role). Rotar:
 
 ```bash
-vault write -f auth/approle/role/mdqr-decode-service/secret-id
+vault write -f auth/approle/role/hub-base-service/secret-id
 # distribuir el nuevo secret-id a los .env
 ```
 
