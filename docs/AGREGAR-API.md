@@ -45,16 +45,25 @@ Reglas:
 - Config inválida (conector inexistente, campo sin tipo…) = **el servicio no
   arranca** (fail-fast, deliberado).
 
-## Paso 2 — Publicar la configuración
+## Paso 2 — Publicar la configuración (CLI del operador)
+
+El operador no necesita conocer curl/Consul/docker — usa **`deploy/scripts/hub-api.sh`**:
 
 ```bash
-# La clave es config/base-service/<spring.application.name>.yml
-curl -X PUT --data-binary @deploy/staging/consul-config/base-service-application.yml \
-     http://<consul>:8500/v1/kv/config/base-service/hub-ms-base.yml
-docker restart hub-staging-base-service     # segundos; sin rebuild de imagen
+deploy/scripts/hub-api.sh validate   # valida el YAML (tipos, conectores, reglas) SIN publicar
+deploy/scripts/hub-api.sh diff       # muestra qué cambiaría vs lo publicado
+deploy/scripts/hub-api.sh publish    # valida → publica en Consul KV → reinicia → verifica
+deploy/scripts/hub-api.sh list       # APIs activas (desde el Swagger del gateway)
 ```
 
-Verificar en el log de arranque: `Contratos inbound registrados: [..., DENUNCIA/v1]`.
+`publish` es atómico en la práctica: si la validación falla **no publica nada**,
+y al final muestra los contratos registrados. Para otro servidor/entorno, las
+variables `HUB_API_FILE`, `HUB_CONSUL_URL`, `HUB_KV_KEY`, `HUB_CONTAINER` y
+`HUB_GATEWAY_URL` cambian los defaults (que apuntan a staging local).
+
+> Nota: los bloques que solo cambian el **destino** de una API ya declarada en
+> la imagen (p.ej. `caso-penal-v1` con `adapter-bean: ""` + `connector: ...`)
+> son *overrides parciales* — válidos; Spring mergea por clave.
 
 ## Paso 3 — Autorizar partners (Keycloak, realm `hub-partner`)
 
