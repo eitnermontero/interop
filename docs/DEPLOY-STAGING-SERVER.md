@@ -36,8 +36,9 @@ Al servidor solo viajan **dos artefactos**:
 deploy/scripts/export-images.sh --with-tools
 #    → deploy/dist/hub-images-<fecha>.tar.gz
 
-# 3. Generar la PKI y el cert del partner AQUÍ (el servidor no necesita JDK/keytool)
-SERVER_CN=<hostname-o-IP-del-servidor> deploy/scripts/create-pki.sh --partner felcn-api
+# 3. (La PKI ahora es de Vault y se inicializa EN el servidor, fase B —
+#     requiere openssl y keytool ahí; si el servidor no tiene JDK, generar los
+#     .p12 en esta máquina apuntando VAULT_ADDR al Vault del servidor)
 
 # 4. Empaquetar el deploy (sin fuente, sin dist para no duplicar el tar)
 tar --exclude='deploy/dist' -czf hub-deploy-<fecha>.tar.gz deploy/
@@ -65,6 +66,11 @@ deploy/scripts/keycloak-sync-admin.sh
 deploy/scripts/keycloak-sync-partner.sh   # crea los clients de partners del CSV
 TOOLS_HOST=127.0.0.1 DB_NAME=hub_auth deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
 TOOLS_HOST=127.0.0.1 DB_NAME=hub_base deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
+
+# 2b. PKI de Vault (CA + cert del gateway + certs de partners)
+deploy/scripts/vault-pki.sh init
+deploy/scripts/vault-pki.sh server <hostname-del-servidor> <ip>
+deploy/scripts/vault-pki.sh partner felcn-api
 
 # 3. Directorios de logs (los contenedores corren como uid 1000)
 mkdir -p ~/logs/hub-staging/{gateway,base-service} && chown -R 1000:1000 ~/logs/hub-staging

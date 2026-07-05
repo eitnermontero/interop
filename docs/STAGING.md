@@ -36,8 +36,9 @@ deploy/scripts/keycloak-sync-partner.sh
 TOOLS_HOST=127.0.0.1 DB_NAME=hub_auth deploy/scripts/vault-seed.sh --ns hub-auth --kc-realm hub-admin
 TOOLS_HOST=127.0.0.1 DB_NAME=hub_base deploy/scripts/vault-seed.sh --ns hub-base --kc-realm hub-admin
 
-# PKI (CA + keystore/truststore del gateway) — ver ONBOARDING-PARTNER.md
-SERVER_CN=localhost deploy/scripts/create-pki.sh
+# PKI de Vault (CA raíz + intermedia + roles) — ver ONBOARDING-PARTNER.md
+deploy/scripts/vault-pki.sh init
+deploy/scripts/vault-pki.sh server localhost 127.0.0.1
 ```
 
 ## 2. Construir imágenes
@@ -124,11 +125,14 @@ PGPASSWORD=postgres psql -U postgres -h 127.0.0.1 -p 5433 -d hub_base \
 
 ## Gaps conocidos (pendientes para prod)
 
-1. **mTLS de transporte apagado** en staging (`HUB_MTLS_TEST_MODE=true`): los
-   certs ya están emitidos; habilitación en `ONBOARDING-PARTNER.md` §6.
-2. Errores del gateway aún en formato `ProblemDetail` (migración a
-   `ApiResponse` — plan ADR-0005).
-3. `hub_audit_log.correlation_id` vacío vía gateway (falta el filtro de
-   correlación del ADR-0005) y `partner_id` = UUID del service account
-   (propagar `azp` legible).
-4. Adaptador genérico sin resilience4j ni auth `API_KEY` Vault (ADR-0007 fase 2).
+1. **mTLS de transporte apagado** en staging (`HUB_MTLS_TEST_MODE=true`): la
+   PKI de Vault ya emite todo (`vault-pki.sh`); habilitación del listener en
+   `ONBOARDING-PARTNER.md` §6.
+2. Vault del stack tools en **dev mode** (volátil): la CA se pierde si se
+   recrea el contenedor — re-correr `vault-pki.sh init/server/partner`. Prod
+   exige Vault en modo real (raft).
+3. Adaptador genérico sin resilience4j ni auth `API_KEY` Vault (ADR-0007 fase 2).
+4. Firma Vault Transit de la cadena de auditoría inactiva (`NoOpAuditSigner`).
+
+> Resueltos 2026-07-05: errores del gateway ya son `ApiResponse`; el filtro de
+> correlación propaga `X-Correlation-ID` a la auditoría; `partner_id` usa `azp`.

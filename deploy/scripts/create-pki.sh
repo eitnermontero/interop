@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Genera la PKI para mTLS del gateway HUB.
 #
+# ⚠ DEPRECADO: la PKI del hub ahora corre sobre el motor pki de Vault —
+#   usar deploy/scripts/vault-pki.sh (init/server/partner/revoke).
+#   Este script se conserva solo como referencia/contingencia sin Vault.
+#
 # Produce en deploy/certs/:
 #   ca.crt              — Certificado raíz de la CA (importar en clientes/browsers)
 #   ca.key              — Clave privada de la CA (NO distribuir)

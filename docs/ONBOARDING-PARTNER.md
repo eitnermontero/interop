@@ -31,31 +31,44 @@ Reglas:
 - El CSV con secrets NO debe commitearse con secrets reales de producción —
   gestionarlos en Vault o en el gestor de secretos del pipeline.
 
-## 2. Emitir el certificado del partner (PKI)
+## 2. Emitir el certificado del partner (PKI de Vault)
+
+La PKI corre sobre el motor `pki` de **Vault** (ADR-0001): jerarquía
+`HUB Root CA` (10 años) → `HUB Intermediate CA` (5 años) → certificados de
+partner (TTL 90 días, rotables) con **CRL de revocación**.
 
 ```bash
-SERVER_CN=<hostname público del gateway> deploy/scripts/create-pki.sh --partner felcn-api
+# Setup de la PKI (una sola vez por Vault)
+deploy/scripts/vault-pki.sh init
+deploy/scripts/vault-pki.sh server <hostname-del-gateway> <ip>   # server.p12 + truststore.p12
+
+# Por cada partner
+deploy/scripts/vault-pki.sh partner felcn-api
 ```
 
 Produce en `deploy/certs/`:
 
 | Archivo | Qué es | Quién lo recibe |
 |---|---|---|
-| `ca.crt` | CA raíz del hub | Público (partners lo usan para confiar en el server) |
-| `ca.key` | Clave de la CA | **NUNCA se distribuye** — custodiar offline |
-| `server.p12` | Keystore del gateway (TLS server) | Solo el gateway |
-| `truststore.p12` | CA para validar certs de clientes | Solo el gateway |
-| `partners/felcn-api.p12` | Cert + clave del partner (password = `KEYSTORE_PASSWORD`) | **El partner, por canal seguro** |
+| `vault-ca-chain.crt` | Cadena de CAs (intermedia + raíz) | Público (partners validan el server) |
+| `server.p12` / `truststore.p12` | Keystore TLS y truststore del gateway | Solo el gateway |
+| `partners/<n>.p12` (+ .crt/.key/.chain.crt) | Credencial del partner (password = `KEYSTORE_PASSWORD`) | **El partner, por canal seguro** |
 
-Vigencia: certs 825 días (rotación documentada: re-ejecutar `--partner` y
-reentregar). A futuro: migrar la emisión al motor `pki` de Vault (ADR-0001)
-para vida corta + rotación automática.
+Operación:
+- **Rotación**: `vault-pki.sh partner <nombre>` re-emite (TTL corto por diseño — 90 días).
+- **Revocación**: `vault-pki.sh revoke <serial>` → entra al CRL (`/v1/pki_int/crl`). El serial se muestra al emitir.
+- **Estado**: `vault-pki.sh status` lista los seriales emitidos.
+
+> ⚠ El Vault del stack tools corre en **dev mode** (volátil): si el contenedor
+> se recrea, la CA se pierde y hay que re-emitir todo (`init` + `server` +
+> `partner ...`). Para producción: Vault en modo real (raft) — bloqueante ya
+> identificado. La PKI OpenSSL anterior (`create-pki.sh`) queda **deprecada**.
 
 ## 3. Qué se le entrega al partner
 
 1. `client_id` + `client_secret` (canal seguro, separado del cert).
 2. `felcn-api.p12` + password (canal seguro).
-3. `ca.crt` (para validar el certificado del servidor).
+3. `vault-ca-chain.crt` (para validar el certificado del servidor).
 4. URLs: token endpoint `POST https://<hub>/oauth2/token` (nunca Keycloak
    directo) y catálogo de APIs (Swagger del gateway).
 5. La guía de consumo (§4) y el catálogo de `error.code` (ADR-0005 §7).
@@ -132,8 +145,8 @@ En staging el binding cert↔token corre en modo simulado
 ## 7. Baja / rotación
 
 - **Baja**: deshabilitar el client en Keycloak (o quitar el scope) — corta el
-  acceso aunque el cert siga vigente. El cert se revoca sacándolo del
-  truststore (o CRL cuando la PKI sea Vault).
+  acceso aunque el cert siga vigente. El cert se revoca con
+  `vault-pki.sh revoke <serial>` (CRL de Vault).
 - **Rotación de secret**: nuevo secret en el CSV + re-sync + entrega.
-- **Rotación de cert**: `create-pki.sh --partner <nombre>` re-emite; entregar el
-  nuevo `.p12`; el anterior deja de usarse.
+- **Rotación de cert**: `vault-pki.sh partner <nombre>` re-emite; entregar el
+  nuevo `.p12`; revocar el anterior por serial.
