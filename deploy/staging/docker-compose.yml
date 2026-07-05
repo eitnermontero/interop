@@ -1,0 +1,84 @@
+# Stack de STAGING — postgres propio (DB desde cero) + gateway + base-service.
+#
+# Las tools (Consul, Redis, Vault, Keycloak) viven en deploy/tools/ y se
+# alcanzan por NOMBRE DE CONTENEDOR via la red compartida hub-shared
+# (las tools bindean sus puertos a 127.0.0.1 del host — no son alcanzables
+# via host.docker.internal desde otros contenedores).
+#
+# Orden de arranque:
+#   1. deploy/scripts/tools.sh --up          (tools + red hub-shared)
+#   2. Seeds: keycloak-sync-*.sh, vault-seed.sh (ver docs/STAGING.md)
+#   3. docker compose -f deploy/staging/docker-compose.yml --env-file deploy/staging/.env up -d
+#
+# La configuración de las APIs (hub.apis) NO vive en la imagen: el admin la
+# publica en Consul KV (config/base-service/application.yml) y reinicia
+# base-service. Ver docs/STAGING.md §5.
+name: ${HUB_STACK_NAME:-hub-staging}
+
+networks:
+  hub_net:
+    name: ${HUB_NETWORK_NAME:-hub-staging-net}
+    driver: bridge
+  hub_shared:
+    name: ${HUB_SHARED_NETWORK:-hub-shared}
+    external: true
+
+volumes:
+  staging_pg_data:
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: hub-staging-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${HUB_STAGING_DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${HUB_STAGING_DB_PASSWORD:-postgres}
+    volumes:
+      - staging_pg_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "${HUB_STAGING_DB_PORT:-127.0.0.1:5433}:5432"
+    networks:
+      - hub_net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  gateway:
+    extends:
+      file: ../services/001-gateway.yml
+      service: hub-gateway
+    container_name: hub-staging-gateway
+    networks:
+      - hub_net
+      - hub_shared
+    ports:
+      - "${HUB_GATEWAY_PORT:-0.0.0.0:8088}:8080"
+    environment:
+      LOG_FILE: gateway.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: hubgateway-staging-1
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: hub-staging-gateway
+      # RFC 8705: binding cert↔token en modo simulado hasta configurar
+      # Keycloak con mTLS en el token endpoint (ver docs/ONBOARDING-PARTNER.md §6).
+      HUB_MTLS_TEST_MODE: "${HUB_MTLS_TEST_MODE:-true}"
+
+  base-service:
+    extends:
+      file: ../services/002-base-service.yml
+      service: hub-base-service
+    container_name: hub-staging-base-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - hub_net
+      - hub_shared
+    ports:
+      - "${HUB_BASE_PORT:-127.0.0.1:8089}:8081"
+    environment:
+      LOG_FILE: base-service.log
+      SPRING_CLOUD_CONSUL_DISCOVERY_INSTANCE_ID: hubbaseservice-staging-1
+      SPRING_CLOUD_CONSUL_DISCOVERY_HOSTNAME: hub-staging-base-service

@@ -1,0 +1,46 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# Configuración de APIs del hub — STAGING (plano de control, ADR-0007)
+#
+# El ADMIN publica este archivo en Consul KV y reinicia base-service:
+#   curl -X PUT --data-binary @deploy/staging/consul-config/base-service-application.yml \
+#        http://127.0.0.1:8500/v1/kv/config/base-service/hub-ms-base.yml
+#   docker restart hub-staging-base-service
+#
+# Los CONTRATOS (fields) de CASO_PENAL/CASO_PENAL_EDITAR vienen del
+# application.yml base de la imagen; aquí solo se configura el DESTINO.
+# adapter-bean: "" anula el stub por defecto y activa el conector HTTP.
+#
+# Backend de la institución (FELCN) simulado con JSONPlaceholder:
+#   POST  https://jsonplaceholder.typicode.com/posts        → 201 {"id":101}
+#   PATCH https://jsonplaceholder.typicode.com/posts/{id}   → 200 {...}
+# Al integrar el backend real: cambiar base-url/target-path y reiniciar.
+# ═══════════════════════════════════════════════════════════════════════════
+hub:
+  connectors:
+    backend-felcn:
+      base-url: https://jsonplaceholder.typicode.com
+      timeout-ms: 8000
+    backend-registro:                    # backend del registro de antecedentes (simulado)
+      base-url: https://jsonplaceholder.typicode.com
+      timeout-ms: 8000
+  apis:
+    # ─── API integrada 2026-07-05 siguiendo docs/AGREGAR-API.md — solo config ───
+    solicitud-antecedente-v1:
+      product: SOLICITUD_ANTECEDENTE
+      version: v1
+      method: POST
+      connector: backend-registro
+      target-path: /comments
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: ci,              type: STRING, required: true,  max-length: 15 }
+        - { name: nombre_completo, type: STRING, required: true,  max-length: 200 }
+        - { name: motivo,          type: STRING, required: false, max-length: 500 }
+    caso-penal-v1:
+      adapter-bean: ""
+      connector: backend-felcn
+      target-path: /posts
+    caso-penal-editar-v1:
+      adapter-bean: ""
+      connector: backend-felcn
+      target-path: /posts/{id_pol_caso}

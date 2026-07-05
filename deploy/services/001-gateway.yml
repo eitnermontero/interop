@@ -1,17 +1,17 @@
 services:
-  mdqr-gateway:
-    image: ${MDQR_GATEWAY_IMAGE:-cr.sintesis.com.bo/mdqr-dev/mdqr-gateway}:${MDQR_GATEWAY_VERSION:-latest}
+  hub-gateway:
+    image: ${HUB_GATEWAY_IMAGE:-cr.sintesis.com.bo/hub-dev/hub-gateway}:${HUB_GATEWAY_VERSION:-latest}
     restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: ${MDQR_GATEWAY_MEM_LIMIT:-768M}
+          memory: ${HUB_GATEWAY_MEM_LIMIT:-768M}
         reservations:
-          memory: ${MDQR_GATEWAY_MEM_RESERVATION:-384M}
+          memory: ${HUB_GATEWAY_MEM_RESERVATION:-384M}
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - ${LOG_DIR:-~/logs/mdqr}${TENANT_ID:+-}${TENANT_ID}/gateway/:/app/logs
-      - ${MDQR_CERTS_DIR:-/srv/interop/deploy/certs}:/certs:ro
+      - ${LOG_DIR:-~/logs/hub}${TENANT_ID:+-}${TENANT_ID}/gateway/:/app/logs
+      - ${HUB_CERTS_DIR:-/srv/interop/deploy/certs}:/certs:ro
     extra_hosts:
       # Tools (Consul/Redis/Vault/Keycloak) viven en deploy/tools/ — otra red Docker.
       - "host.docker.internal:host-gateway"
@@ -20,96 +20,99 @@ services:
       TENANT_ID: ${TENANT_ID:-}
 
       # --- JVM ---
-      _JAVA_OPTIONS: ${MDQR_GATEWAY_JAVA_OPTS:-}
+      _JAVA_OPTIONS: ${HUB_GATEWAY_JAVA_OPTS:-}
 
       # --- Spring profile ---
-      SPRING_PROFILES_ACTIVE: ${MDQR_GATEWAY_PROFILE:-dev}
+      SPRING_PROFILES_ACTIVE: ${HUB_GATEWAY_PROFILE:-dev}
 
       # --- Server (mTLS en 8443, management HTTP en 8080) ---
-      SERVER_SSL_PORT: ${MDQR_GATEWAY_SSL_PORT:-8443}
+      SERVER_SSL_PORT: ${HUB_GATEWAY_SSL_PORT:-8443}
       MANAGEMENT_SERVER_PORT: 8080
 
       # --- mTLS ---
       SSL_CERTS_DIR: /certs
-      SSL_KEYSTORE_PASSWORD: ${MDQR_SSL_KEYSTORE_PASSWORD:-changeit}
-      SSL_TRUSTSTORE_PASSWORD: ${MDQR_SSL_TRUSTSTORE_PASSWORD:-changeit}
+      SSL_KEYSTORE_PASSWORD: ${HUB_SSL_KEYSTORE_PASSWORD:-changeit}
+      SSL_TRUSTSTORE_PASSWORD: ${HUB_SSL_TRUSTSTORE_PASSWORD:-changeit}
 
       # --- Service discovery (Consul) ---
-      SPRING_CLOUD_CONSUL_HOST: ${MDQR_CONSUL_HOST:-host.docker.internal}
-      SPRING_CLOUD_CONSUL_PORT: ${MDQR_CONSUL_PORT:-8500}
-      SPRING_CLOUD_CONSUL_SCHEME: ${MDQR_CONSUL_SCHEME:-http}
-      SPRING_CLOUD_CONSUL_TOKEN: ${MDQR_CONSUL_TOKEN:-}
-      SPRING_CLOUD_CONSUL_DISCOVERY_SERVICE_NAME: mdqrgateway${TENANT_ID:+-}${TENANT_ID}
+      SPRING_CLOUD_CONSUL_HOST: ${HUB_CONSUL_HOST:-host.docker.internal}
+      SPRING_CLOUD_CONSUL_PORT: ${HUB_CONSUL_PORT:-8500}
+      SPRING_CLOUD_CONSUL_SCHEME: ${HUB_CONSUL_SCHEME:-http}
+      SPRING_CLOUD_CONSUL_TOKEN: ${HUB_CONSUL_TOKEN:-}
+      SPRING_CLOUD_CONSUL_DISCOVERY_SERVICE_NAME: hubgateway${TENANT_ID:+-}${TENANT_ID}
       # Consul external (otra Docker network) no alcanza el IP interno del container, asi que
       # desactivamos el HTTP active check. La service queda registrada en el catalog pero sin
       # health-check — alternativa: configurar TTL passive si la app lo soporta.
       SPRING_CLOUD_CONSUL_DISCOVERY_REGISTER_HEALTH_CHECK: "false"
 
       # --- Vault ---
-      SPRING_CLOUD_VAULT_HOST: ${MDQR_VAULT_HOST:-host.docker.internal}
-      SPRING_CLOUD_VAULT_PORT: ${MDQR_VAULT_PORT:-8200}
-      SPRING_CLOUD_VAULT_SCHEME: ${MDQR_VAULT_SCHEME:-http}
-      SPRING_CLOUD_VAULT_AUTHENTICATION: ${MDQR_VAULT_AUTHENTICATION:-TOKEN}
-      SPRING_CLOUD_VAULT_TOKEN: ${MDQR_VAULT_TOKEN:-root}
-      SPRING_CLOUD_VAULT_APP_ROLE_ROLE_ID: ${MDQR_VAULT_ROLE_ID:-}
-      SPRING_CLOUD_VAULT_APP_ROLE_SECRET_ID: ${MDQR_VAULT_SECRET_ID:-}
-      # Namespace tenant-aware: secret/mdqr[-<tenant>]/...
+      SPRING_CLOUD_VAULT_HOST: ${HUB_VAULT_HOST:-host.docker.internal}
+      SPRING_CLOUD_VAULT_PORT: ${HUB_VAULT_PORT:-8200}
+      SPRING_CLOUD_VAULT_SCHEME: ${HUB_VAULT_SCHEME:-http}
+      SPRING_CLOUD_VAULT_AUTHENTICATION: ${HUB_VAULT_AUTHENTICATION:-TOKEN}
+      SPRING_CLOUD_VAULT_TOKEN: ${HUB_VAULT_TOKEN:-root}
+      SPRING_CLOUD_VAULT_APP_ROLE_ROLE_ID: ${HUB_VAULT_ROLE_ID:-}
+      SPRING_CLOUD_VAULT_APP_ROLE_SECRET_ID: ${HUB_VAULT_SECRET_ID:-}
+      # Namespace tenant-aware: secret/hub[-<tenant>]/...
       # Env names = property path en MAYUSCULAS (Spring Boot relaxed binding).
-      SPRING_CLOUD_VAULT_KV_DEFAULT_CONTEXT: ${MDQR_VAULT_NAMESPACE_BASE:-mdqr}${TENANT_ID:+-}${TENANT_ID}
-      SPRING_CLOUD_VAULT_KV_APPLICATION_NAME: ${MDQR_VAULT_NAMESPACE_BASE:-mdqr}${TENANT_ID:+-}${TENANT_ID}
+      SPRING_CLOUD_VAULT_KV_DEFAULT_CONTEXT: ${HUB_VAULT_NAMESPACE_BASE:-hub}${TENANT_ID:+-}${TENANT_ID}
+      SPRING_CLOUD_VAULT_KV_APPLICATION_NAME: ${HUB_VAULT_NAMESPACE_BASE:-hub}${TENANT_ID:+-}${TENANT_ID}
       # KV mount: 'secret' (dev) o 'kv' (stage, vault cluster monta kv/).
-      SPRING_CLOUD_VAULT_KV_BACKEND: ${MDQR_VAULT_KV_BACKEND:-secret}
+      SPRING_CLOUD_VAULT_KV_BACKEND: ${HUB_VAULT_KV_BACKEND:-secret}
       # Namespace tenant-aware para los config.import de Vault (ver application.yml).
-      MDQR_VAULT_NS: ${MDQR_DECRYPT_VAULT_NS:-mdqr-decode}${TENANT_ID:+-}${TENANT_ID}
+      HUB_VAULT_NS: ${HUB_BASE_VAULT_NS:-hub-base}${TENANT_ID:+-}${TENANT_ID}
       # Mount KV de Vault para los config.import (dev=secret, stage=kv).
-      MDQR_VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
+      HUB_VAULT_MOUNT: ${HUB_VAULT_MOUNT:-secret}
       # VAULT_NS y VAULT_MOUNT son leídos directamente por ${VAULT_NS:...} en application.yml
-      VAULT_NS: ${MDQR_DECRYPT_VAULT_NS:-mdqr-decode}${TENANT_ID:+-}${TENANT_ID}
-      VAULT_MOUNT: ${MDQR_VAULT_MOUNT:-secret}
+      VAULT_NS: ${HUB_BASE_VAULT_NS:-hub-base}${TENANT_ID:+-}${TENANT_ID}
+      VAULT_MOUNT: ${HUB_VAULT_MOUNT:-secret}
 
       # --- Redis ---
-      SPRING_DATA_REDIS_HOST: ${MDQR_REDIS_HOST:-host.docker.internal}
-      SPRING_DATA_REDIS_PORT: ${MDQR_REDIS_PORT:-6379}
+      SPRING_DATA_REDIS_HOST: ${HUB_REDIS_HOST:-host.docker.internal}
+      SPRING_DATA_REDIS_PORT: ${HUB_REDIS_PORT:-6379}
       # password (clave) -> Vault secret/<ns>/system/redis. NO en env.
       # Spring Data: standalone (dev) o cluster. El bean LettuceConnectionFactory custom
-      # (RedisConfiguration) elige segun MDQR_REDIS_CLUSTER_ENABLED=true + MDQR_REDIS_CLUSTER_NODES.
-      APPLICATION_REDIS_CLUSTER_ENABLED: ${MDQR_REDIS_CLUSTER_ENABLED:-false}
-      APPLICATION_REDIS_CLUSTER_NODES: ${MDQR_REDIS_CLUSTER_NODES:-}
+      # (RedisConfiguration) elige segun HUB_REDIS_CLUSTER_ENABLED=true + HUB_REDIS_CLUSTER_NODES.
+      APPLICATION_REDIS_CLUSTER_ENABLED: ${HUB_REDIS_CLUSTER_ENABLED:-false}
+      APPLICATION_REDIS_CLUSTER_NODES: ${HUB_REDIS_CLUSTER_NODES:-}
 
       # --- Keycloak / OIDC ---
       # keycloak.service-client.* publican via Vault; aqui las dejamos overrideables por env.
-      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}
-      KEYCLOAK_SERVICE_CLIENT_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
+      KEYCLOAK_SERVICE_CLIENT_AUTH_SERVER_URL: ${HUB_KEYCLOAK_URL:-http://host.docker.internal:8180}
+      KEYCLOAK_SERVICE_CLIENT_REALM: ${HUB_KEYCLOAK_REALM_BASE:-hub-admin}${TENANT_ID:+-}${TENANT_ID}
       # application.keycloak.external-url = URL que keycloak embebe en el JWT iss
-      # (validacion del resource-server). Default = mismo MDQR_KEYCLOAK_URL.
-      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}}
-      APPLICATION_KEYCLOAK_REALM: ${MDQR_KEYCLOAK_REALM_BASE:-mdqr-admin}${TENANT_ID:+-}${TENANT_ID}
-      # partner-keycloak.external-url = URL del issuer en tokens del realm mdqr-partner.
-      KEYCLOAK_PARTNER_EXTERNAL_URL: ${MDQR_KEYCLOAK_EXTERNAL_URL:-${MDQR_KEYCLOAK_URL:-http://host.docker.internal:8180}}
+      # (validacion del resource-server). Default = mismo HUB_KEYCLOAK_URL.
+      APPLICATION_KEYCLOAK_EXTERNAL_URL: ${HUB_KEYCLOAK_EXTERNAL_URL:-${HUB_KEYCLOAK_URL:-http://host.docker.internal:8180}}
+      APPLICATION_KEYCLOAK_REALM: ${HUB_KEYCLOAK_REALM_BASE:-hub-admin}${TENANT_ID:+-}${TENANT_ID}
+      # partner-keycloak.external-url = URL del issuer en tokens del realm hub-partner.
+      KEYCLOAK_PARTNER_EXTERNAL_URL: ${HUB_KEYCLOAK_EXTERNAL_URL:-${HUB_KEYCLOAK_URL:-http://host.docker.internal:8180}}
+      # URL interna gateway → Keycloak del token proxy (override del valor seedeado en Vault,
+      # que apunta a 127.0.0.1 y no es alcanzable desde el contenedor).
+      KEYCLOAK_PARTNER_CLIENT_AUTH_SERVER_URL: ${HUB_KEYCLOAK_URL:-http://host.docker.internal:8180}
 
       # --- Logging ---
       # LOG_DIR + LOG_FILE los lee logback-spring.xml para el RollingFileAppender.
       LOG_DIR: /app/logs
       LOG_FILE: gateway.log
-      LOGGING_LEVEL_ROOT: ${MDQR_GATEWAY_ROOT_LOG_LEVEL:-INFO}
-      LOGGING_LEVEL_BO_COM_SINTESIS_MDQR_GATEWAY: ${MDQR_GATEWAY_LOG_LEVEL:-INFO}
-      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: ${MDQR_LOG_MAX_FILE_SIZE:-500MB}
-      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: ${MDQR_LOG_MAX_HISTORY:-90}
+      LOGGING_LEVEL_ROOT: ${HUB_GATEWAY_ROOT_LOG_LEVEL:-INFO}
+      LOGGING_LEVEL_BO_COM_SINTESIS_HUB_GATEWAY: ${HUB_GATEWAY_LOG_LEVEL:-INFO}
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_FILE_SIZE: ${HUB_LOG_MAX_FILE_SIZE:-500MB}
+      LOGGING_LOGBACK_ROLLINGPOLICY_MAX_HISTORY: ${HUB_LOG_MAX_HISTORY:-90}
 
       # --- mTLS RFC 8705 test mode (bypass cnf.x5t#S256 check) ---
       HUB_MTLS_TEST_MODE: ${HUB_MTLS_TEST_MODE:-false}
 
       # --- CORS ---
-      APPLICATION_CORS_ALLOWED_ORIGINS: ${MDQR_GATEWAY_CORS_ALLOWED_ORIGINS:-*}
-      APPLICATION_CORS_ALLOWED_METHODS: ${MDQR_GATEWAY_CORS_ALLOWED_METHODS:-*}
-      APPLICATION_CORS_ALLOWED_HEADERS: ${MDQR_GATEWAY_CORS_ALLOWED_HEADERS:-*}
-      APPLICATION_CORS_ALLOW_CREDENTIALS: ${MDQR_GATEWAY_CORS_ALLOW_CREDENTIALS:-true}
+      APPLICATION_CORS_ALLOWED_ORIGINS: ${HUB_GATEWAY_CORS_ALLOWED_ORIGINS:-*}
+      APPLICATION_CORS_ALLOWED_METHODS: ${HUB_GATEWAY_CORS_ALLOWED_METHODS:-*}
+      APPLICATION_CORS_ALLOWED_HEADERS: ${HUB_GATEWAY_CORS_ALLOWED_HEADERS:-*}
+      APPLICATION_CORS_ALLOW_CREDENTIALS: ${HUB_GATEWAY_CORS_ALLOW_CREDENTIALS:-true}
 
     # NOTA: ports: se define en el compose consumer (dev/prod), no aca.
     healthcheck:
       # Puerto 8080 = management HTTP (sin TLS). El app principal está en 8443 HTTPS.
       test: ["CMD-SHELL", "wget -q -O- http://localhost:8080/management/health | grep -q '\"status\":\"UP\"'"]
-      interval: ${MDQR_HC_API_INTERVAL:-30s}
-      timeout: ${MDQR_HC_API_TIMEOUT:-10s}
-      retries: ${MDQR_HC_API_RETRIES:-3}
-      start_period: ${MDQR_HC_API_START_PERIOD:-60s}
+      interval: ${HUB_HC_API_INTERVAL:-30s}
+      timeout: ${HUB_HC_API_TIMEOUT:-10s}
+      retries: ${HUB_HC_API_RETRIES:-3}
+      start_period: ${HUB_HC_API_START_PERIOD:-60s}
