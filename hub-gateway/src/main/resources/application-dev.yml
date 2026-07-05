@@ -1,0 +1,17 @@
+logging:
+  level:
+    bo.com.sintesis.hub.gateway: DEBUG
+    org.springframework.cloud.gateway: DEBUG
+
+springdoc:
+  swagger-ui:
+    enabled: true
+
+application:
+  cors:
+    allowed-origins: http://localhost:8080,http://localhost:8081,http://localhost:4200,http://localhost:4300
+    allowed-methods: "*"
+    allowed-headers: "*"
+    exposed-headers: Authorization,Link,X-Total-Count
+    allow-credentials: true
+    max-age: 1800

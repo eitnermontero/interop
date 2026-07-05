@@ -1,0 +1,54 @@
+server:
+  port: 8082
+
+spring:
+  config:
+    import: ""
+
+  cloud:
+    loadbalancer:
+      cache:
+        ttl: 15s
+    vault:
+      enabled: false
+      config:
+        lifecycle:
+          enabled: false
+    consul:
+      enabled: true
+      config:
+        enabled: false
+        import-check:
+          enabled: false
+      discovery:
+        enabled: true
+        # Solo instancias con health check passing — evita que el LB enrute
+        # a instancias de otros proyectos que se registren con el mismo service-name.
+        query-passing: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+  session:
+    store-type: redis
+    redis:
+      namespace: hub-gateway:session
+
+application:
+  keycloak:
+    auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    external-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    realm: hub-admin
+    resource: hubadminservice
+    credentials:
+      secret: hubadminservice-secret
+  partner-keycloak:
+    auth-server-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    external-url: http://${KEYCLOAK_HOST:127.0.0.1}:${KEYCLOAK_PORT:8180}
+    realm: hub-partner
+    resource: unilink-api
+    credentials:
+      secret: unilink-api-secret
