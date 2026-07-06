@@ -26,7 +26,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO="$(cd "$SCRIPT_DIR/../.." && pwd)"
 PARTNER="${PARTNER:-felcn-api}"
-SERVER_CN="${SERVER_CN:-localhost}"
+SERVER_CN="${SERVER_CN:-$(hostname)}"
+SERVER_IP="${SERVER_IP:-$(hostname -I 2>/dev/null | awk '{print $1}')}"
 SERVER_IP="${SERVER_IP:-127.0.0.1}"
 GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:8088}"
 LOG_BASE="${LOG_BASE:-$HOME/logs/hub-staging}"
@@ -47,8 +48,17 @@ esperar() { # esperar <descripcion> <intentos> <comando...>
 
 # ── 0. Prerequisitos ─────────────────────────────────────────────────────────
 command -v docker >/dev/null || fallo "docker no está instalado"
+if ! docker image inspect cr.sintesis.com.bo/hub-dev/hub-gateway:latest >/dev/null 2>&1 \
+   || ! docker image inspect cr.sintesis.com.bo/hub-dev/hub-ms-base:latest >/dev/null 2>&1; then
+  # Autocarga: buscar el tar de imágenes junto al paquete extraído
+  TAR=$(ls -t "$REPO"/../hub-images-*.tar.gz "$REPO"/hub-images-*.tar.gz "$REPO"/deploy/dist/hub-images-*.tar.gz 2>/dev/null | head -1 || true)
+  if [ -n "$TAR" ]; then
+    echo -e "${CYAN}[i]${NC} Cargando imágenes desde $TAR (puede tardar unos minutos)..."
+    docker load -i "$TAR" >/dev/null
+  fi
+fi
 docker image inspect cr.sintesis.com.bo/hub-dev/hub-gateway:latest >/dev/null 2>&1 \
-  || fallo "Falta la imagen hub-gateway. Cargar con: ./gradlew jibDockerBuild  (o docker load -i hub-images-*.tar.gz)"
+  || fallo "Falta la imagen hub-gateway y no se encontró hub-images-*.tar.gz junto al paquete."
 docker image inspect cr.sintesis.com.bo/hub-dev/hub-ms-base:latest >/dev/null 2>&1 \
   || fallo "Falta la imagen hub-ms-base."
 [ -f "$REPO/deploy/tools/.env" ] || { cp "$REPO/deploy/tools/.env.example" "$REPO/deploy/tools/.env"; ok "deploy/tools/.env creado desde .env.example"; }
