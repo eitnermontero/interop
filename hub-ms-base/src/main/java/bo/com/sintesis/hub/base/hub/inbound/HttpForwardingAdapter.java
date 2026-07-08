@@ -23,6 +23,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * producto. La URL efectiva es {@code base-url + target-path}, con placeholders
  * {@code {campo}} resueltos desde el payload (p. ej. {@code /casos/{id_pol_caso}}).
  *
+ * <p>Para contratos de solo lectura ({@code method: GET}) el reenvío se hace sin
+ * body — los catálogos declarados así no reciben payload de entrada.
+ *
  * <p>Semántica de errores (catálogo ADR-0005 §7):
  * <ul>
  *   <li>Destino alcanzado pero respondió error → 502 (UPSTREAM_ERROR).</li>
@@ -55,17 +58,24 @@ public class HttpForwardingAdapter {
 
         RestClient client = clients.computeIfAbsent(connectorName, n -> buildClient(connector));
         String path = resolverPlaceholders(api.getTargetPath(), payload);
+        HttpMethod httpMethod = HttpMethod.valueOf(api.getMethod().toUpperCase());
 
         try {
             @SuppressWarnings({"unchecked", "rawtypes"})
-            ResponseEntity<Map> response = client
-                    .method(HttpMethod.valueOf(api.getMethod().toUpperCase()))
-                    .uri(path)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .header("X-Correlation-ID", correlationId)
-                    .body(payload)
-                    .retrieve()
-                    .toEntity(Map.class);
+            ResponseEntity<Map> response = (httpMethod == HttpMethod.GET)
+                    // GET: sin body — los catálogos de solo lectura no tienen payload de entrada.
+                    ? client.method(httpMethod)
+                            .uri(path)
+                            .header("X-Correlation-ID", correlationId)
+                            .retrieve()
+                            .toEntity(Map.class)
+                    : client.method(httpMethod)
+                            .uri(path)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .header("X-Correlation-ID", correlationId)
+                            .body(payload)
+                            .retrieve()
+                            .toEntity(Map.class);
 
             @SuppressWarnings("unchecked")
             Map<String, Object> data = response.getBody() != null ? response.getBody() : Map.of();
@@ -98,7 +108,12 @@ public class HttpForwardingAdapter {
         }
         // JdkClientHttpRequestFactory (java.net.http.HttpClient): a diferencia de
         // SimpleClientHttpRequestFactory (HttpURLConnection), soporta PATCH.
+        // version(HTTP_1_1): sin fijarla, el HttpClient intenta negociar HTTP/2 por
+        // defecto; contra backends que solo hablan HTTP/1.1 (el caso típico de las
+        // instituciones partner) eso produce conexiones truncadas/EOF intermitentes
+        // (reproducido con WireMock al escribir los tests de este adaptador).
         java.net.http.HttpClient httpClient = java.net.http.HttpClient.newBuilder()
+                .version(java.net.http.HttpClient.Version.HTTP_1_1)
                 .connectTimeout(Duration.ofMillis(connector.getTimeoutMs()))
                 .build();
         JdkClientHttpRequestFactory factory = new JdkClientHttpRequestFactory(httpClient);

@@ -131,7 +131,12 @@ public class HubAuditInterceptor implements HandlerInterceptor {
         // Headers de correlación y negocio
         String partnerId = obtenerHeader(request, HEADER_PARTNER_ID, ANONYMOUS_PARTNER);
         String correlationId = obtenerHeader(request, HEADER_CORRELATION_ID, null);
-        String idempotencyKey = obtenerHeader(request, HEADER_IDEMPOTENCY, null);
+        // GET es idempotente por naturaleza (catálogos de solo lectura, ADR-0006/0007):
+        // se ignora cualquier X-Idempotency-Key enviada por el caller para no rechazar
+        // reintentos legítimos con 409 por una clave reutilizada entre consultas.
+        String idempotencyKey = "GET".equalsIgnoreCase(request.getMethod())
+                ? null
+                : obtenerHeader(request, HEADER_IDEMPOTENCY, null);
 
         // Producto dinámico: lo pone DispatcherController como atributo del request.
         // Fallback a "UNKNOWN" si el interceptor se activa fuera del dispatcher genérico.

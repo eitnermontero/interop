@@ -40,6 +40,7 @@ class InboundContractOpenApiCustomizerTest {
         ContractRegistry registry = new ContractRegistry();
         registry.register(contratoCasoPenalPost());
         registry.register(contratoCasoPenalEditar());
+        registry.register(contratoCatalogoGet());
 
         customizer = new InboundContractOpenApiCustomizer(registry);
         openApi = new OpenAPI();
@@ -289,5 +290,93 @@ class InboundContractOpenApiCustomizerTest {
                 new FieldRule("fecha_caso",       FieldType.DATETIME, false, null, "iso8601")
         );
         return new ContractDefinition("CASO_PENAL_EDITAR", "v1", campos, "id_pol_caso");
+    }
+
+    /**
+     * Contrato de catálogo de solo lectura ({@code httpMethod=GET}), sin campos —
+     * los catálogos declarados así no tienen payload de entrada.
+     */
+    private ContractDefinition contratoCatalogoGet() {
+        return new ContractDefinition("CATALOGO_UNIDADES", "v1", List.of(), null, "GET");
+    }
+
+    // ─── Path GET (catálogo de solo lectura) ───────────────────────────────────
+
+    @Test
+    @DisplayName("Debe generar path GET para un contrato de solo lectura")
+    void debeGenerarPathGetParaContratoDeSoloLectura() {
+        assertThat(openApi.getPaths())
+                .containsKey("/api/inbound/CATALOGO_UNIDADES/v1");
+
+        PathItem item = openApi.getPaths().get("/api/inbound/CATALOGO_UNIDADES/v1");
+        assertThat(item.getGet())
+                .as("La operacion GET debe existir en el path del catálogo")
+                .isNotNull();
+        assertThat(item.getPost())
+                .as("No debe existir operacion POST para un contrato de solo lectura")
+                .isNull();
+        assertThat(item.getPatch())
+                .as("No debe existir operacion PATCH para un contrato de solo lectura")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("La operacion GET no debe tener requestBody")
+    void operacionGetNoDebeTenerRequestBody() {
+        var getOp = openApi.getPaths()
+                .get("/api/inbound/CATALOGO_UNIDADES/v1")
+                .getGet();
+
+        assertThat(getOp.getRequestBody())
+                .as("Un catálogo de solo lectura no recibe payload de entrada")
+                .isNull();
+    }
+
+    @Test
+    @DisplayName("La operacion GET no debe documentar X-Idempotency-Key, pero sí X-Correlation-ID")
+    void operacionGetNoDebeDocumentarIdempotencyKey() {
+        List<Parameter> params = openApi.getPaths()
+                .get("/api/inbound/CATALOGO_UNIDADES/v1")
+                .getGet()
+                .getParameters();
+
+        assertThat(params)
+                .extracting(Parameter::getName)
+                .as("GET es idempotente por naturaleza — no exige X-Idempotency-Key")
+                .doesNotContain("X-Idempotency-Key");
+
+        Parameter correlationId = params.stream()
+                .filter(p -> "X-Correlation-ID".equals(p.getName()))
+                .findFirst()
+                .orElse(null);
+        assertThat(correlationId).isNotNull();
+        assertThat(correlationId.getRequired()).isFalse();
+    }
+
+    @Test
+    @DisplayName("Responses de GET deben incluir 200, sin 400 ni 409")
+    void responsesDeGetDebenIncluir200SinValidacionNiIdempotencia() {
+        var getOp = openApi.getPaths()
+                .get("/api/inbound/CATALOGO_UNIDADES/v1")
+                .getGet();
+
+        assertThat(getOp.getResponses())
+                .containsKey("200")
+                .containsKey("403")
+                .containsKey("500")
+                .doesNotContainKey("400")
+                .doesNotContainKey("409")
+                .doesNotContainKey("201");
+    }
+
+    @Test
+    @DisplayName("La operacion GET debe tener el tag del producto")
+    void getDebeTenerTagDelProducto() {
+        List<String> tags = openApi.getPaths()
+                .get("/api/inbound/CATALOGO_UNIDADES/v1")
+                .getGet()
+                .getTags();
+
+        assertThat(tags).containsExactly("CATALOGO_UNIDADES");
     }
 }

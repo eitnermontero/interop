@@ -73,7 +73,13 @@ public class HubInteropProperties {
         private String product;
         /** Versión del contrato. */
         private String version = "v1";
-        /** Método HTTP hacia el destino (POST | PATCH | PUT). */
+        /**
+         * Método HTTP hacia el destino, y también el verbo con el que el partner debe
+         * invocar el producto en el dispatcher (POST | PATCH | PUT | GET). {@code GET}
+         * identifica catálogos de solo lectura: sin body de entrada, sin
+         * {@code X-Idempotency-Key} exigible, y sin invocar {@code ContractValidator}
+         * más allá de un contrato sin campos.
+         */
         private String method = "POST";
         /** Nombre del conector destino (usa el adaptador HTTP genérico). Excluyente con adapterBean. */
         private String connector;

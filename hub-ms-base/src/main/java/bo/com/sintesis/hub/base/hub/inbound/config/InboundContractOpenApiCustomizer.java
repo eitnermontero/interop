@@ -35,13 +35,17 @@ import java.util.Map;
  * <p>Para cada {@link ContractDefinition} presente en el registry en el momento del
  * arranque genera:
  * <ul>
- *   <li>Productos <b>sin</b> sufijo {@code _EDITAR}:
+ *   <li>Productos <b>sin</b> sufijo {@code _EDITAR} y {@code httpMethod=POST}:
  *       {@code POST /api/inbound/{product}/{version}} con el schema construido desde
  *       los {@link FieldRule} del contrato.</li>
  *   <li>Productos <b>con</b> sufijo {@code _EDITAR}:
  *       {@code PATCH /api/inbound/{productBase}/{version}/{id}} — {@code productBase}
  *       es el producto sin el sufijo, y el parámetro de path {@code id} documenta el
  *       campo que el dispatcher inyecta bajo {@code resourceIdField}.</li>
+ *   <li>Productos de solo lectura ({@link ContractDefinition#isReadOnly()},
+ *       {@code httpMethod=GET}): {@code GET /api/inbound/{product}/{version}} — sin
+ *       {@code requestBody}, sin cabecera {@code X-Idempotency-Key} y sin respuesta 400/409
+ *       (catálogos sin payload de entrada).</li>
  * </ul>
  *
  * <p>Mapeo de tipos {@link FieldType} a OpenAPI:
@@ -57,8 +61,9 @@ import java.util.Map;
  * una sola vez en {@code components/schemas} y las operaciones los referencian con
  * {@code $ref} para no duplicar.
  *
- * <p>Cabeceras documentadas en todas las operaciones de escritura:
- * {@code X-Idempotency-Key} (requerida) y {@code X-Correlation-ID} (opcional).
+ * <p>Cabeceras documentadas: {@code X-Correlation-ID} (opcional, todas las operaciones)
+ * y {@code X-Idempotency-Key} (requerida, solo POST/PATCH — GET es idempotente por
+ * naturaleza y no la exige).
  */
 @Slf4j
 @RequiredArgsConstructor
@@ -208,10 +213,11 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
         if (esEdicion) {
             String productoBase = producto.substring(0, producto.length() - EDITAR_SUFFIX.length());
             String path = "/api/inbound/" + productoBase + "/" + version + "/{id}";
-            registrarPathItem(openApi, path, contrato, productoBase, true);
+            registrarPathItem(openApi, path, contrato, productoBase, Verbo.PATCH);
         } else {
             String path = "/api/inbound/" + producto + "/" + version;
-            registrarPathItem(openApi, path, contrato, producto, false);
+            Verbo verbo = contrato.isReadOnly() ? Verbo.GET : Verbo.POST;
+            registrarPathItem(openApi, path, contrato, producto, verbo);
         }
     }
 
@@ -219,46 +225,64 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
                                    String path,
                                    ContractDefinition contrato,
                                    String productoBase,
-                                   boolean esEdicion) {
+                                   Verbo verbo) {
         PathItem pathItem = openApi.getPaths()
                 .computeIfAbsent(path, k -> new PathItem());
 
-        Operation operacion = construirOperacion(contrato, productoBase, esEdicion);
+        Operation operacion = construirOperacion(contrato, productoBase, verbo);
 
-        if (esEdicion) {
-            pathItem.patch(operacion);
-        } else {
-            pathItem.post(operacion);
+        switch (verbo) {
+            case PATCH -> pathItem.patch(operacion);
+            case GET   -> pathItem.get(operacion);
+            case POST  -> pathItem.post(operacion);
         }
 
-        log.debug("Path OpenAPI generado: {} {} ({})",
-                esEdicion ? "PATCH" : "POST", path, contrato.product());
+        log.debug("Path OpenAPI generado: {} {} ({})", verbo, path, contrato.product());
     }
 
     // ─── Construcción de operación ────────────────────────────────────────────
 
+    /** Verbo HTTP de la operación generada — determina forma de request/response documentada. */
+    private enum Verbo { POST, PATCH, GET }
+
     private Operation construirOperacion(ContractDefinition contrato,
                                           String productoBase,
-                                          boolean esEdicion) {
+                                          Verbo verbo) {
         String version = contrato.version();
 
         Operation op = new Operation()
-                .operationId((esEdicion ? "patch" : "post") + "_" + productoBase + "_" + version)
-                .summary((esEdicion ? "Editar " : "Crear ") + productoBase.replace("_", " ").toLowerCase())
-                .description(construirDescripcion(productoBase, version, esEdicion))
+                .operationId(verbo.name().toLowerCase() + "_" + productoBase + "_" + version)
+                .summary(resumenPorVerbo(verbo) + " " + productoBase.replace("_", " ").toLowerCase())
+                .description(construirDescripcion(productoBase, version, verbo))
                 .addTagsItem(productoBase)
-                .parameters(construirParametros(contrato, esEdicion))
-                .requestBody(construirRequestBody(contrato, productoBase, esEdicion))
-                .responses(construirResponses(esEdicion));
+                .parameters(construirParametros(contrato, verbo))
+                .responses(construirResponses(verbo));
+
+        // GET no tiene body de entrada — catálogos de solo lectura sin payload.
+        if (verbo != Verbo.GET) {
+            op.requestBody(construirRequestBody(contrato, productoBase, verbo));
+        }
 
         return op;
     }
 
-    private static String construirDescripcion(String productoBase, String version,
-                                                boolean esEdicion) {
-        String metodo = esEdicion ? "PATCH" : "POST";
+    private static String resumenPorVerbo(Verbo verbo) {
+        return switch (verbo) {
+            case POST -> "Crear";
+            case PATCH -> "Editar";
+            case GET -> "Consultar";
+        };
+    }
+
+    private static String construirDescripcion(String productoBase, String version, Verbo verbo) {
         String rutaPartner = "/partner/v1/inbound/" + productoBase + "/" + version
-                + (esEdicion ? "/{id}" : "");
+                + (verbo == Verbo.PATCH ? "/{id}" : "");
+
+        String tipoOperacion = switch (verbo) {
+            case POST -> "Creación de recurso";
+            case PATCH -> "Edición de recurso";
+            case GET -> "Consulta de catálogo (solo lectura, sin payload de entrada)";
+        };
 
         return String.format("""
                 %s del producto **%s** (`%s`).
@@ -268,27 +292,29 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
                 El catálogo de campos y sus reglas de validación proviene directamente de
                 `hub.apis` — no requiere cambios de código al añadir o modificar campos.
                 """,
-                esEdicion ? "Edición de recurso" : "Creación de recurso",
+                tipoOperacion,
                 productoBase,
-                metodo,
-                metodo,
+                verbo.name(),
+                verbo.name(),
                 rutaPartner);
     }
 
-    private static List<Parameter> construirParametros(ContractDefinition contrato,
-                                                        boolean esEdicion) {
+    private static List<Parameter> construirParametros(ContractDefinition contrato, Verbo verbo) {
         List<Parameter> params = new ArrayList<>();
 
-        // Cabecera X-Idempotency-Key — requerida
-        params.add(new Parameter()
-                .name("X-Idempotency-Key")
-                .in("header")
-                .required(true)
-                .description("Clave única de la operación. Reenvíos con la misma clave son " +
-                             "idempotentes y no generan duplicados.")
-                .schema(new Schema<String>().type("string")));
+        // Cabecera X-Idempotency-Key — requerida solo en operaciones de escritura.
+        // GET es idempotente por naturaleza (ver HubAuditInterceptor) y no la exige.
+        if (verbo != Verbo.GET) {
+            params.add(new Parameter()
+                    .name("X-Idempotency-Key")
+                    .in("header")
+                    .required(true)
+                    .description("Clave única de la operación. Reenvíos con la misma clave son " +
+                                 "idempotentes y no generan duplicados.")
+                    .schema(new Schema<String>().type("string")));
+        }
 
-        // Cabecera X-Correlation-ID — opcional
+        // Cabecera X-Correlation-ID — opcional, para todas las operaciones
         params.add(new Parameter()
                 .name("X-Correlation-ID")
                 .in("header")
@@ -299,7 +325,7 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
                 .schema(new Schema<String>().type("string")));
 
         // Parámetro de path {id} para operaciones PATCH
-        if (esEdicion) {
+        if (verbo == Verbo.PATCH) {
             String campoId = contrato.resourceIdField() != null
                     ? contrato.resourceIdField()
                     : "id";
@@ -318,8 +344,8 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
 
     private static RequestBody construirRequestBody(ContractDefinition contrato,
                                                      String productoBase,
-                                                     boolean esEdicion) {
-        Schema<Object> schema = construirSchema(contrato, productoBase, esEdicion);
+                                                     Verbo verbo) {
+        Schema<Object> schema = construirSchema(contrato, productoBase, verbo);
 
         return new RequestBody()
                 .required(true)
@@ -334,9 +360,9 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
     @SuppressWarnings("unchecked")
     private static Schema<Object> construirSchema(ContractDefinition contrato,
                                                    String productoBase,
-                                                   boolean esEdicion) {
+                                                   Verbo verbo) {
         ObjectSchema schema = new ObjectSchema();
-        schema.name(productoBase + (esEdicion ? "_Editar" : "_Crear") + "_" + contrato.version());
+        schema.name(productoBase + (verbo == Verbo.PATCH ? "_Editar" : "_Crear") + "_" + contrato.version());
         schema.description("Payload del contrato " + contrato.product() + "/" + contrato.version());
 
         List<String> requeridos = new ArrayList<>();
@@ -378,28 +404,32 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
 
     // ─── Responses ────────────────────────────────────────────────────────────
 
-    private static ApiResponses construirResponses(boolean esEdicion) {
+    private static ApiResponses construirResponses(Verbo verbo) {
         Schema<?> refApiResponse = new Schema<>().$ref("#/components/schemas/" + SCHEMA_API_RESPONSE);
 
         ApiResponses responses = new ApiResponses();
 
         // Éxito
-        String codigoExito = esEdicion ? "200" : "201";
-        String descripcionExito = esEdicion
-                ? "Recurso editado correctamente"
-                : "Recurso creado correctamente";
+        String codigoExito = verbo == Verbo.POST ? "201" : "200";
+        String descripcionExito = switch (verbo) {
+            case POST -> "Recurso creado correctamente";
+            case PATCH -> "Recurso editado correctamente";
+            case GET -> "Catálogo obtenido correctamente";
+        };
         responses.addApiResponse(codigoExito, new ApiResponse()
                 .description(descripcionExito)
                 .content(new Content().addMediaType(MEDIA_TYPE_JSON,
                         new MediaType().schema(refApiResponse))));
 
-        // 400 Validación
-        responses.addApiResponse("400", new ApiResponse()
-                .description("Payload inválido — el contrato no se cumple " +
-                             "(campos requeridos ausentes, tipos incorrectos, maxLength excedido)")
-                .content(new Content().addMediaType(MEDIA_TYPE_JSON,
-                        new MediaType().schema(new Schema<>()
-                                .$ref("#/components/schemas/" + SCHEMA_API_RESPONSE)))));
+        // 400 Validación — no aplica a GET (sin body de entrada que pueda incumplir el contrato)
+        if (verbo != Verbo.GET) {
+            responses.addApiResponse("400", new ApiResponse()
+                    .description("Payload inválido — el contrato no se cumple " +
+                                 "(campos requeridos ausentes, tipos incorrectos, maxLength excedido)")
+                    .content(new Content().addMediaType(MEDIA_TYPE_JSON,
+                            new MediaType().schema(new Schema<>()
+                                    .$ref("#/components/schemas/" + SCHEMA_API_RESPONSE)))));
+        }
 
         // 403 Producto no autorizado
         responses.addApiResponse("403", new ApiResponse()
@@ -408,12 +438,14 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
                         new MediaType().schema(new Schema<>()
                                 .$ref("#/components/schemas/" + SCHEMA_API_RESPONSE)))));
 
-        // 409 Idempotencia
-        responses.addApiResponse("409", new ApiResponse()
-                .description("X-Idempotency-Key ya procesada — operación duplicada rechazada")
-                .content(new Content().addMediaType(MEDIA_TYPE_JSON,
-                        new MediaType().schema(new Schema<>()
-                                .$ref("#/components/schemas/" + SCHEMA_API_RESPONSE)))));
+        // 409 Idempotencia — solo aplica a operaciones de escritura
+        if (verbo != Verbo.GET) {
+            responses.addApiResponse("409", new ApiResponse()
+                    .description("X-Idempotency-Key ya procesada — operación duplicada rechazada")
+                    .content(new Content().addMediaType(MEDIA_TYPE_JSON,
+                            new MediaType().schema(new Schema<>()
+                                    .$ref("#/components/schemas/" + SCHEMA_API_RESPONSE)))));
+        }
 
         // 500 Error interno
         responses.addApiResponse("500", new ApiResponse()

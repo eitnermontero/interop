@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -31,15 +32,19 @@ import java.util.UUID;
 /**
  * Controlador genérico del motor inbound del hub de interoperabilidad.
  *
- * <p>Expone dos endpoints:
+ * <p>Expone tres endpoints:
  * <ul>
  *   <li>{@code POST /api/inbound/{product}/{version}} — crear recurso.</li>
  *   <li>{@code PATCH /api/inbound/{product}/{version}/{id}} — editar recurso.
  *       Resuelve el contrato {@code {product}_EDITAR/{version}} e inyecta el
  *       {@code {id}} del path bajo el campo {@link ContractDefinition#resourceIdField()}.</li>
+ *   <li>{@code GET /api/inbound/{product}/{version}} — consultar catálogo de solo
+ *       lectura. Sin body de entrada; solo atiende contratos declarados con
+ *       {@code method: GET} ({@link ContractDefinition#isReadOnly()}). No exige
+ *       {@code X-Idempotency-Key} (ver {@link bo.com.sintesis.hub.base.hub.HubAuditInterceptor}).</li>
  * </ul>
  *
- * <p>Flujo común (POST y PATCH):
+ * <p>Flujo común (POST, PATCH y GET):
  * <ol>
  *   <li>Resolución del contrato en {@link ContractRegistry} — 403 si no existe.</li>
  *   <li>Validación del payload contra el contrato — 400 con violations si falla.</li>
@@ -73,6 +78,18 @@ public class DispatcherController {
 
     // ─── POST: crear ──────────────────────────────────────────────────────────
 
+    /**
+     * Crear recurso inbound.
+     *
+     * <p>Solo atiende contratos que <b>no</b> sean de solo lectura
+     * ({@link ContractDefinition#isReadOnly()}). Un producto declarado
+     * {@code method: GET} (catálogo) no debe poder invocarse por POST — de lo
+     * contrario, al no tener {@code fields} que validar, el body (con o sin
+     * contenido) pasaría la validación trivialmente y honraría
+     * {@code X-Idempotency-Key} para una operación que en realidad es una
+     * lectura pura, contradiciendo el resto del diseño (ver también
+     * {@link #get}, que aplica la verificación simétrica).
+     */
     @PostMapping("/{product}/{version}")
     public ResponseEntity<ApiResponse<Map<String, Object>>> post(
             @PathVariable String product,
@@ -88,8 +105,8 @@ public class DispatcherController {
         log.info("Inbound POST: product={}/{} partner={} correlationId={}", product, version, partnerId, cid);
 
         var contractOpt = contractRegistry.lookup(product, version);
-        if (contractOpt.isEmpty()) {
-            log.warn("Producto no registrado: {}/{} — partner={}", product, version, partnerId);
+        if (contractOpt.isEmpty() || contractOpt.get().isReadOnly()) {
+            log.warn("Producto no registrado como POST: {}/{} — partner={}", product, version, partnerId);
             return respuestaProductoNoAutorizado(product, version, cid, httpResponse);
         }
 
@@ -148,6 +165,46 @@ public class DispatcherController {
 
         httpRequest.setAttribute(ATTR_AUDIT_PRODUCT, editProduct);
         return procesarDispatch(contract, efectivePayload, partnerId, cid, httpResponse);
+    }
+
+    // ─── GET: consultar catálogo (solo lectura) ──────────────────────────────
+
+    /**
+     * Consulta de catálogo de solo lectura.
+     *
+     * <p>Sin cuerpo de petición: el contrato resuelto se reenvía tal cual al backend
+     * configurado en {@code hub.connectors} (path estático, sin placeholders —
+     * estos catálogos no tienen parámetros). No exige {@code X-Idempotency-Key}
+     * porque GET es idempotente por naturaleza; el header ni siquiera se declara
+     * en este método, y {@link bo.com.sintesis.hub.base.hub.HubAuditInterceptor}
+     * ignora cualquier clave que igualmente llegue en la petición.
+     *
+     * <p>Solo atiende contratos declarados con {@code method: GET} en {@code hub.apis}
+     * ({@link ContractDefinition#isReadOnly()}). Si el {@code product}/{@code version}
+     * no está registrado, o está registrado con otro verbo (POST/PATCH), se responde
+     * 403 igual que un producto no autorizado — evita que un GET dispare
+     * accidentalmente un contrato de escritura con un payload vacío sin validar.
+     */
+    @GetMapping("/{product}/{version}")
+    public ResponseEntity<ApiResponse<Map<String, Object>>> get(
+            @PathVariable String product,
+            @PathVariable String version,
+            @RequestHeader(value = "X-Partner-Id",     required = false) String partnerId,
+            @RequestHeader(value = "X-Correlation-ID", required = false) String correlationId,
+            HttpServletRequest httpRequest,
+            HttpServletResponse httpResponse) {
+
+        String cid = resolverCorrelationId(correlationId);
+        log.info("Inbound GET: product={}/{} partner={} correlationId={}", product, version, partnerId, cid);
+
+        var contractOpt = contractRegistry.lookup(product, version);
+        if (contractOpt.isEmpty() || !contractOpt.get().isReadOnly()) {
+            log.warn("Producto no registrado como catálogo GET: {}/{} — partner={}", product, version, partnerId);
+            return respuestaProductoNoAutorizado(product, version, cid, httpResponse);
+        }
+
+        httpRequest.setAttribute(ATTR_AUDIT_PRODUCT, product);
+        return procesarDispatch(contractOpt.get(), Map.of(), partnerId, cid, httpResponse);
     }
 
     // ─── lógica compartida ────────────────────────────────────────────────────

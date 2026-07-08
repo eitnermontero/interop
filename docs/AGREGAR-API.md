@@ -27,7 +27,7 @@ hub:
     denuncia-v1:                     # clave lógica (única)
       product: DENUNCIA              # código canónico — define la URL
       version: v1
-      method: POST                   # POST | PATCH (PATCH requiere resource-id-field)
+      method: POST                   # POST | PATCH | GET (ver reglas abajo)
       connector: backend-mi-institucion
       target-path: /denuncias        # path en el destino; admite {campo} del payload
       required-scope: https://api.sintesis.com.bo/denuncia
@@ -35,6 +35,15 @@ hub:
         - { name: codigo,  type: STRING,  required: true, max-length: 50 }   # INTEGER, BOOLEAN,
         - { name: detalle, type: STRING,  required: false }                  # DATETIME, ARRAY)
         - { name: fecha,   type: DATETIME, required: false, format: iso8601 }
+
+    catalogo-unidades-v1:            # ejemplo de catálogo de solo lectura
+      product: CATALOGO_UNIDADES
+      version: v1
+      method: GET                    # GET = solo lectura, sin payload de entrada
+      connector: backend-mi-institucion
+      target-path: /catalogos/unidades   # estático — GET no admite placeholders {campo}
+      required-scope: https://api.sintesis.com.bo/catalogo.unidades
+      # sin "fields": un catálogo GET no valida body porque no lo recibe
 ```
 
 Reglas:
@@ -42,6 +51,12 @@ Reglas:
   (bean `InboundPort` custom, solo para destinos no HTTP/JSON — eso sí es código).
 - Para edición: producto con sufijo `_EDITAR` + `resource-id-field` — el
   dispatcher inyecta el `{id}` del path en ese campo del payload.
+- Para catálogos de solo lectura: `method: GET`, sin `fields` (no hay body de
+  entrada que validar) y `target-path` estático — estos catálogos no reciben
+  parámetros. El dispatcher solo atiende por `GET` los productos declarados
+  así; si el `product`/`version` existe pero fue declarado con otro método
+  (POST/PATCH), responde 403 igual que un producto no registrado. GET tampoco
+  exige `X-Idempotency-Key` (es idempotente por naturaleza).
 - Config inválida (conector inexistente, campo sin tipo…) = **el servicio no
   arranca** (fail-fast, deliberado).
 
@@ -88,6 +103,10 @@ TOKEN=$(curl -s -X POST http://<hub>/oauth2/token -d grant_type=client_credentia
 curl -X POST http://<hub>/partner/v1/inbound/DENUNCIA/v1 \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -H "X-Idempotency-Key: $(uuidgen)" -d '{"codigo":"D-001"}'
+
+# Catálogo de solo lectura (GET) — sin body, sin X-Idempotency-Key
+curl http://<hub>/partner/v1/inbound/CATALOGO_UNIDADES/v1 \
+  -H "Authorization: Bearer $TOKEN"
 ```
 
 Todo request queda auditado (`hub_audit_log`: hash + cadena por partner).

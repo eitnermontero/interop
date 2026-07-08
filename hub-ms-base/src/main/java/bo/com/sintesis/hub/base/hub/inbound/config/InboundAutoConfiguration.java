@@ -92,8 +92,9 @@ public class InboundAutoConfiguration {
                 .map(f -> new FieldRule(f.getName(), f.getType(), f.isRequired(),
                         f.getMaxLength(), f.getFormat()))
                 .toList();
+        String httpMethod = StringUtils.hasText(api.getMethod()) ? api.getMethod().toUpperCase() : "POST";
         contractRegistry.register(new ContractDefinition(
-                api.getProduct(), api.getVersion(), reglas, api.getResourceIdField()));
+                api.getProduct(), api.getVersion(), reglas, api.getResourceIdField(), httpMethod));
     }
 
     /** Adaptador HTTP genérico — el InboundPort de propósito general (ADR-0007). */
