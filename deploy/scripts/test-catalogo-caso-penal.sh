@@ -74,7 +74,7 @@ POL_CASO_ID=$(dato pol_caso_id)
 echo "    pol_caso_id=$POL_CASO_ID"
 
 paso 2 "CASO_PENAL_EDITAR/v1 — editar caso"
-HTTP=$(llamar PATCH "CASO_PENAL_EDITAR/v1/$POL_CASO_ID" '{"tipo_denuncia_id":2,"hecho_zona":"Zona Sur"}')
+HTTP=$(llamar PATCH "CASO_PENAL/v1/$POL_CASO_ID" '{"tipo_denuncia_id":2,"hecho_zona":"Zona Sur"}')
 exigir_2xx "Editar caso" "$HTTP"
 
 paso 3 "CASO_PENAL_DELITO/v1 — registrar delito"
@@ -83,7 +83,7 @@ exigir_2xx "Registrar delito" "$HTTP"
 POL_CASO_DELITO_ID=$(pedir_id pol_caso_delito_id)
 
 paso 4 "CASO_PENAL_DELITO_EDITAR/v1 — dar de baja delito"
-HTTP=$(llamar PATCH "CASO_PENAL_DELITO_EDITAR/v1/$POL_CASO_DELITO_ID" '{"es_principal":true,"es_tentativo":false,"estado":1}')
+HTTP=$(llamar PATCH "CASO_PENAL_DELITO/v1/$POL_CASO_DELITO_ID" '{"es_principal":true,"es_tentativo":false,"estado":1}')
 exigir_2xx "Editar delito" "$HTTP"
 
 paso 5 "CASO_PENAL_SUJETO/v1 — registrar sujeto"
@@ -92,7 +92,7 @@ exigir_2xx "Registrar sujeto" "$HTTP"
 POL_CASO_PERSONA_ID=$(pedir_id pol_caso_persona_id)
 
 paso 6 "CASO_PENAL_SUJETO_EDITAR/v1 — editar sujeto"
-HTTP=$(llamar PATCH "CASO_PENAL_SUJETO_EDITAR/v1/$POL_CASO_PERSONA_ID" '{"tipo_sujeto_id":[1,2]}')
+HTTP=$(llamar PATCH "CASO_PENAL_SUJETO/v1/$POL_CASO_PERSONA_ID" '{"tipo_sujeto_id":[1,2]}')
 exigir_2xx "Editar sujeto" "$HTTP"
 
 paso 7 "CASO_PENAL_ABOGADO/v1 — registrar abogado"
@@ -101,7 +101,7 @@ exigir_2xx "Registrar abogado" "$HTTP"
 POL_ABOGADO_ID=$(pedir_id pol_caso_persona_abogado_id)
 
 paso 8 "CASO_PENAL_ABOGADO_EDITAR/v1 — dar de baja abogado"
-HTTP=$(llamar PATCH "CASO_PENAL_ABOGADO_EDITAR/v1/$POL_ABOGADO_ID" '{"estado":0,"motivo_baja":"prueba"}')
+HTTP=$(llamar PATCH "CASO_PENAL_ABOGADO/v1/$POL_ABOGADO_ID" '{"estado":0,"motivo_baja":"prueba"}')
 exigir_2xx "Editar abogado" "$HTTP"
 
 paso 9 "CASO_PENAL_SITUACION_JURIDICA/v1 — registrar situación jurídica"
@@ -118,7 +118,7 @@ exigir_2xx "Registrar fiscal" "$HTTP"
 POL_FUNCIONARIO_ID=$(pedir_id pol_caso_funcionario_id)
 
 paso 12 "CASO_PENAL_FISCAL_EDITAR/v1 — dar de baja fiscal"
-HTTP=$(llamar PATCH "CASO_PENAL_FISCAL_EDITAR/v1/$POL_FUNCIONARIO_ID" '{"estado":0}')
+HTTP=$(llamar PATCH "CASO_PENAL_FISCAL/v1/$POL_FUNCIONARIO_ID" '{"estado":0}')
 exigir_2xx "Editar fiscal" "$HTTP"
 
 paso 13 "CASO_PENAL_ACTIVIDAD/v1 — registrar actividad"
@@ -145,7 +145,7 @@ POL_AGENDA_ID=$(dato pol_agenda_id)
 echo "    pol_agenda_id=$POL_AGENDA_ID"
 
 paso 18 "CASO_PENAL_AGENDA_EDITAR/v1 — reprogramar audiencia"
-HTTP=$(llamar PATCH "CASO_PENAL_AGENDA_EDITAR/v1/$POL_AGENDA_ID" '{"descripcion":"Audiencia reprogramada","estado":1}')
+HTTP=$(llamar PATCH "CASO_PENAL_AGENDA/v1/$POL_AGENDA_ID" '{"descripcion":"Audiencia reprogramada","estado":1}')
 exigir_2xx "Editar audiencia" "$HTTP"
 
 echo ""
