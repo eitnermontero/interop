@@ -142,10 +142,11 @@ cmd_server() {
   # Keystore del gateway (cert + clave + cadena)
   openssl pkcs12 -export -in "$base.crt" -inkey "$base.key" -certfile "$base.chain.crt" \
     -name "hub-gateway" -out "$CERTS_DIR/server.p12" -passout "pass:$KEYSTORE_PASSWORD"
-  # Truststore (CAs que el gateway acepta como emisoras de certs de cliente)
+  # Truststore (CAs que el gateway acepta como emisoras de certs de cliente).
+  # openssl en vez de keytool: el servidor no tiene por qué tener un JDK instalado.
   rm -f "$CERTS_DIR/truststore.p12"
-  keytool -importcert -noprompt -alias hub-vault-ca -file "$CERTS_DIR/vault-ca-chain.crt" \
-    -keystore "$CERTS_DIR/truststore.p12" -storetype PKCS12 -storepass "$TRUSTSTORE_PASSWORD" >/dev/null 2>&1
+  openssl pkcs12 -export -in "$CERTS_DIR/vault-ca-chain.crt" -nokeys \
+    -out "$CERTS_DIR/truststore.p12" -passout "pass:$TRUSTSTORE_PASSWORD" -name hub-vault-ca
   ok "Emitido. serial=$serial"
   echo "   $CERTS_DIR/server.p12 (password=$KEYSTORE_PASSWORD)"
   echo "   $CERTS_DIR/truststore.p12 (password=$TRUSTSTORE_PASSWORD)"

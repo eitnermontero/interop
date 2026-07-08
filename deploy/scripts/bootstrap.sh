@@ -85,9 +85,9 @@ TOOLS_HOST=127.0.0.1 DB_NAME=hub_base "$REPO/deploy/scripts/vault-seed.sh" --ns 
 ok "namespaces hub-auth y hub-base seedeados"
 
 paso 5 "PKI de Vault (CA raíz + intermedia + cert del gateway + partner)"
-"$REPO/deploy/scripts/vault-pki.sh" init >/dev/null
-"$REPO/deploy/scripts/vault-pki.sh" server "$SERVER_CN" "$SERVER_IP" >/dev/null
-"$REPO/deploy/scripts/vault-pki.sh" partner "$PARTNER" >/dev/null
+"$REPO/deploy/scripts/vault-pki.sh" init >/dev/null || fallo "vault-pki.sh init"
+"$REPO/deploy/scripts/vault-pki.sh" server "$SERVER_CN" "$SERVER_IP" >/dev/null || fallo "vault-pki.sh server"
+"$REPO/deploy/scripts/vault-pki.sh" partner "$PARTNER" >/dev/null || fallo "vault-pki.sh partner"
 ok "PKI lista; credencial de '$PARTNER' en deploy/certs/partners/"
 
 paso 6 "Directorios de logs (uid 1000 del contenedor)"
