@@ -85,6 +85,12 @@ hub:
     backend-fake:
       base-url: http://127.0.0.1:9099
       timeout-ms: 3000
+    # Backend real de Fiscalía (MP→POL/FELCN) — mismo catálogo de
+    # deploy/staging/consul-config/base-service-application.yml, para poder
+    # probar todo localmente antes de tocar el servidor.
+    backend-fiscalia:
+      base-url: http://172.16.76.20:3333
+      timeout-ms: 8000
   apis:
     orden-fake-v1:
       product: ORDEN_FAKE
@@ -97,6 +103,422 @@ hub:
         - { name: codigo,      type: STRING,  required: true,  max-length: 20 }
         - { name: monto,       type: INTEGER, required: true }
         - { name: descripcion, type: STRING,  required: false, max-length: 200 }
+
+    # ═══ Catálogo MP→POL/FELCN — idéntico a deploy/staging/consul-config/ ═══
+    caso-penal-v1:
+      product: CASO_PENAL
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: cud,                          type: STRING,   required: true }
+        - { name: mp_caso_id,                   type: INTEGER,  required: true }
+        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+        - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
+        - { name: esta_reservado,               type: BOOLEAN,  required: false }
+        - { name: oficina_comun_id,             type: INTEGER,  required: true }
+        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+        - { name: hecho_zona,                   type: STRING,   required: false }
+        - { name: hecho_direccion,              type: STRING,   required: false }
+        - { name: hecho_latitud,                type: STRING,   required: false }
+        - { name: hecho_longitud,               type: STRING,   required: false }
+        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+        - { name: hecho_relato,                 type: STRING,   required: false }
+        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+        - { name: caso_estado_id,               type: INTEGER,  required: true }
+        - { name: caso_etapa_id,                type: INTEGER,  required: true }
+        - { name: denominacion_caso,            type: STRING,   required: false }
+        - { name: tags,                         type: ARRAY,    required: false }
+
+    caso-penal-editar-v1:
+      product: CASO_PENAL_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_caso_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id,                  type: INTEGER,  required: true }
+        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+        - { name: hecho_zona,                   type: STRING,   required: false }
+        - { name: hecho_direccion,              type: STRING,   required: false }
+        - { name: hecho_latitud,                type: STRING,   required: false }
+        - { name: hecho_longitud,               type: STRING,   required: false }
+        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+        - { name: hecho_relato,                 type: STRING,   required: false }
+        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+        - { name: denominacion_caso,            type: STRING,   required: false }
+        - { name: tags_id,                      type: ARRAY,    required: false }
+
+    caso-penal-delito-v1:
+      product: CASO_PENAL_DELITO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/delitos
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id, type: INTEGER, required: true }
+        - { name: delitos,     type: ARRAY,   required: true }
+
+    caso-penal-delito-editar-v1:
+      product: CASO_PENAL_DELITO_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_caso_delito_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/delitos/{pol_caso_delito_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_delito_id, type: INTEGER, required: true }
+        - { name: es_principal,       type: BOOLEAN, required: false }
+        - { name: es_tentativo,       type: BOOLEAN, required: false }
+        - { name: estado,             type: INTEGER, required: false }
+
+    caso-penal-sujeto-v1:
+      product: CASO_PENAL_SUJETO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/sujetos
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id, type: INTEGER, required: true }
+        - { name: sujetos,     type: ARRAY,   required: true }
+
+    caso-penal-sujeto-editar-v1:
+      product: CASO_PENAL_SUJETO_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_caso_persona_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_id,    type: INTEGER, required: true }
+        - { name: tipo_sujeto_id,         type: ARRAY,   required: true }
+        - { name: parentesco_victima_id,  type: INTEGER, required: false }
+        - { name: es_querellante,         type: BOOLEAN, required: false }
+        - { name: estado,                 type: INTEGER, required: false }
+
+    caso-penal-abogado-v1:
+      product: CASO_PENAL_ABOGADO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/abogados
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_id, type: INTEGER, required: true }
+        - { name: abogados,            type: ARRAY,   required: true }
+
+    caso-penal-abogado-editar-v1:
+      product: CASO_PENAL_ABOGADO_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_caso_persona_abogado_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/abogados/{pol_caso_persona_abogado_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_abogado_id, type: INTEGER, required: true }
+        - { name: estado,                      type: INTEGER, required: true }
+        - { name: motivo_baja,                 type: STRING,  required: false }
+
+    caso-penal-situacion-juridica-v1:
+      product: CASO_PENAL_SITUACION_JURIDICA
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/situaciones-juridicas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_id,     type: INTEGER, required: true }
+        - { name: situaciones_juridicas,   type: ARRAY,   required: true }
+
+    caso-penal-domicilio-v1:
+      product: CASO_PENAL_DOMICILIO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/domicilios
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_id,      type: INTEGER, required: true }
+        - { name: mp_persona_domicilio_id,  type: INTEGER, required: true }
+        - { name: pais_id,                  type: INTEGER, required: true }
+        - { name: municipio_id,             type: INTEGER, required: false }
+        - { name: direccion,                type: STRING,  required: false }
+        - { name: latitud,                  type: STRING,  required: false }
+        - { name: longitud,                 type: STRING,  required: false }
+
+    caso-penal-fiscal-v1:
+      product: CASO_PENAL_FISCAL
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/fiscales
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id, type: INTEGER, required: true }
+        - { name: fiscales,    type: ARRAY,   required: true }
+
+    caso-penal-fiscal-editar-v1:
+      product: CASO_PENAL_FISCAL_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_caso_funcionario_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/fiscales/{pol_caso_funcionario_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_funcionario_id, type: INTEGER, required: true }
+        - { name: estado,                  type: INTEGER, required: true }
+
+    caso-penal-actividad-v1:
+      product: CASO_PENAL_ACTIVIDAD
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/actividades
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id,  type: INTEGER, required: true }
+        - { name: actividades,  type: ARRAY,   required: true }
+
+    caso-penal-reserva-v1:
+      product: CASO_PENAL_RESERVA
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/reservas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: estado,             type: INTEGER,  required: true }
+        - { name: tabla,              type: INTEGER,  required: true }
+        - { name: tabla_id,           type: INTEGER,  required: true }
+        - { name: fecha_fin_reserva,  type: DATETIME, required: false, format: iso8601 }
+
+    caso-penal-juzgado-v1:
+      product: CASO_PENAL_JUZGADO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/juzgado
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id, type: INTEGER, required: true }
+        - { name: juzgado_id,  type: INTEGER, required: true }
+
+    caso-penal-sujeto-juzgado-v1:
+      product: CASO_PENAL_SUJETO_JUZGADO
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/sujetos/juzgado
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_persona_ids, type: ARRAY,   required: true }
+        - { name: juzgado_id,           type: INTEGER, required: true }
+
+    caso-penal-agenda-v1:
+      product: CASO_PENAL_AGENDA
+      version: v1
+      method: POST
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/agendas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_caso_id,             type: INTEGER,  required: true }
+        - { name: oj_audiencia_id,         type: INTEGER,  required: true }
+        - { name: oj_audiencia_detalle_id, type: INTEGER,  required: true }
+        - { name: tipo_audiencia_id,       type: INTEGER,  required: true }
+        - { name: tipo_actividad_id,       type: INTEGER,  required: true }
+        - { name: juzgado_id,              type: INTEGER,  required: true }
+        - { name: sala_audiencia_id,       type: INTEGER,  required: true }
+        - { name: estado_audiencia_id,     type: INTEGER,  required: true }
+        - { name: modalidad,               type: INTEGER,  required: false }
+        - { name: fecha_hora_inicio,       type: DATETIME, required: true, format: iso8601 }
+        - { name: fecha_hora_fin,          type: DATETIME, required: true, format: iso8601 }
+        - { name: descripcion,             type: STRING,   required: true }
+        - { name: latitud,                 type: STRING,   required: false }
+        - { name: longitud,                type: STRING,   required: false }
+        - { name: direccion,               type: STRING,   required: false }
+        - { name: enlace_audiencia,        type: STRING,   required: false }
+        - { name: mp_caso_persona_ids,     type: ARRAY,    required: false }
+
+    caso-penal-agenda-editar-v1:
+      product: CASO_PENAL_AGENDA_EDITAR
+      version: v1
+      method: PATCH
+      resource-id-field: pol_agenda_id
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/agendas/{pol_agenda_id}
+      required-scope: https://api.sintesis.com.bo/caso.penal
+      fields:
+        - { name: pol_agenda_id,                 type: INTEGER,  required: true }
+        - { name: mp_audiencia_detalle_id,       type: INTEGER,  required: false }
+        - { name: tipo_audiencia_id,             type: INTEGER,  required: false }
+        - { name: tipo_actividad_id,             type: INTEGER,  required: false }
+        - { name: juzgado_id,                    type: INTEGER,  required: false }
+        - { name: sala_audiencia_id,             type: INTEGER,  required: false }
+        - { name: estado_audiencia_id,           type: INTEGER,  required: false }
+        - { name: modalidad,                     type: INTEGER,  required: false }
+        - { name: fecha_hora_inicio,             type: DATETIME, required: false, format: iso8601 }
+        - { name: fecha_hora_fin,                type: DATETIME, required: false, format: iso8601 }
+        - { name: descripcion,                   type: STRING,   required: false }
+        - { name: latitud,                       type: STRING,   required: false }
+        - { name: longitud,                      type: STRING,   required: false }
+        - { name: direccion,                     type: STRING,   required: false }
+        - { name: fecha_hora_inicio_grabacion,   type: DATETIME, required: false, format: iso8601 }
+        - { name: duracion_grabacion,            type: STRING,   required: false }
+        - { name: enlace_audiencia,              type: STRING,   required: false }
+        - { name: archivo_extension,             type: STRING,   required: false }
+        - { name: archivo_enlace,                type: STRING,   required: false }
+        - { name: archivo_tamano,                type: INTEGER,  required: false }
+        - { name: archivo_hash,                  type: STRING,   required: false }
+        - { name: suspencion_audiencia_id,       type: INTEGER,  required: false }
+        - { name: observaciones,                 type: STRING,   required: false }
+        - { name: estado,                        type: INTEGER,  required: false }
+        - { name: mp_caso_persona_ids,           type: ARRAY,    required: false }
+
+    catalogo-bienes-v1:
+      product: CATALOGO_BIENES
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/bienes
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-calidades-bien-v1:
+      product: CATALOGO_CALIDADES_BIEN
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/calidades-bien
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-caracteristicas-v1:
+      product: CATALOGO_CARACTERISTICAS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/caracteristicas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-clases-v1:
+      product: CATALOGO_CLASES
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/clases
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-contenidos-bien-v1:
+      product: CATALOGO_CONTENIDOS_BIEN
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/contenidos-bien
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-contenidos-caso-v1:
+      product: CATALOGO_CONTENIDOS_CASO
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/contenidos-caso
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-estados-v1:
+      product: CATALOGO_ESTADOS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/estados
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-etapas-v1:
+      product: CATALOGO_ETAPAS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/etapas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-grados-v1:
+      product: CATALOGO_GRADOS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/grados
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-juridicas-v1:
+      product: CATALOGO_JURIDICAS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/juridicas
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-recursos-v1:
+      product: CATALOGO_RECURSOS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/recursos
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-situaciones-legales-v1:
+      product: CATALOGO_SITUACIONES_LEGALES
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/situaciones-legales
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-tamanos-documento-v1:
+      product: CATALOGO_TAMANOS_DOCUMENTO
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/tamanos-documento
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-tipos-v1:
+      product: CATALOGO_TIPOS
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/tipos
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-tipos-persona-v1:
+      product: CATALOGO_TIPOS_PERSONA
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/tipos-persona
+      required-scope: https://api.sintesis.com.bo/caso.penal
+
+    catalogo-unidades-v1:
+      product: CATALOGO_UNIDADES
+      version: v1
+      method: GET
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/catalogos/unidades
+      required-scope: https://api.sintesis.com.bo/caso.penal
   inbound:
     # Activa el StubInboundAdapter para CASO_PENAL/v1 en lugar del adaptador real.
     # NUNCA poner true en producción.
