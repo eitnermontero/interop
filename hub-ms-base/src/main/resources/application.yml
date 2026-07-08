@@ -164,56 +164,71 @@ hub:
   # Agregar una API = un bloque en hub.apis (+ scope en Keycloak). Cero código.
   # Cada API declara exactamente uno de: adapter-bean (InboundPort custom) o
   # connector (destino HTTP genérico declarado en hub.connectors).
+  #
+  # IMPORTANTE (verificado 2026-07-07): Spring NO mergea listas (`fields`)
+  # entre application.yml y un override de perfil/Consul — la lista completa
+  # viene de una sola fuente. Por eso el contrato (fields) de CASO_PENAL/
+  # CASO_PENAL_EDITAR vive aquí, no en un override; solo el DESTINO de otras
+  # APIs nuevas (que no tienen fields hardcodeados que pisar) se declara por
+  # entorno en deploy/*/consul-config/*.yml o application-{profile}.yml.
+  connectors:
+    backend-fiscalia:
+      base-url: http://172.16.76.20:3333
+      timeout-ms: 8000
   apis:
     caso-penal-v1:
       product: CASO_PENAL
       version: v1
       method: POST
-      adapter-bean: stubInboundAdapter    # reemplazar por connector cuando exista la app de negocio
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
-        - { name: cud,                        type: STRING,   required: true,  max-length: 50 }
-        - { name: id_externo_caso,            type: INTEGER,  required: true }
-        - { name: id_tipo_denuncia,           type: INTEGER,  required: true }
-        - { name: id_oficina,                 type: INTEGER,  required: true }
-        - { name: id_estado,                  type: INTEGER,  required: true }
-        - { name: id_etapa,                   type: INTEGER,  required: true }
-        - { name: id_externo_caso_referencia, type: INTEGER,  required: false }
-        - { name: es_reservado,               type: BOOLEAN,  required: false }
-        - { name: id_municipio,               type: INTEGER,  required: false }
-        - { name: zona,                       type: STRING,   required: false, max-length: 255 }
-        - { name: direccion,                  type: STRING,   required: false }
-        - { name: latitud,                    type: STRING,   required: false, max-length: 30 }
-        - { name: longitud,                   type: STRING,   required: false, max-length: 30 }
-        - { name: referencia,                 type: STRING,   required: false }
-        - { name: relato,                     type: STRING,   required: false }
-        - { name: fecha_caso,                 type: DATETIME, required: false, format: iso8601 }
-        - { name: fecha_fin,                  type: DATETIME, required: false, format: iso8601 }
-        - { name: fecha_aproximada,           type: STRING,   required: false, max-length: 255 }
-        - { name: denominacion_caso,          type: STRING,   required: false, max-length: 500 }
-        - { name: tags,                       type: ARRAY,    required: false }
+        - { name: cud,                          type: STRING,   required: true }
+        - { name: mp_caso_id,                   type: INTEGER,  required: true }
+        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+        - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
+        - { name: esta_reservado,               type: BOOLEAN,  required: false }
+        - { name: oficina_comun_id,             type: INTEGER,  required: true }
+        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+        - { name: hecho_zona,                   type: STRING,   required: false }
+        - { name: hecho_direccion,              type: STRING,   required: false }
+        - { name: hecho_latitud,                type: STRING,   required: false }
+        - { name: hecho_longitud,               type: STRING,   required: false }
+        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+        - { name: hecho_relato,                 type: STRING,   required: false }
+        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+        - { name: caso_estado_id,               type: INTEGER,  required: true }
+        - { name: caso_etapa_id,                type: INTEGER,  required: true }
+        - { name: denominacion_caso,            type: STRING,   required: false }
+        - { name: tags,                         type: ARRAY,    required: false }
     caso-penal-editar-v1:
       product: CASO_PENAL_EDITAR
       version: v1
       method: PATCH
-      adapter-bean: stubInboundAdapter
-      resource-id-field: id_pol_caso        # el dispatcher inyecta el {id} del path aquí
+      resource-id-field: pol_caso_id        # el dispatcher inyecta el {id} del path aquí
+      connector: backend-fiscalia
+      target-path: /v1/external/fiscalia/casos/{pol_caso_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
-        - { name: id_tipo_denuncia,           type: INTEGER,  required: true }
-        - { name: id_externo_caso_referencia, type: INTEGER,  required: false }
-        - { name: id_municipio,               type: INTEGER,  required: false }
-        - { name: zona,                       type: STRING,   required: false, max-length: 255 }
-        - { name: direccion,                  type: STRING,   required: false }
-        - { name: latitud,                    type: STRING,   required: false, max-length: 30 }
-        - { name: longitud,                   type: STRING,   required: false, max-length: 30 }
-        - { name: referencia,                 type: STRING,   required: false }
-        - { name: relato,                     type: STRING,   required: false }
-        - { name: fecha_caso,                 type: DATETIME, required: false, format: iso8601 }
-        - { name: fecha_fin,                  type: DATETIME, required: false, format: iso8601 }
-        - { name: fecha_aproximada,           type: STRING,   required: false, max-length: 255 }
-        - { name: denominacion_caso,          type: STRING,   required: false, max-length: 500 }
-        - { name: tags,                       type: ARRAY,    required: false }
+        - { name: pol_caso_id,                  type: INTEGER,  required: true }
+        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+        - { name: hecho_zona,                   type: STRING,   required: false }
+        - { name: hecho_direccion,              type: STRING,   required: false }
+        - { name: hecho_latitud,                type: STRING,   required: false }
+        - { name: hecho_longitud,               type: STRING,   required: false }
+        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+        - { name: hecho_relato,                 type: STRING,   required: false }
+        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+        - { name: denominacion_caso,            type: STRING,   required: false }
+        - { name: tags_id,                      type: ARRAY,    required: false }
   outbound:
     efxrate:
       url: https://api.efxrate.example.com

@@ -33,6 +33,13 @@
 # entrada, catálogos de solo lectura, sin body/fields/resource-id-field). Los
 # 16 productos CATALOGO_* de abajo son pass-through directo a
 # /v1/external/fiscalia/catalogos/* del mismo backend — sin parámetros.
+#
+# IMPORTANTE: caso-penal-v1/caso-penal-editar-v1 NO están en este archivo.
+# Spring no mergea listas (`fields`) entre application.yml y un override —
+# gana una sola fuente completa — así que el contrato real de esos 2
+# productos vive directamente en application.yml (base de la imagen), no
+# aquí. Este archivo solo declara los otros 16 endpoints de escritura + 16
+# catálogos, que no tienen fields hardcodeados que pisar.
 # ═══════════════════════════════════════════════════════════════════════════
 hub:
   connectors:
@@ -41,64 +48,8 @@ hub:
       timeout-ms: 8000
 
   apis:
-    # ─── Caso ───────────────────────────────────────────────────────────────
-    caso-penal-v1:
-      product: CASO_PENAL
-      adapter-bean: ""                     # limpia el stub por defecto de application.yml
-      version: v1
-      method: POST
-      connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: cud,                          type: STRING,   required: true }
-        - { name: mp_caso_id,                   type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
-        - { name: esta_reservado,               type: BOOLEAN,  required: false }
-        - { name: oficina_comun_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: caso_estado_id,               type: INTEGER,  required: true }
-        - { name: caso_etapa_id,                type: INTEGER,  required: true }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags,                         type: ARRAY,    required: false }
-
-    caso-penal-editar-v1:
-      product: CASO_PENAL_EDITAR
-      adapter-bean: ""                     # limpia el stub por defecto de application.yml
-      version: v1
-      method: PATCH
-      resource-id-field: pol_caso_id
-      connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: pol_caso_id,                  type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags_id,                      type: ARRAY,    required: false }
-
+    # caso-penal-v1 / caso-penal-editar-v1 ahora viven en application.yml
+    # (base de la imagen) — ver nota de cabecera de este archivo.
     # ─── Delitos ────────────────────────────────────────────────────────────
     caso-penal-delito-v1:
       product: CASO_PENAL_DELITO

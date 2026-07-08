@@ -85,9 +85,10 @@ hub:
     backend-fake:
       base-url: http://127.0.0.1:9099
       timeout-ms: 3000
-    # Backend real de Fiscalía (MP→POL/FELCN) — mismo catálogo de
-    # deploy/staging/consul-config/base-service-application.yml, para poder
-    # probar todo localmente antes de tocar el servidor.
+    # backend-fiscalia también está declarado en application.yml (base, junto
+    # con caso-penal-v1/caso-penal-editar-v1) — se repite aquí (mismo valor)
+    # solo para que deploy/scripts/hub-api.sh valide este archivo de forma
+    # standalone sin conocer la base; en runtime Spring lo resuelve igual.
     backend-fiscalia:
       base-url: http://172.16.76.20:3333
       timeout-ms: 8000
@@ -103,64 +104,6 @@ hub:
         - { name: codigo,      type: STRING,  required: true,  max-length: 20 }
         - { name: monto,       type: INTEGER, required: true }
         - { name: descripcion, type: STRING,  required: false, max-length: 200 }
-
-    # ═══ Catálogo MP→POL/FELCN — idéntico a deploy/staging/consul-config/ ═══
-    caso-penal-v1:
-      product: CASO_PENAL
-      adapter-bean: ""                     # limpia el stub por defecto de application.yml
-      version: v1
-      method: POST
-      connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: cud,                          type: STRING,   required: true }
-        - { name: mp_caso_id,                   type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
-        - { name: esta_reservado,               type: BOOLEAN,  required: false }
-        - { name: oficina_comun_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: caso_estado_id,               type: INTEGER,  required: true }
-        - { name: caso_etapa_id,                type: INTEGER,  required: true }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags,                         type: ARRAY,    required: false }
-
-    caso-penal-editar-v1:
-      product: CASO_PENAL_EDITAR
-      adapter-bean: ""                     # limpia el stub por defecto de application.yml
-      version: v1
-      method: PATCH
-      resource-id-field: pol_caso_id
-      connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: pol_caso_id,                  type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags_id,                      type: ARRAY,    required: false }
 
     caso-penal-delito-v1:
       product: CASO_PENAL_DELITO
