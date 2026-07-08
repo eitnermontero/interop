@@ -1,3 +1,3 @@
 clientId,description,scopes,secret
-fiscalia-bol-api,Fiscalía General del Estado (Bolivia) — Partner del Hub FELCN,https://api.sintesis.com.bo/caso.penal,CHANGE_ME_fiscalia_secret
+fiscalia-bol-api,Fiscalía General del Estado (Bolivia) — Partner del Hub FELCN,https://api.sintesis.com.bo/caso.penal,fiscalia-bol-41aa1602b16970eb36a4d2a8f561c2fa
 felcn-api,FELCN (Fuerza Especial de Lucha Contra el Narcotrafico) — Partner del Hub,https://api.sintesis.com.bo/caso.penal,6c850edbe3b87240bed8fdfcb552ef5d7cb5aee8ad15b596
