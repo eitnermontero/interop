@@ -56,8 +56,11 @@ class StubInboundAdapterTest {
         ForwardResult result = adapter.forward(
                 "CASO_PENAL", "v1", payload, UUID.randomUUID().toString());
 
-        assertThat(result.data()).containsKey("id_pol_caso");
-        Object idPolCaso = result.data().get("id_pol_caso");
+        // ForwardResult.data() es Object (soporta tanto objetos JSON como arrays de
+        // catálogos GET) — el stub siempre devuelve un Map, así que se castea aquí.
+        Map<String, ?> data = (Map<String, ?>) result.data();
+        assertThat(data).containsKey("id_pol_caso");
+        Object idPolCaso = data.get("id_pol_caso");
         assertThat(idPolCaso).isInstanceOf(Integer.class);
         assertThat((Integer) idPolCaso).isPositive();
     }
@@ -71,9 +74,9 @@ class StubInboundAdapterTest {
         ForwardResult r3 = adapter.forward("CASO_PENAL", "v1", Map.of(), "corr-3");
 
         // Al menos dos de tres deben ser distintos (prácticamente siempre todos distintos)
-        int id1 = (Integer) r1.data().get("id_pol_caso");
-        int id2 = (Integer) r2.data().get("id_pol_caso");
-        int id3 = (Integer) r3.data().get("id_pol_caso");
+        int id1 = (Integer) ((Map<String, ?>) r1.data()).get("id_pol_caso");
+        int id2 = (Integer) ((Map<String, ?>) r2.data()).get("id_pol_caso");
+        int id3 = (Integer) ((Map<String, ?>) r3.data()).get("id_pol_caso");
 
         assertThat(List.of(id1, id2, id3).stream().distinct().count())
                 .as("Con ThreadLocalRandom y rango amplio los IDs deben ser distintos")

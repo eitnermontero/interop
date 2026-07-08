@@ -226,6 +226,48 @@ class CatalogoInboundGetIT {
     }
 
     @Test
+    @DisplayName("GET contra un backend que responde un array JSON (caso real Fiscalía) — "
+            + "el ApiResponse.data() es ese array, no un 502")
+    void get_backendResponeArrayJson_envuelveApiResponseSinError() throws Exception {
+        // Los catálogos reales del backend de Fiscalía responden un array JSON en el
+        // body (ej. [] o [{...}]), no un objeto — antes del fix, HttpForwardingAdapter
+        // forzaba toEntity(Map.class) y esto producía 502 (UPSTREAM_ERROR) por fallo
+        // de deserialización de Jackson.
+        WIRE_MOCK.stubFor(get(urlEqualTo(CATALOGO_TARGET_PATH))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"id\":1,\"nombre\":\"FELCC La Paz\"},"
+                                + "{\"id\":2,\"nombre\":\"FELCC Santa Cruz\"}]")));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inbound/CATALOGO_TEST/v1")
+                        .header("X-Partner-Id", "partner-array-response"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.status").value(200))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data[0].nombre").value("FELCC La Paz"))
+                .andExpect(jsonPath("$.data[1].nombre").value("FELCC Santa Cruz"));
+    }
+
+    @Test
+    @DisplayName("GET contra un backend que responde un array JSON vacío ([]) — 200 con data() vacío")
+    void get_backendResponeArrayJsonVacio_respondeOkConDataVacio() throws Exception {
+        WIRE_MOCK.stubFor(get(urlEqualTo(CATALOGO_TARGET_PATH))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[]")));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inbound/CATALOGO_TEST/v1")
+                        .header("X-Partner-Id", "partner-empty-array-response"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.success").value(true))
+                .andExpect(jsonPath("$.data").isArray())
+                .andExpect(jsonPath("$.data").isEmpty());
+    }
+
+    @Test
     @DisplayName("X-Idempotency-Key enviada en un GET se ignora — no se propaga a la auditoría ni genera 409")
     void get_ignoraIdempotencyKeyEnviada() throws Exception {
         WIRE_MOCK.stubFor(get(urlEqualTo(CATALOGO_TARGET_PATH))

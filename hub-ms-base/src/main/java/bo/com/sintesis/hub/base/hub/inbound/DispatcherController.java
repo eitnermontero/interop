@@ -91,7 +91,7 @@ public class DispatcherController {
      * {@link #get}, que aplica la verificación simétrica).
      */
     @PostMapping("/{product}/{version}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> post(
+    public ResponseEntity<ApiResponse<Object>> post(
             @PathVariable String product,
             @PathVariable String version,
             @RequestBody Map<String, Object> payload,
@@ -126,7 +126,7 @@ public class DispatcherController {
      * prevalece.
      */
     @PatchMapping("/{product}/{version}/{id}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> patch(
+    public ResponseEntity<ApiResponse<Object>> patch(
             @PathVariable String product,
             @PathVariable String version,
             @PathVariable String id,
@@ -186,7 +186,7 @@ public class DispatcherController {
      * accidentalmente un contrato de escritura con un payload vacío sin validar.
      */
     @GetMapping("/{product}/{version}")
-    public ResponseEntity<ApiResponse<Map<String, Object>>> get(
+    public ResponseEntity<ApiResponse<Object>> get(
             @PathVariable String product,
             @PathVariable String version,
             @RequestHeader(value = "X-Partner-Id",     required = false) String partnerId,
@@ -209,7 +209,7 @@ public class DispatcherController {
 
     // ─── lógica compartida ────────────────────────────────────────────────────
 
-    private ResponseEntity<ApiResponse<Map<String, Object>>> procesarDispatch(
+    private ResponseEntity<ApiResponse<Object>> procesarDispatch(
             ContractDefinition contract,
             Map<String, Object> payload,
             String partnerId,
@@ -273,7 +273,7 @@ public class DispatcherController {
         }
     }
 
-    private ResponseEntity<ApiResponse<Map<String, Object>>> respuestaProductoNoAutorizado(
+    private ResponseEntity<ApiResponse<Object>> respuestaProductoNoAutorizado(
             String product, String version, String correlationId, HttpServletResponse httpResponse) {
         ApiError apiError = new ApiError(
                 "PRODUCT_NOT_AUTHORIZED",

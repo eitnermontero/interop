@@ -61,24 +61,27 @@ public class HttpForwardingAdapter {
         HttpMethod httpMethod = HttpMethod.valueOf(api.getMethod().toUpperCase());
 
         try {
-            @SuppressWarnings({"unchecked", "rawtypes"})
-            ResponseEntity<Map> response = (httpMethod == HttpMethod.GET)
+            // toEntity(Object.class): la forma real de la respuesta depende del destino —
+            // un objeto JSON ({...}) deserializa a LinkedHashMap, un array JSON ([...])
+            // deserializa a ArrayList (p. ej. catálogos GET que responden un array plano).
+            // Map.class forzaba la deserialización a objeto y fallaba con "Error while
+            // extracting response" en cualquier destino que respondiera un array.
+            ResponseEntity<Object> response = (httpMethod == HttpMethod.GET)
                     // GET: sin body — los catálogos de solo lectura no tienen payload de entrada.
                     ? client.method(httpMethod)
                             .uri(path)
                             .header("X-Correlation-ID", correlationId)
                             .retrieve()
-                            .toEntity(Map.class)
+                            .toEntity(Object.class)
                     : client.method(httpMethod)
                             .uri(path)
                             .contentType(MediaType.APPLICATION_JSON)
                             .header("X-Correlation-ID", correlationId)
                             .body(payload)
                             .retrieve()
-                            .toEntity(Map.class);
+                            .toEntity(Object.class);
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> data = response.getBody() != null ? response.getBody() : Map.of();
+            Object data = response.getBody() != null ? response.getBody() : Map.of();
             log.debug("Forward OK: connector={} path={} status={} correlationId={}",
                     connectorName, path, response.getStatusCode().value(), correlationId);
             return new ForwardResult(true, response.getStatusCode().value(), data,

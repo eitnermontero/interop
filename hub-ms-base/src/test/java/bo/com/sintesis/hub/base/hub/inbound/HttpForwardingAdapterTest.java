@@ -81,9 +81,56 @@ class HttpForwardingAdapterTest {
 
         assertThat(result.ok()).isTrue();
         assertThat(result.httpStatus()).isEqualTo(200);
-        assertThat(result.data()).containsKey("unidades");
+        assertThat(result.data()).isInstanceOf(Map.class);
+        assertThat((Map<String, ?>) result.data()).containsKey("unidades");
 
         wireMock.verify(1, getRequestedFor(urlEqualTo("/catalogos/unidades")));
+    }
+
+    @Test
+    @DisplayName("method=GET contra un backend que responde un array JSON — data() es una List, no falla con 502")
+    void forward_conMethodGet_backendResponeArrayJson_dataEsLista() {
+        // Bug real detectado en el backend de Fiscalía: los catálogos responden un
+        // array JSON en el body (ej. [] o [{"id":1,"nombre":"..."}]), no un objeto.
+        // Antes del fix, toEntity(Map.class) fallaba con
+        // "Error while extracting response for type [java.util.Map<?, ?>]" → 502.
+        wireMock.stubFor(get(urlEqualTo("/catalogos/unidades"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[{\"id\":1,\"nombre\":\"FELCC La Paz\"},{\"id\":2,\"nombre\":\"FELCC Santa Cruz\"}]")));
+
+        HubInteropProperties.ApiProps api = apiProps("GET", "/catalogos/unidades");
+
+        ForwardResult result = adapter.forward(
+                "wiremock-catalogo", connector, api, Map.of(), UUID.randomUUID().toString());
+
+        assertThat(result.ok()).as("El array JSON no debe producir un 502 de deserialización").isTrue();
+        assertThat(result.httpStatus()).isEqualTo(200);
+        assertThat(result.data()).isInstanceOf(java.util.List.class);
+
+        java.util.List<?> data = (java.util.List<?>) result.data();
+        assertThat(data).hasSize(2);
+        assertThat(((Map<?, ?>) data.get(0)).get("nombre")).isEqualTo("FELCC La Paz");
+    }
+
+    @Test
+    @DisplayName("method=GET contra un backend que responde un array JSON vacío — data() es una List vacía")
+    void forward_conMethodGet_backendResponeArrayJsonVacio_dataEsListaVacia() {
+        wireMock.stubFor(get(urlEqualTo("/catalogos/unidades"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("[]")));
+
+        HubInteropProperties.ApiProps api = apiProps("GET", "/catalogos/unidades");
+
+        ForwardResult result = adapter.forward(
+                "wiremock-catalogo", connector, api, Map.of(), UUID.randomUUID().toString());
+
+        assertThat(result.ok()).isTrue();
+        assertThat(result.data()).isInstanceOf(java.util.List.class);
+        assertThat((java.util.List<?>) result.data()).isEmpty();
     }
 
     @Test
