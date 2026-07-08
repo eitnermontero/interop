@@ -2,7 +2,10 @@
 # =============================================================================
 # keycloak-sync-partner.sh — Realm hub-partner (clientes externos / M2M)
 #
-# Idempotente: crea recursos faltantes, omite los existentes.
+# Idempotente: crea recursos faltantes; para clientes ya existentes,
+# reconcilia (fuerza) el secret y las asignaciones de scope contra el CSV
+# en vez de omitirlos — así una corrección de secret en clients.csv se
+# aplica con solo volver a correr el script.
 # Solo usa client_credentials — sin usuarios, sin SPA.
 #
 # Uso:
@@ -155,27 +158,29 @@ create_partner_client() {
 
   local existing_id
   existing_id=$(kc_get "/clients?clientId=${clientId}" | jq -r '.[0].id // empty')
-  if [ -n "$existing_id" ]; then
-    warn "Client '${clientId}' already exists — skip"; return
-  fi
 
   local new_id
-  new_id=$(kc_post_get_id "/clients" "$(jq -n \
-    --arg cid "$clientId" --arg desc "$description" --arg s "$secret" '{
-      clientId:$cid, name:$desc, secret:$s, enabled:true,
-      protocol:"openid-connect", publicClient:false,
-      serviceAccountsEnabled:true,
-      authorizationServicesEnabled:false,
-      directAccessGrantsEnabled:false,
-      standardFlowEnabled:false,
-      implicitFlowEnabled:false,
-      attributes:{
-        "access.token.lifespan": "300",
-        "use.refresh.tokens": "false"
-      }
-    }')")
-  [ -z "$new_id" ] && { error "Failed to create client '${clientId}'"; return; }
-  info "Client '${clientId}' created (${new_id})"
+  if [ -n "$existing_id" ]; then
+    warn "Client '${clientId}' already exists — reconciliando secret/scopes"
+    new_id="$existing_id"
+  else
+    new_id=$(kc_post_get_id "/clients" "$(jq -n \
+      --arg cid "$clientId" --arg desc "$description" --arg s "$secret" '{
+        clientId:$cid, name:$desc, secret:$s, enabled:true,
+        protocol:"openid-connect", publicClient:false,
+        serviceAccountsEnabled:true,
+        authorizationServicesEnabled:false,
+        directAccessGrantsEnabled:false,
+        standardFlowEnabled:false,
+        implicitFlowEnabled:false,
+        attributes:{
+          "access.token.lifespan": "300",
+          "use.refresh.tokens": "false"
+        }
+      }')")
+    [ -z "$new_id" ] && { error "Failed to create client '${clientId}'"; return; }
+    info "Client '${clientId}' created (${new_id})"
+  fi
 
   # Force secret
   curl -sf -o /dev/null -X PUT \
