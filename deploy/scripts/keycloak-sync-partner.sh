@@ -175,18 +175,25 @@ create_partner_client() {
         implicitFlowEnabled:false,
         attributes:{
           "access.token.lifespan": "300",
-          "use.refresh.tokens": "false"
+          "use.refresh.tokens": "false",
+          "tls.client.certificate.bound.access.tokens": "true"
         }
       }')")
     [ -z "$new_id" ] && { error "Failed to create client '${clientId}'"; return; }
     info "Client '${clientId}' created (${new_id})"
   fi
 
-  # Force secret
+  # Force secret + atributos (incluye el binding de certificado RFC 8705 —
+  # ver docs/ONBOARDING-PARTNER.md §6; requiere KC_SPI_X509CERT_LOOKUP_*
+  # ya configurado en el contenedor y que el proxy reenvíe X-SSL-Client-Cert)
   curl -sf -o /dev/null -X PUT \
     -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" \
     -d "$(jq -n --arg id "$new_id" --arg cid "$clientId" --arg s "$secret" \
-      '{id:$id, clientId:$cid, secret:$s}')" \
+      '{id:$id, clientId:$cid, secret:$s, attributes:{
+        "access.token.lifespan": "300",
+        "use.refresh.tokens": "false",
+        "tls.client.certificate.bound.access.tokens": "true"
+      }}')" \
     "${KC_URL}/admin/realms/${KC_REALM}/clients/${new_id}" || true
 
   # Assign optional scopes (the partner's allowed API scopes)
