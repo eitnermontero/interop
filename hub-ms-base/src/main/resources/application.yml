@@ -181,7 +181,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos
+      target-path: /api/v1/external/fiscalia/casos
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: cud,                          type: STRING,   required: true }
@@ -211,7 +211,7 @@ hub:
       method: PATCH
       resource-id-field: pol_caso_id        # el dispatcher inyecta el {id} del path aquí
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id,                  type: INTEGER,  required: true }

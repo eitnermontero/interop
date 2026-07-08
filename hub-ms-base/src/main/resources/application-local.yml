@@ -110,7 +110,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/delitos
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}/delitos
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id, type: INTEGER, required: true }
@@ -122,7 +122,7 @@ hub:
       method: PATCH
       resource-id-field: pol_caso_delito_id
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/delitos/{pol_caso_delito_id}
+      target-path: /api/v1/external/fiscalia/delitos/{pol_caso_delito_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_delito_id, type: INTEGER, required: true }
@@ -135,7 +135,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/sujetos
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}/sujetos
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id, type: INTEGER, required: true }
@@ -147,7 +147,7 @@ hub:
       method: PATCH
       resource-id-field: pol_caso_persona_id
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}
+      target-path: /api/v1/external/fiscalia/sujetos/{pol_caso_persona_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_id,    type: INTEGER, required: true }
@@ -161,7 +161,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/abogados
+      target-path: /api/v1/external/fiscalia/sujetos/{pol_caso_persona_id}/abogados
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_id, type: INTEGER, required: true }
@@ -173,7 +173,7 @@ hub:
       method: PATCH
       resource-id-field: pol_caso_persona_abogado_id
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/abogados/{pol_caso_persona_abogado_id}
+      target-path: /api/v1/external/fiscalia/abogados/{pol_caso_persona_abogado_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_abogado_id, type: INTEGER, required: true }
@@ -185,7 +185,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/situaciones-juridicas
+      target-path: /api/v1/external/fiscalia/sujetos/{pol_caso_persona_id}/situaciones-juridicas
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_id,     type: INTEGER, required: true }
@@ -196,7 +196,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/sujetos/{pol_caso_persona_id}/domicilios
+      target-path: /api/v1/external/fiscalia/sujetos/{pol_caso_persona_id}/domicilios
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_id,      type: INTEGER, required: true }
@@ -212,7 +212,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/fiscales
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}/fiscales
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id, type: INTEGER, required: true }
@@ -224,7 +224,7 @@ hub:
       method: PATCH
       resource-id-field: pol_caso_funcionario_id
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/fiscales/{pol_caso_funcionario_id}
+      target-path: /api/v1/external/fiscalia/fiscales/{pol_caso_funcionario_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_funcionario_id, type: INTEGER, required: true }
@@ -235,7 +235,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/actividades
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}/actividades
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id,  type: INTEGER, required: true }
@@ -246,7 +246,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/reservas
+      target-path: /api/v1/external/fiscalia/reservas
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: estado,             type: INTEGER,  required: true }
@@ -259,7 +259,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/juzgado
+      target-path: /api/v1/external/fiscalia/casos/juzgado
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id, type: INTEGER, required: true }
@@ -270,7 +270,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/sujetos/juzgado
+      target-path: /api/v1/external/fiscalia/sujetos/juzgado
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_persona_ids, type: ARRAY,   required: true }
@@ -281,7 +281,7 @@ hub:
       version: v1
       method: POST
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/casos/{pol_caso_id}/agendas
+      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}/agendas
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_caso_id,             type: INTEGER,  required: true }
@@ -308,7 +308,7 @@ hub:
       method: PATCH
       resource-id-field: pol_agenda_id
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/agendas/{pol_agenda_id}
+      target-path: /api/v1/external/fiscalia/agendas/{pol_agenda_id}
       required-scope: https://api.sintesis.com.bo/caso.penal
       fields:
         - { name: pol_agenda_id,                 type: INTEGER,  required: true }
@@ -342,7 +342,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/bienes
+      target-path: /api/v1/external/fiscalia/catalogos/bienes
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-calidades-bien-v1:
@@ -350,7 +350,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/calidades-bien
+      target-path: /api/v1/external/fiscalia/catalogos/calidades-bien
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-caracteristicas-v1:
@@ -358,7 +358,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/caracteristicas
+      target-path: /api/v1/external/fiscalia/catalogos/caracteristicas
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-clases-v1:
@@ -366,7 +366,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/clases
+      target-path: /api/v1/external/fiscalia/catalogos/clases
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-contenidos-bien-v1:
@@ -374,7 +374,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/contenidos-bien
+      target-path: /api/v1/external/fiscalia/catalogos/contenidos-bien
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-contenidos-caso-v1:
@@ -382,7 +382,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/contenidos-caso
+      target-path: /api/v1/external/fiscalia/catalogos/contenidos-caso
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-estados-v1:
@@ -390,7 +390,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/estados
+      target-path: /api/v1/external/fiscalia/catalogos/estados
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-etapas-v1:
@@ -398,7 +398,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/etapas
+      target-path: /api/v1/external/fiscalia/catalogos/etapas
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-grados-v1:
@@ -406,7 +406,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/grados
+      target-path: /api/v1/external/fiscalia/catalogos/grados
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-juridicas-v1:
@@ -414,7 +414,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/juridicas
+      target-path: /api/v1/external/fiscalia/catalogos/juridicas
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-recursos-v1:
@@ -422,7 +422,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/recursos
+      target-path: /api/v1/external/fiscalia/catalogos/recursos
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-situaciones-legales-v1:
@@ -430,7 +430,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/situaciones-legales
+      target-path: /api/v1/external/fiscalia/catalogos/situaciones-legales
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-tamanos-documento-v1:
@@ -438,7 +438,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/tamanos-documento
+      target-path: /api/v1/external/fiscalia/catalogos/tamanos-documento
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-tipos-v1:
@@ -446,7 +446,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/tipos
+      target-path: /api/v1/external/fiscalia/catalogos/tipos
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-tipos-persona-v1:
@@ -454,7 +454,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/tipos-persona
+      target-path: /api/v1/external/fiscalia/catalogos/tipos-persona
       required-scope: https://api.sintesis.com.bo/caso.penal
 
     catalogo-unidades-v1:
@@ -462,7 +462,7 @@ hub:
       version: v1
       method: GET
       connector: backend-fiscalia
-      target-path: /v1/external/fiscalia/catalogos/unidades
+      target-path: /api/v1/external/fiscalia/catalogos/unidades
       required-scope: https://api.sintesis.com.bo/caso.penal
   inbound:
     # Activa el StubInboundAdapter para CASO_PENAL/v1 en lugar del adaptador real.
