@@ -44,6 +44,7 @@ hub:
     # ─── Caso ───────────────────────────────────────────────────────────────
     caso-penal-v1:
       product: CASO_PENAL
+      adapter-bean: ""                     # limpia el stub por defecto de application.yml
       version: v1
       method: POST
       connector: backend-fiscalia
@@ -74,6 +75,7 @@ hub:
 
     caso-penal-editar-v1:
       product: CASO_PENAL_EDITAR
+      adapter-bean: ""                     # limpia el stub por defecto de application.yml
       version: v1
       method: PATCH
       resource-id-field: pol_caso_id
