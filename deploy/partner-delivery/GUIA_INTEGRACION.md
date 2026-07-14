@@ -1,10 +1,10 @@
 # Hub de Interoperabilidad FELCN — Guía de Integración para la Fiscalía
 
-**Versión:** 1.1
+**Versión:** 1.2
 **Hub (proveedor):** FELCN — Fuerza Especial de Lucha Contra el Narcotráfico (Bolivia)
 **Partner (consumidor):** Fiscalía General del Estado Plurinacional de Bolivia
 **Ambiente:** Desarrollo / Pruebas
-**Fecha:** 2026-06-30 (actualizado 2026-07-14 — ver aviso abajo)
+**Fecha:** 2026-06-30 (actualizado 2026-07-14 — consultas nuevas + scope por grupo, ver aviso abajo)
 
 ---
 
@@ -15,6 +15,10 @@
 > o actualizaba casos penales, **va a empezar a fallar** — ver §7.5. Hoy el Hub
 > solo expone **consultas de solo lectura**: operativos, seguimientos y
 > catálogos (§7.1 a §7.4).
+>
+> Además, **cada grupo de consulta ahora exige su propio scope** en el token
+> (antes uno solo habilitaba todo) — ver §3.2. Si ya tenía un token/flujo
+> armado con el scope viejo (`caso.penal`), pida los scopes nuevos.
 
 ## 1. Resumen
 
@@ -110,19 +114,33 @@ POST /interop/oauth2/token
 Content-Type: application/x-www-form-urlencoded
 [TLS: certificado de cliente fiscalia-bol-api]
 
-grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>&scope=https://api.sintesis.com.bo/caso.penal
+grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>&scope=https://api.sintesis.com.bo/consulta.operativos https://api.sintesis.com.bo/consulta.seguimientos https://api.sintesis.com.bo/consulta.catalogos
 ```
 
-> ⚠️ **El `scope` es OBLIGATORIO** — está configurado como *optional scope* en
-> Keycloak, no *default*. Si lo omite, el token se emite igual (200) pero sin
-> el scope de negocio, y **todas** las llamadas a `/interop/v1/inbound/...`
-> responden `403 SUBSCRIPTION_INACTIVE` (el token solo trae `email profile`).
+> ⚠️ **El `scope` es OBLIGATORIO** — son *optional scopes* en Keycloak, no
+> *default*. Si lo omite, el token se emite igual (200) pero sin scope de
+> negocio, y **todas** las llamadas a `/interop/v1/inbound/...` responden
+> `403 SUBSCRIPTION_INACTIVE`.
+>
+> **Desde 2026-07-14 cada grupo tiene su PROPIO scope** (ya no hay uno solo
+> que habilite todo) — pida solo los que necesite, separados por espacio:
+>
+> | Grupo | Scope |
+> |---|---|
+> | Operativos (§7.1/§7.2) | `https://api.sintesis.com.bo/consulta.operativos` |
+> | Seguimientos (§7.3) | `https://api.sintesis.com.bo/consulta.seguimientos` |
+> | Catálogos (§7.4) | `https://api.sintesis.com.bo/consulta.catalogos` |
+>
+> Un token que no incluya el scope del grupo que está llamando responde
+> `403 SUBSCRIPTION_INACTIVE` **solo para ese grupo** — los demás siguen
+> funcionando si su scope sí está presente.
 
 **Respuesta exitosa (200):**
 ```json
 {
     "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
     "expires_in": 300,
+    "scope": "email profile https://api.sintesis.com.bo/consulta.operativos https://api.sintesis.com.bo/consulta.seguimientos https://api.sintesis.com.bo/consulta.catalogos",
     "token_type": "Bearer"
 }
 ```
@@ -149,10 +167,14 @@ BASE="https://desarrollo.felcn.gob.bo"
 # 1) Obtener token (presentando el certificado de cliente)
 # El scope es OBLIGATORIO (optional scope en Keycloak) — sin él, el token
 # se emite pero sin permiso de negocio y todo lo demás responde 403.
+# Pida solo los scopes de los grupos que vaya a usar (separados por espacio);
+# --data-urlencode se encarga de codificar el espacio correctamente.
 curl -s -X POST "$BASE/interop/oauth2/token" \
   --cert "$CERT" --key "$KEY" \
-  -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>&scope=https://api.sintesis.com.bo/caso.penal'
+  -d grant_type=client_credentials \
+  -d client_id=fiscalia-bol-api \
+  -d client_secret=<CLIENT_SECRET> \
+  --data-urlencode 'scope=https://api.sintesis.com.bo/consulta.operativos https://api.sintesis.com.bo/consulta.seguimientos https://api.sintesis.com.bo/consulta.catalogos'
 
 # 2) Llamar la API (token + certificado) — consulta de solo lectura, sin body
 curl -s -X GET "$BASE/interop/v1/inbound/OPERATIVO/v1?pagina=1&limite=10" \
@@ -225,7 +247,7 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 | `Error: socket hang up` / `SSL` al obtener token | Certificado de cliente no configurado para el host | Repetir paso 4.2 (Host exacto `desarrollo.felcn.gob.bo`, puerto 443) |
 | `401` en el token | `client_secret` incorrecto | Verificar la variable `client_secret` |
 | `401` en la API de negocio | Token expirado, o el certificado no coincide con el token | Volver a ejecutar **Obtener Token** con el mismo certificado |
-| `403 SUBSCRIPTION_INACTIVE` | El token se pidió **sin `scope`** — Keycloak lo emite igual pero solo con `email profile` | Volver a ejecutar **Obtener Token** (ya incluye `scope=https://api.sintesis.com.bo/caso.penal` en la colección) |
+| `403 SUBSCRIPTION_INACTIVE` | El token no incluye el scope del **grupo** que está llamando (cada uno tiene el suyo — ver §3.2) | Volver a ejecutar **Obtener Token** pidiendo el scope de ese grupo (la colección ya trae los 3 en `{{scopes}}`) |
 | `403 PRODUCT_NOT_AUTHORIZED` | Producto/versión no autorizado | Verificar la URL (ej. `/OPERATIVO/v1`) — `CASO_PENAL` está discontinuado, ver §7.5 |
 
 ---
@@ -292,9 +314,12 @@ Todas las respuestas siguen el mismo envelope:
 ## 7. Contrato de las APIs vigentes
 
 Todo lo de esta sección es **`GET`, de solo lectura** — sin body, sin
-`X-Idempotency-Key` (GET es idempotente por naturaleza).
+`X-Idempotency-Key` (GET es idempotente por naturaleza). Cada grupo exige su
+propio scope en el token (§3.2) — sin él, `403 SUBSCRIPTION_INACTIVE`.
 
 ### 7.1 Consultar operativos — listado (`GET /interop/v1/inbound/OPERATIVO/v1`)
+
+> Scope: `https://api.sintesis.com.bo/consulta.operativos`
 
 Los parámetros van como **query string**, todos opcionales:
 
@@ -312,6 +337,8 @@ curl -s --cert "$CERT" --key "$KEY" -H "Authorization: Bearer $TOKEN" \
 
 ### 7.2 Consultar operativo — detalle (`GET /interop/v1/inbound/OPERATIVO_DETALLE/v1?cud=...`)
 
+> Scope: `https://api.sintesis.com.bo/consulta.operativos` (mismo que el listado)
+
 `cud` va como **query param**, no como segmento de la URL:
 
 | Parámetro | Tipo | Requerido | Descripción |
@@ -327,12 +354,16 @@ Si falta `cud`, responde `400 VALIDATION_ERROR`.
 
 ### 7.3 Consultar seguimientos — listado y detalle
 
+> Scope: `https://api.sintesis.com.bo/consulta.seguimientos` (distinto al de operativos)
+
 Mismo contrato que operativos (§7.1/§7.2), reemplazando el producto:
 
 - Listado: `GET /interop/v1/inbound/SEGUIMIENTO/v1` (mismos params `pagina`/`limite`/`filtro`/`orden`)
 - Detalle: `GET /interop/v1/inbound/SEGUIMIENTO_DETALLE/v1?cud=...`
 
 ### 7.4 Catálogos (sin cambios)
+
+> Scope: `https://api.sintesis.com.bo/consulta.catalogos` (distinto a los dos anteriores)
 
 Los 16 catálogos de solo lectura (`CATALOGO_UNIDADES`, `CATALOGO_ESTADOS`, etc.)
 siguen igual: `GET /interop/v1/inbound/CATALOGO_.../v1`, sin parámetros. Ver el
