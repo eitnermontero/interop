@@ -110,8 +110,13 @@ POST /interop/oauth2/token
 Content-Type: application/x-www-form-urlencoded
 [TLS: certificado de cliente fiscalia-bol-api]
 
-grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>
+grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>&scope=https://api.sintesis.com.bo/caso.penal
 ```
+
+> ⚠️ **El `scope` es OBLIGATORIO** — está configurado como *optional scope* en
+> Keycloak, no *default*. Si lo omite, el token se emite igual (200) pero sin
+> el scope de negocio, y **todas** las llamadas a `/interop/v1/inbound/...`
+> responden `403 SUBSCRIPTION_INACTIVE` (el token solo trae `email profile`).
 
 **Respuesta exitosa (200):**
 ```json
@@ -142,10 +147,12 @@ KEY="./fiscalia-bol-api.key"
 BASE="https://desarrollo.felcn.gob.bo"
 
 # 1) Obtener token (presentando el certificado de cliente)
+# El scope es OBLIGATORIO (optional scope en Keycloak) — sin él, el token
+# se emite pero sin permiso de negocio y todo lo demás responde 403.
 curl -s -X POST "$BASE/interop/oauth2/token" \
   --cert "$CERT" --key "$KEY" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
-  -d 'grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>'
+  -d 'grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>&scope=https://api.sintesis.com.bo/caso.penal'
 
 # 2) Llamar la API (token + certificado) — consulta de solo lectura, sin body
 curl -s -X GET "$BASE/interop/v1/inbound/OPERATIVO/v1?pagina=1&limite=10" \
@@ -218,7 +225,8 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 | `Error: socket hang up` / `SSL` al obtener token | Certificado de cliente no configurado para el host | Repetir paso 4.2 (Host exacto `desarrollo.felcn.gob.bo`, puerto 443) |
 | `401` en el token | `client_secret` incorrecto | Verificar la variable `client_secret` |
 | `401` en la API de negocio | Token expirado, o el certificado no coincide con el token | Volver a ejecutar **Obtener Token** con el mismo certificado |
-| `403` | Producto/versión no autorizado | Verificar la URL (ej. `/OPERATIVO/v1`) — `CASO_PENAL` está discontinuado, ver §7.5 |
+| `403 SUBSCRIPTION_INACTIVE` | El token se pidió **sin `scope`** — Keycloak lo emite igual pero solo con `email profile` | Volver a ejecutar **Obtener Token** (ya incluye `scope=https://api.sintesis.com.bo/caso.penal` en la colección) |
+| `403 PRODUCT_NOT_AUTHORIZED` | Producto/versión no autorizado | Verificar la URL (ej. `/OPERATIVO/v1`) — `CASO_PENAL` está discontinuado, ver §7.5 |
 
 ---
 

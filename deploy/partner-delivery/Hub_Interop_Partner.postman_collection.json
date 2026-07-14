@@ -102,6 +102,12 @@
                   "key": "client_secret",
                   "value": "{{client_secret}}",
                   "type": "text"
+                },
+                {
+                  "key": "scope",
+                  "value": "https://api.sintesis.com.bo/caso.penal",
+                  "type": "text",
+                  "description": "OBLIGATORIO: es un optional scope en Keycloak. Sin este parámetro el token se emite igual pero sin permiso de negocio (todo lo demás responde 403 SUBSCRIPTION_INACTIVE)."
                 }
               ]
             },
@@ -116,7 +122,7 @@
                 "token"
               ]
             },
-            "description": "Obtiene un access_token JWT válido por 300 segundos.\nEl token se guarda automáticamente en la variable {{token}} para todas las demás requests."
+            "description": "Obtiene un access_token JWT válido por 300 segundos.\nEl token se guarda automáticamente en la variable {{token}} para todas las demás requests.\n\nIMPORTANTE: el scope 'https://api.sintesis.com.bo/caso.penal' es un optional scope en Keycloak (no default) — hay que pedirlo explícitamente en el body (ya viene armado en esta request). Sin él, el token se emite igual (200) pero sin permiso de negocio, y toda llamada a /interop/v1/inbound/... responde 403 SUBSCRIPTION_INACTIVE."
           },
           "response": [
             {
