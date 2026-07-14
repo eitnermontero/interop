@@ -1,2 +1,5 @@
 name,description
-https://api.sintesis.com.bo/caso.penal,Registro y actualización de casos penales (interoperabilidad penal)
+https://api.sintesis.com.bo/caso.penal,Registro y actualización de casos penales — legacy (endpoints de escritura de baja desde 2026-07-14)
+https://api.sintesis.com.bo/consulta.operativos,Consulta de operativos (listado y detalle por cud)
+https://api.sintesis.com.bo/consulta.seguimientos,Consulta de seguimientos (listado y detalle por cud)
+https://api.sintesis.com.bo/consulta.catalogos,Consulta de catálogos de referencia (16 catálogos, solo lectura)

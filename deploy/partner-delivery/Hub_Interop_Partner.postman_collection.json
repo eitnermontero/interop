@@ -25,6 +25,12 @@
       "description": "Client Secret provisto por el equipo del Hub (completar)"
     },
     {
+      "key": "scopes",
+      "value": "https://api.sintesis.com.bo/consulta.operativos https://api.sintesis.com.bo/consulta.seguimientos https://api.sintesis.com.bo/consulta.catalogos",
+      "type": "string",
+      "description": "Scopes a pedir en el token, separados por espacio (formato OAuth2 estándar). Por defecto pide los 3 (prueba todo). Para probar el control de acceso por grupo, dejar solo UNO — ej. 'https://api.sintesis.com.bo/consulta.operativos' — y confirmar que las otras carpetas responden 403 SUBSCRIPTION_INACTIVE."
+    },
+    {
       "key": "token",
       "value": "",
       "type": "string",
@@ -105,9 +111,9 @@
                 },
                 {
                   "key": "scope",
-                  "value": "https://api.sintesis.com.bo/caso.penal",
+                  "value": "{{scopes}}",
                   "type": "text",
-                  "description": "OBLIGATORIO: es un optional scope en Keycloak. Sin este parámetro el token se emite igual pero sin permiso de negocio (todo lo demás responde 403 SUBSCRIPTION_INACTIVE)."
+                  "description": "Scopes tomados de la variable de colección {{scopes}} (separados por espacio). Cada grupo (operativos/seguimientos/catálogos) tiene su PROPIO scope — el token solo habilita los grupos cuyo scope pidió."
                 }
               ]
             },
@@ -122,7 +128,7 @@
                 "token"
               ]
             },
-            "description": "Obtiene un access_token JWT válido por 300 segundos.\nEl token se guarda automáticamente en la variable {{token}} para todas las demás requests.\n\nIMPORTANTE: el scope 'https://api.sintesis.com.bo/caso.penal' es un optional scope en Keycloak (no default) — hay que pedirlo explícitamente en el body (ya viene armado en esta request). Sin él, el token se emite igual (200) pero sin permiso de negocio, y toda llamada a /interop/v1/inbound/... responde 403 SUBSCRIPTION_INACTIVE."
+            "description": "Obtiene un access_token JWT válido por 300 segundos, con los scopes de la variable {{scopes}}.\nEl token se guarda automáticamente en {{token}} para todas las demás requests.\n\nIMPORTANTE: desde 2026-07-14 cada grupo tiene su propio scope (ya no hay un scope único que habilite todo):\n- Gestión de Operativos → https://api.sintesis.com.bo/consulta.operativos\n- Gestión de Seguimiento → https://api.sintesis.com.bo/consulta.seguimientos\n- Catálogos → https://api.sintesis.com.bo/consulta.catalogos\nSi el token no incluye el scope del grupo que está llamando, responde 403 SUBSCRIPTION_INACTIVE."
           },
           "response": [
             {
@@ -135,7 +141,7 @@
                   "value": "application/json"
                 }
               ],
-              "body": "{\n    \"access_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...\",\n    \"expires_in\": 300,\n    \"refresh_expires_in\": 0,\n    \"token_type\": \"Bearer\",\n    \"scope\": \"email profile\"\n}"
+              "body": "{\n    \"access_token\": \"eyJhbGciOiJSUzI1NiIsInR5cCIgOiAiSldUIiwia2lkIiA6IC4uLg...\",\n    \"expires_in\": 300,\n    \"refresh_expires_in\": 0,\n    \"token_type\": \"Bearer\",\n    \"not-before-policy\": 0,\n    \"scope\": \"email profile https://api.sintesis.com.bo/consulta.operativos https://api.sintesis.com.bo/consulta.catalogos https://api.sintesis.com.bo/consulta.seguimientos\"\n}"
             },
             {
               "name": "401 — Credenciales inválidas",

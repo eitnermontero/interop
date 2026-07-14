@@ -338,7 +338,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/operativos
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.operativos
       fields:
         - { name: pagina,  type: STRING, required: false }
         - { name: limite,  type: STRING, required: false }
@@ -351,7 +351,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/operativos/{cud}
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.operativos
       fields:
         - { name: cud, type: STRING, required: true }
 
@@ -361,7 +361,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/seguimientos
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.seguimientos
       fields:
         - { name: pagina,  type: STRING, required: false }
         - { name: limite,  type: STRING, required: false }
@@ -374,7 +374,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/seguimientos/{cud}
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.seguimientos
       fields:
         - { name: cud, type: STRING, required: true }
 
@@ -385,7 +385,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/bienes
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-calidades-bien-v1:
       product: CATALOGO_CALIDADES_BIEN
@@ -393,7 +393,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/calidades-bien
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-caracteristicas-v1:
       product: CATALOGO_CARACTERISTICAS
@@ -401,7 +401,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/caracteristicas
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-clases-v1:
       product: CATALOGO_CLASES
@@ -409,7 +409,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/clases
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-contenidos-bien-v1:
       product: CATALOGO_CONTENIDOS_BIEN
@@ -417,7 +417,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/contenidos-bien
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-contenidos-caso-v1:
       product: CATALOGO_CONTENIDOS_CASO
@@ -425,7 +425,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/contenidos-caso
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-estados-v1:
       product: CATALOGO_ESTADOS
@@ -433,7 +433,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/estados
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-etapas-v1:
       product: CATALOGO_ETAPAS
@@ -441,7 +441,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/etapas
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-grados-v1:
       product: CATALOGO_GRADOS
@@ -449,7 +449,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/grados
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-juridicas-v1:
       product: CATALOGO_JURIDICAS
@@ -457,7 +457,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/juridicas
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-recursos-v1:
       product: CATALOGO_RECURSOS
@@ -465,7 +465,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/recursos
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-situaciones-legales-v1:
       product: CATALOGO_SITUACIONES_LEGALES
@@ -473,7 +473,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/situaciones-legales
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-tamanos-documento-v1:
       product: CATALOGO_TAMANOS_DOCUMENTO
@@ -481,7 +481,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/tamanos-documento
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-tipos-v1:
       product: CATALOGO_TIPOS
@@ -489,7 +489,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/tipos
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-tipos-persona-v1:
       product: CATALOGO_TIPOS_PERSONA
@@ -497,7 +497,7 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/tipos-persona
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos
 
     catalogo-unidades-v1:
       product: CATALOGO_UNIDADES
@@ -505,4 +505,4 @@ hub:
       method: GET
       connector: backend-fiscalia
       target-path: /api/v1/external/fiscalia/catalogos/unidades
-      required-scope: https://api.sintesis.com.bo/caso.penal
+      required-scope: https://api.sintesis.com.bo/consulta.catalogos

@@ -14,6 +14,8 @@ import org.springframework.web.server.WebFilterChain;
 import reactor.core.publisher.Mono;
 
 import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.Map;
 
 /**
  * Filtro de suscripción de partner: verifica que el partner identificado en
@@ -25,9 +27,11 @@ import java.util.Arrays;
  *
  * <p>Estrategia de verificación (PoC):
  * <ul>
- *   <li>Verifica que el scope del JWT incluya {@code caso.penal} para cualquier
- *       path bajo {@code /partner/v1/**}. Spring Security ya validó el JWT; este
- *       filtro hace la comprobación del scope de negocio adicionalmente.</li>
+ *   <li>Extrae el {@code product} del path ({@code /partner/v1/inbound/{product}/{version}[/{id}]})
+ *       y verifica que el scope del JWT incluya el scope requerido para ESE producto
+ *       (ver {@link #SCOPE_POR_PREFIJO_PRODUCTO} — un scope distinto por grupo:
+ *       operativos, seguimientos, catálogos). Spring Security ya validó el JWT;
+ *       este filtro hace la comprobación del scope de negocio adicionalmente.</li>
  *   <li>En un entorno de producción completo, se consultaría la tabla
  *       {@code admin.partner_subscription} en ms-auth vía Redis o HTTP. El TODO
  *       documenta el punto de extensión.</li>
@@ -48,13 +52,32 @@ import java.util.Arrays;
 @Component
 public class PartnerSubscriptionFilter implements WebFilter, Ordered {
 
-    /** Scope que habilita el acceso al producto de interoperabilidad penal. */
-    public static final String SCOPE_CASO_PENAL = "https://api.sintesis.com.bo/caso.penal";
+    /** Scope legacy — productos de escritura CASO_PENAL_* (hoy de baja, ver hub-ms-base). */
+    private static final String SCOPE_CASO_PENAL = "caso.penal";
 
-    /** Scope corto alternativo (Keycloak puede emitirlo como "caso.penal"). */
-    private static final String SCOPE_CASO_PENAL_SHORT = "caso.penal";
+    /**
+     * Scope requerido por prefijo de producto — un scope distinto por grupo
+     * (2026-07-14). La clave es el prefijo del nombre de producto tal como llega
+     * en el path ({@code /partner/v1/inbound/{product}/{version}}); la primera
+     * que matchee gana. Cualquier producto que no matchee ningún prefijo cae al
+     * scope legacy {@link #SCOPE_CASO_PENAL}.
+     *
+     * <p>Nota: {@code hub.apis.*.required-scope} en hub-ms-base es documental
+     * (lo aplica el gateway, no hub-ms-base — ver {@code HubInteropProperties}).
+     * Esta tabla es la aplicación REAL; si se agrega un producto nuevo con un
+     * grupo/scope distinto, hay que agregar la entrada acá.
+     */
+    private static final Map<String, String> SCOPE_POR_PREFIJO_PRODUCTO = new LinkedHashMap<>();
+    static {
+        SCOPE_POR_PREFIJO_PRODUCTO.put("CATALOGO_",    "consulta.catalogos");
+        SCOPE_POR_PREFIJO_PRODUCTO.put("OPERATIVO",    "consulta.operativos");
+        SCOPE_POR_PREFIJO_PRODUCTO.put("SEGUIMIENTO",  "consulta.seguimientos");
+    }
+
+    private static final String SCOPE_URI_PREFIX = "https://api.sintesis.com.bo/";
 
     private static final String PARTNER_PATH_PREFIX = "/partner/";
+    private static final String INBOUND_PATH_PREFIX = "/partner/v1/inbound/";
     private static final String TOKEN_PATH          = "/oauth2/token";
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -137,9 +160,10 @@ public class PartnerSubscriptionFilter implements WebFilter, Ordered {
     /**
      * Verifica si el partner tiene suscripción activa para el path solicitado.
      *
-     * <p>Implementación PoC: comprueba que el scope del JWT incluya
-     * {@code caso.penal} para cualquier ruta bajo {@code /partner/v1/**}.
-     * En producción se consultaría {@code admin.partner_subscription}.
+     * <p>Implementación PoC: extrae el producto del path y comprueba que el
+     * scope del JWT incluya el scope requerido para ESE producto (ver
+     * {@link #scopeRequeridoPara}). En producción se consultaría
+     * {@code admin.partner_subscription}.
      *
      * TODO(hub-poc): Consultar admin.partner_subscription en ms-auth:
      *   {@code SELECT status FROM admin.partner_subscription
@@ -149,22 +173,49 @@ public class PartnerSubscriptionFilter implements WebFilter, Ordered {
      *    AND (valid_to IS NULL OR valid_to > NOW())}
      */
     private boolean verificarSuscripcion(String partnerId, String path, String scope) {
-        // Todo el espacio /partner/v1/** requiere el scope caso.penal
-        if (path.startsWith("/partner/v1/")) {
-            if (scope == null) {
-                log.debug("JWT sin claim scope — partnerId={}", partnerId);
-                return false;
-            }
-            boolean tiene = scope.contains(SCOPE_CASO_PENAL) || scope.contains(SCOPE_CASO_PENAL_SHORT);
-            if (!tiene) {
-                log.debug("Scope insuficiente — partnerId={} scope={}", partnerId, scope);
-            }
-            return tiene;
+        if (!path.startsWith("/partner/v1/")) {
+            // Para otros paths de /partner/**, permitir si hay cualquier scope válido
+            log.debug("Path sin regla de suscripción específica — permitiendo: path={}", path);
+            return true;
         }
-        // Para otros paths de /partner/**, permitir si hay cualquier scope válido
-        // TODO(hub-poc): Ampliar con mapeo path → product_code cuando haya más productos
-        log.debug("Path sin regla de suscripción específica — permitiendo: path={}", path);
-        return true;
+        if (scope == null) {
+            log.debug("JWT sin claim scope — partnerId={}", partnerId);
+            return false;
+        }
+        String producto = extraerProducto(path);
+        String scopeRequerido = scopeRequeridoPara(producto);
+        boolean tiene = scope.contains(SCOPE_URI_PREFIX + scopeRequerido) || scope.contains(scopeRequerido);
+        if (!tiene) {
+            log.debug("Scope insuficiente — partnerId={} producto={} scopeRequerido={} scope={}",
+                    partnerId, producto, scopeRequerido, scope);
+        }
+        return tiene;
+    }
+
+    /**
+     * Extrae el nombre de producto del path {@code /partner/v1/inbound/{product}/{version}[/{id}]}.
+     * Devuelve {@code null} si el path no calza con ese patrón (ej. rutas fuera de
+     * {@code /inbound/}, que hoy no existen pero no deben romper el filtro).
+     */
+    private static String extraerProducto(String path) {
+        if (!path.startsWith(INBOUND_PATH_PREFIX)) {
+            return null;
+        }
+        String resto = path.substring(INBOUND_PATH_PREFIX.length());
+        int barra = resto.indexOf('/');
+        return barra > 0 ? resto.substring(0, barra) : (resto.isEmpty() ? null : resto);
+    }
+
+    /** Scope requerido según el prefijo del producto (ver {@link #SCOPE_POR_PREFIJO_PRODUCTO}). */
+    private static String scopeRequeridoPara(String producto) {
+        if (producto != null) {
+            for (Map.Entry<String, String> entry : SCOPE_POR_PREFIJO_PRODUCTO.entrySet()) {
+                if (producto.startsWith(entry.getKey())) {
+                    return entry.getValue();
+                }
+            }
+        }
+        return SCOPE_CASO_PENAL;
     }
 
     /**
