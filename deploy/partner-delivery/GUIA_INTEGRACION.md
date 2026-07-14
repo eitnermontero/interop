@@ -1,22 +1,31 @@
 # Hub de Interoperabilidad FELCN — Guía de Integración para la Fiscalía
 
-**Versión:** 1.0
+**Versión:** 1.1
 **Hub (proveedor):** FELCN — Fuerza Especial de Lucha Contra el Narcotráfico (Bolivia)
 **Partner (consumidor):** Fiscalía General del Estado Plurinacional de Bolivia
 **Ambiente:** Desarrollo / Pruebas
-**Fecha:** 2026-06-30
+**Fecha:** 2026-06-30 (actualizado 2026-07-14 — ver aviso abajo)
 
 ---
+
+> ⚠️ **Aviso (2026-07-14):** los endpoints de **escritura** (`POST`/`PATCH` de
+> `CASO_PENAL` y sus sub-entidades — delitos, sujetos, abogados, fiscales,
+> actividades, agendas, etc.) **ya no están disponibles**: el backend de la
+> FELCN dejó de implementarlos y responde `404`. Si su integración registraba
+> o actualizaba casos penales, **va a empezar a fallar** — ver §7.5. Hoy el Hub
+> solo expone **consultas de solo lectura**: operativos, seguimientos y
+> catálogos (§7.1 a §7.4).
 
 ## 1. Resumen
 
 La **FELCN de Bolivia** expone su **Hub de Interoperabilidad**: una API REST segura
-para que sistemas externos autorizados registren y actualicen recursos en los
-sistemas internos de la FELCN.
+para que sistemas externos autorizados consulten información de los sistemas
+internos de la FELCN.
 
-La **Fiscalía General del Estado** (partner) consume este Hub para registrar y
-actualizar casos penales. La comunicación exige **doble factor de seguridad**:
-certificado de cliente (**mTLS**) + token **OAuth2** ligado a ese certificado.
+La **Fiscalía General del Estado** (partner) consume este Hub para **consultar**
+operativos, seguimientos y catálogos. La comunicación exige **doble factor de
+seguridad**: certificado de cliente (**mTLS**) + token **OAuth2** ligado a ese
+certificado.
 
 **Servidor de pruebas:** `https://desarrollo.felcn.gob.bo`
 **Identificador del cliente (client_id):** `fiscalia-bol-api`
@@ -32,9 +41,14 @@ certificado de cliente (**mTLS**) + token **OAuth2** ligado a ese certificado.
 | Operación | Método | URL |
 |-----------|--------|-----|
 | Obtener token | `POST` | `https://desarrollo.felcn.gob.bo/interop/oauth2/token` |
-| Registrar caso penal | `POST` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/CASO_PENAL/v1` |
-| Actualizar caso penal | `PATCH` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/CASO_PENAL/v1/{id}` |
+| Consultar operativos (listado) | `GET` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/OPERATIVO/v1` |
+| Consultar operativo (detalle) | `GET` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/OPERATIVO_DETALLE/v1?cud=...` |
+| Consultar seguimientos (listado) | `GET` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/SEGUIMIENTO/v1` |
+| Consultar seguimiento (detalle) | `GET` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/SEGUIMIENTO_DETALLE/v1?cud=...` |
+| Consultar catálogos (16 disponibles) | `GET` | `https://desarrollo.felcn.gob.bo/interop/v1/inbound/CATALOGO_.../v1` |
 | Documentación de referencia (Swagger) | `GET` | `https://desarrollo.felcn.gob.bo/interop/docs/` |
+
+> ~~Registrar/actualizar caso penal (`POST`/`PATCH CASO_PENAL`)~~ — **discontinuado**, ver §7.5.
 
 ---
 
@@ -60,7 +74,7 @@ Cada petición atraviesa los controles **en este orden**. El primero que falle c
 2. **Credenciales** — se validan `client_id` y `client_secret`.
 3. **Enlace token↔certificado** — el token se emite ya ligado al certificado presentado (`cnf.x5t#S256`).
 
-**Al llamar la API de negocio (`POST/PATCH /interop/v1/inbound/...`):**
+**Al llamar la API de negocio (`GET /interop/v1/inbound/...`):**
 1. **mTLS** — se valida el certificado de cliente contra la CA (mismo punto único).
 2. **JWT** — se valida el token (firma, emisor, expiración).
 3. **Binding RFC 8705** — el certificado de ESTA conexión debe ser el mismo al que está ligado el token. Si no coincide → `401`.
@@ -133,12 +147,10 @@ curl -s -X POST "$BASE/interop/oauth2/token" \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   -d 'grant_type=client_credentials&client_id=fiscalia-bol-api&client_secret=<CLIENT_SECRET>'
 
-# 2) Llamar la API (token + certificado)
-curl -s -X POST "$BASE/interop/v1/inbound/CASO_PENAL/v1" \
+# 2) Llamar la API (token + certificado) — consulta de solo lectura, sin body
+curl -s -X GET "$BASE/interop/v1/inbound/OPERATIVO/v1?pagina=1&limite=10" \
   --cert "$CERT" --key "$KEY" \
-  -H "Authorization: Bearer <ACCESS_TOKEN>" \
-  -H "Content-Type: application/json" \
-  -d '{ "cud": "...", "id_externo_caso": 1, "id_tipo_denuncia": 1, "id_oficina": 1, "id_estado": 1, "id_etapa": 1 }'
+  -H "Authorization: Bearer <ACCESS_TOKEN>"
 ```
 
 > El `.crt`/`.key` PEM sirven para cURL y para la mayoría de librerías HTTP. Para
@@ -155,7 +167,13 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 ### 4.1 Importar la colección
 
 1. Abrir Postman → **Import** → seleccionar `Hub_Interop_Partner.postman_collection.json`.
-2. La colección aparece con las carpetas **Autenticación** y **Casos Penales**.
+2. La colección aparece con las carpetas **Autenticación**, **Gestión de
+   Operativos**, **Gestión de Seguimiento**, **Catálogos** (16 requests) y
+   **Casos Penales (DESCONTINUADO)**.
+
+> ⚠️ La carpeta **Casos Penales** quedó **discontinuada** (§7.5) — sus 3
+> requests (`Registrar`/`Actualizar`/`Validación`) van a responder `404`. Se
+> conserva solo como referencia histórica del contrato.
 
 ### 4.2 Configurar el certificado de cliente (mTLS)
 
@@ -186,10 +204,12 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 
 1. Ejecutar **Autenticación → Obtener Token**. Si el certificado y el secret son
    correctos, responde `200` y el token se guarda automáticamente en la variable
-   `{{token}}`.
-2. Ejecutar **Casos Penales → Registrar Caso Penal**. Debe responder `201` con el
-   `id_pol_caso` asignado (se guarda en `{{ultimo_id_pol_caso}}`).
-3. Ejecutar **Actualizar Caso Penal** — usa el `id` del caso creado.
+   `{{token}}` (las demás requests ya usan `Bearer {{token}}` heredado a nivel
+   de colección — no hay que tocar nada más).
+2. Ejecutar cualquier request de **Gestión de Operativos**/**Gestión de
+   Seguimiento**/**Catálogos**. Para "Detalle de operativo/seguimiento",
+   reemplace la variable de colección `cud_ejemplo` por un `cud` real del
+   entorno de pruebas (pestaña **Variables** de la colección).
 
 ### 4.5 Errores comunes en Postman
 
@@ -198,7 +218,7 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 | `Error: socket hang up` / `SSL` al obtener token | Certificado de cliente no configurado para el host | Repetir paso 4.2 (Host exacto `desarrollo.felcn.gob.bo`, puerto 443) |
 | `401` en el token | `client_secret` incorrecto | Verificar la variable `client_secret` |
 | `401` en la API de negocio | Token expirado, o el certificado no coincide con el token | Volver a ejecutar **Obtener Token** con el mismo certificado |
-| `403` | Producto/versión no autorizado | Verificar la URL `/CASO_PENAL/v1` |
+| `403` | Producto/versión no autorizado | Verificar la URL (ej. `/OPERATIVO/v1`) — `CASO_PENAL` está discontinuado, ver §7.5 |
 
 ---
 
@@ -207,9 +227,11 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 | Cabecera | Requerida | Descripción |
 |----------|-----------|-------------|
 | `Authorization` | ✅ Sí | `Bearer <token>` |
-| `Content-Type` | ✅ Sí | `application/json` |
 | `X-Correlation-ID` | Recomendada | UUID único por request. Si se omite, el hub genera uno. Se retorna en la respuesta. |
-| `X-Idempotency-Key` | Recomendada | UUID único por operación de negocio. Permite reintentar de forma segura sin duplicar. |
+
+> `Content-Type`/`X-Idempotency-Key` no aplican hoy: las APIs vigentes son
+> todas `GET` (sin body, idempotentes por naturaleza) — ver §7.5 para el
+> contrato de escritura descontinuado que sí las exigía.
 
 ---
 
@@ -217,19 +239,19 @@ listas. Para que funcionen, hay que **cargar el certificado de cliente en Postma
 
 Todas las respuestas siguen el mismo envelope:
 
-**Éxito:**
+**Éxito** (`GET OPERATIVO_DETALLE/v1?cud=...`):
 ```json
 {
     "success": true,
-    "status": 201,
-    "message": "Caso aceptado",
-    "data": { "id_pol_caso": 12345 },
+    "status": 200,
+    "message": "Aceptado por el destino 'backend-fiscalia'",
+    "data": { "cud": "7854695124574", "numero_caso": "LP-A -2/26", "..." : "..." },
     "correlationId": "550e8400-e29b-41d4-a716-446655440000",
-    "timestamp": "2026-06-30T10:30:05.123-04:00"
+    "timestamp": "2026-07-14T10:30:05.123-04:00"
 }
 ```
 
-**Error:**
+**Error** (falta el query param requerido `cud`):
 ```json
 {
     "success": false,
@@ -237,14 +259,13 @@ Todas las respuestas siguen el mismo envelope:
     "message": "Error de validación",
     "error": {
         "code": "VALIDATION_ERROR",
-        "message": "El payload no cumple el contrato CASO_PENAL/v1",
+        "message": "El payload no cumple el contrato OPERATIVO_DETALLE/v1",
         "violations": [
-            {"field": "cud", "message": "El campo es requerido"},
-            {"field": "id_oficina", "message": "El campo es requerido"}
+            {"field": "cud", "message": "El campo es requerido"}
         ]
     },
     "correlationId": "550e8400-e29b-41d4-a716-446655440000",
-    "timestamp": "2026-06-30T10:30:05.123-04:00"
+    "timestamp": "2026-07-14T10:30:05.123-04:00"
 }
 ```
 
@@ -252,98 +273,76 @@ Todas las respuestas siguen el mismo envelope:
 
 | Código | Significado | Acción recomendada |
 |--------|-------------|-------------------|
-| 201 | Recurso creado correctamente | Guardar `id_pol_caso` retornado |
 | 200 | Operación exitosa | — |
-| 400 | Payload inválido | Revisar `error.violations` y corregir campos |
+| 400 | Query param inválido/ausente | Revisar `error.violations` y corregir el parámetro |
 | 401 | Token ausente/expirado, o certificado no coincide con el token | Renovar token con el mismo certificado y reintentar |
 | 403 | Producto no autorizado | Verificar `product` y `version` en la URL |
 | 503 | Servicio no disponible | Reintentar con backoff exponencial |
 
 ---
 
-## 7. Contrato CASO_PENAL/v1
+## 7. Contrato de las APIs vigentes
 
-### 7.1 Registrar caso — `POST /interop/v1/inbound/CASO_PENAL/v1`
+Todo lo de esta sección es **`GET`, de solo lectura** — sin body, sin
+`X-Idempotency-Key` (GET es idempotente por naturaleza).
 
-| Campo | Tipo | Requerido | Máx. longitud | Descripción |
-|-------|------|-----------|---------------|-------------|
-| `cud` | string | ✅ | 50 | Código Único de Denuncia |
-| `id_externo_caso` | integer | ✅ | — | ID del caso en el sistema de la Fiscalía |
-| `id_tipo_denuncia` | integer | ✅ | — | Tipo de denuncia (catálogo) |
-| `id_oficina` | integer | ✅ | — | ID de la oficina registrante |
-| `id_estado` | integer | ✅ | — | Estado del caso (catálogo) |
-| `id_etapa` | integer | ✅ | — | Etapa procesal (catálogo) |
-| `id_externo_caso_referencia` | integer | — | — | ID caso padre/referencia |
-| `es_reservado` | boolean | — | — | Si el caso es reservado |
-| `id_municipio` | integer | — | — | ID del municipio |
-| `zona` | string | — | 255 | Zona geográfica |
-| `direccion` | string | — | — | Dirección del hecho |
-| `latitud` | string | — | 30 | Latitud decimal (ej. `-16.500000`) |
-| `longitud` | string | — | 30 | Longitud decimal (ej. `-68.150000`) |
-| `referencia` | string | — | — | Referencia de ubicación |
-| `relato` | string | — | — | Relato del hecho |
-| `fecha_caso` | string (ISO 8601) | — | — | Fecha y hora del hecho (ej. `2026-06-30T10:30:00-04:00`) |
-| `fecha_fin` | string (ISO 8601) | — | — | Fecha y hora de fin |
-| `fecha_aproximada` | string | — | 255 | Descripción textual si la fecha es aproximada |
-| `denominacion_caso` | string | — | 500 | Nombre/denominación del caso |
-| `tags` | array | — | — | Etiquetas asociadas |
+### 7.1 Consultar operativos — listado (`GET /interop/v1/inbound/OPERATIVO/v1`)
 
-**Ejemplo de request mínimo:**
-```json
-{
-    "cud": "120100240000012345",
-    "id_externo_caso": 98765,
-    "id_tipo_denuncia": 1,
-    "id_oficina": 42,
-    "id_estado": 1,
-    "id_etapa": 2
-}
+Los parámetros van como **query string**, todos opcionales:
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `pagina` | string | — | Número de página (≥1) |
+| `limite` | string | — | Resultados por página (10 a 50) |
+| `filtro` | string | — | Texto libre de búsqueda |
+| `orden` | string | — | Criterio de orden |
+
+```bash
+curl -s --cert "$CERT" --key "$KEY" -H "Authorization: Bearer $TOKEN" \
+  "$BASE/interop/v1/inbound/OPERATIVO/v1?pagina=1&limite=10"
 ```
 
-**Ejemplo de request completo:**
-```json
-{
-    "cud": "120100240000012345",
-    "id_externo_caso": 98765,
-    "id_tipo_denuncia": 1,
-    "id_oficina": 42,
-    "id_estado": 1,
-    "id_etapa": 2,
-    "id_municipio": 11,
-    "zona": "Norte",
-    "direccion": "Av. 6 de Agosto s/n",
-    "latitud": "-16.500000",
-    "longitud": "-68.150000",
-    "fecha_caso": "2026-06-30T10:30:00-04:00",
-    "denominacion_caso": "Caso de prueba integración",
-    "relato": "Descripción del hecho delictivo",
-    "es_reservado": false,
-    "tags": []
-}
+### 7.2 Consultar operativo — detalle (`GET /interop/v1/inbound/OPERATIVO_DETALLE/v1?cud=...`)
+
+`cud` va como **query param**, no como segmento de la URL:
+
+| Parámetro | Tipo | Requerido | Descripción |
+|-----------|------|-----------|-------------|
+| `cud` | string | ✅ | Código Único de Denuncia del operativo a consultar |
+
+```bash
+curl -s --cert "$CERT" --key "$KEY" -H "Authorization: Bearer $TOKEN" \
+  "$BASE/interop/v1/inbound/OPERATIVO_DETALLE/v1?cud=7854695124574"
 ```
 
-### 7.2 Actualizar caso — `PATCH /interop/v1/inbound/CASO_PENAL/v1/{id}`
+Si falta `cud`, responde `400 VALIDATION_ERROR`.
 
-`{id}` = `id_pol_caso` retornado al registrar el caso.
+### 7.3 Consultar seguimientos — listado y detalle
 
-| Campo | Tipo | Requerido | Descripción |
-|-------|------|-----------|-------------|
-| `id_tipo_denuncia` | integer | ✅ | Tipo de denuncia |
-| `id_externo_caso_referencia` | integer | — | ID caso padre |
-| `id_municipio` | integer | — | ID del municipio |
-| `zona` | string (max 255) | — | Zona |
-| `direccion` | string | — | Dirección |
-| `latitud` | string (max 30) | — | Latitud |
-| `longitud` | string (max 30) | — | Longitud |
-| `referencia` | string | — | Referencia |
-| `relato` | string | — | Relato actualizado |
-| `fecha_caso` | string (ISO 8601) | — | Fecha del hecho |
-| `fecha_fin` | string (ISO 8601) | — | Fecha de fin |
-| `fecha_aproximada` | string (max 255) | — | Fecha aproximada |
-| `denominacion_caso` | string (max 500) | — | Denominación |
-| `tags` | array | — | Etiquetas (IDs) |
+Mismo contrato que operativos (§7.1/§7.2), reemplazando el producto:
 
-> **Nota:** No incluir `id_pol_caso` en el body — se toma automáticamente del path `{id}`.
+- Listado: `GET /interop/v1/inbound/SEGUIMIENTO/v1` (mismos params `pagina`/`limite`/`filtro`/`orden`)
+- Detalle: `GET /interop/v1/inbound/SEGUIMIENTO_DETALLE/v1?cud=...`
+
+### 7.4 Catálogos (sin cambios)
+
+Los 16 catálogos de solo lectura (`CATALOGO_UNIDADES`, `CATALOGO_ESTADOS`, etc.)
+siguen igual: `GET /interop/v1/inbound/CATALOGO_.../v1`, sin parámetros. Ver el
+Swagger (`/interop/docs/`) para el listado completo.
+
+### 7.5 Descontinuado — Contrato CASO_PENAL/v1 (escritura)
+
+> ⚠️ **Ya no está disponible** (verificado 2026-07-14: el backend responde
+> `404 Cannot POST/PATCH`). Se documenta el contrato histórico por si su
+> integración lo tenía implementado y necesita entender por qué dejó de
+> funcionar. **No lo use para integraciones nuevas.**
+
+Antes se podía **registrar** un caso penal con `POST /interop/v1/inbound/CASO_PENAL/v1`
+(campos `cud`, `id_externo_caso`, `id_tipo_denuncia`, `id_oficina`, `id_estado`,
+`id_etapa` requeridos, más datos del hecho opcionales) y **actualizarlo** con
+`PATCH /interop/v1/inbound/CASO_PENAL/v1/{id}` (`{id}` = `id_pol_caso` asignado
+al registrar). Consulte el historial de este archivo (versión 1.0) para el
+detalle completo de campos si lo necesita como referencia.
 
 ---
 

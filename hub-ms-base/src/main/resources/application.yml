@@ -176,59 +176,66 @@ hub:
       base-url: http://172.16.76.20:3333
       timeout-ms: 8000
   apis:
-    caso-penal-v1:
-      product: CASO_PENAL
-      version: v1
-      method: POST
-      connector: backend-fiscalia
-      target-path: /api/v1/external/fiscalia/casos
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: cud,                          type: STRING,   required: true }
-        - { name: mp_caso_id,                   type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
-        - { name: esta_reservado,               type: BOOLEAN,  required: false }
-        - { name: oficina_comun_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: caso_estado_id,               type: INTEGER,  required: true }
-        - { name: caso_etapa_id,                type: INTEGER,  required: true }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags,                         type: ARRAY,    required: false }
-    caso-penal-editar-v1:
-      product: CASO_PENAL_EDITAR
-      version: v1
-      method: PATCH
-      resource-id-field: pol_caso_id        # el dispatcher inyecta el {id} del path aquí
-      connector: backend-fiscalia
-      target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}
-      required-scope: https://api.sintesis.com.bo/caso.penal
-      fields:
-        - { name: pol_caso_id,                  type: INTEGER,  required: true }
-        - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
-        - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
-        - { name: hecho_municipio_id,           type: INTEGER,  required: false }
-        - { name: hecho_zona,                   type: STRING,   required: false }
-        - { name: hecho_direccion,              type: STRING,   required: false }
-        - { name: hecho_latitud,                type: STRING,   required: false }
-        - { name: hecho_longitud,               type: STRING,   required: false }
-        - { name: hecho_referencia_lugar,       type: STRING,   required: false }
-        - { name: hecho_relato,                 type: STRING,   required: false }
-        - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
-        - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
-        - { name: denominacion_caso,            type: STRING,   required: false }
-        - { name: tags_id,                      type: ARRAY,    required: false }
+    # ── CASO_PENAL/CASO_PENAL_EDITAR: DE BAJA (2026-07-14) ────────────────────
+    # Verificado contra el backend real de Fiscalía (172.16.76.20:3333):
+    # POST /api/v1/external/fiscalia/casos → 404 "Cannot POST". El swagger
+    # interno (172.16.76.20:3333/fiscalia/docs-json) ya NO lista ningún
+    # endpoint de escritura — solo los 16 catálogos GET y las 4 consultas
+    # (operativos/seguimientos). Se comenta, no se borra, por si FELCN
+    # reactiva el intercambio de casos penales más adelante.
+    # caso-penal-v1:
+    #   product: CASO_PENAL
+    #   version: v1
+    #   method: POST
+    #   connector: backend-fiscalia
+    #   target-path: /api/v1/external/fiscalia/casos
+    #   required-scope: https://api.sintesis.com.bo/caso.penal
+    #   fields:
+    #     - { name: cud,                          type: STRING,   required: true }
+    #     - { name: mp_caso_id,                   type: INTEGER,  required: true }
+    #     - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+    #     - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+    #     - { name: creacion_fecha_hora,          type: DATETIME, required: true, format: iso8601 }
+    #     - { name: esta_reservado,               type: BOOLEAN,  required: false }
+    #     - { name: oficina_comun_id,             type: INTEGER,  required: true }
+    #     - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+    #     - { name: hecho_zona,                   type: STRING,   required: false }
+    #     - { name: hecho_direccion,              type: STRING,   required: false }
+    #     - { name: hecho_latitud,                type: STRING,   required: false }
+    #     - { name: hecho_longitud,               type: STRING,   required: false }
+    #     - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+    #     - { name: hecho_relato,                 type: STRING,   required: false }
+    #     - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+    #     - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+    #     - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+    #     - { name: caso_estado_id,               type: INTEGER,  required: true }
+    #     - { name: caso_etapa_id,                type: INTEGER,  required: true }
+    #     - { name: denominacion_caso,            type: STRING,   required: false }
+    #     - { name: tags,                         type: ARRAY,    required: false }
+    # caso-penal-editar-v1:
+    #   product: CASO_PENAL_EDITAR
+    #   version: v1
+    #   method: PATCH
+    #   resource-id-field: pol_caso_id        # el dispatcher inyecta el {id} del path aquí
+    #   connector: backend-fiscalia
+    #   target-path: /api/v1/external/fiscalia/casos/{pol_caso_id}
+    #   required-scope: https://api.sintesis.com.bo/caso.penal
+    #   fields:
+    #     - { name: pol_caso_id,                  type: INTEGER,  required: true }
+    #     - { name: mp_caso_padre_id,             type: INTEGER,  required: false }
+    #     - { name: tipo_denuncia_id,             type: INTEGER,  required: true }
+    #     - { name: hecho_municipio_id,           type: INTEGER,  required: false }
+    #     - { name: hecho_zona,                   type: STRING,   required: false }
+    #     - { name: hecho_direccion,              type: STRING,   required: false }
+    #     - { name: hecho_latitud,                type: STRING,   required: false }
+    #     - { name: hecho_longitud,               type: STRING,   required: false }
+    #     - { name: hecho_referencia_lugar,       type: STRING,   required: false }
+    #     - { name: hecho_relato,                 type: STRING,   required: false }
+    #     - { name: hecho_fecha_hora,             type: DATETIME, required: false, format: iso8601 }
+    #     - { name: hecho_fecha_hora_fin,         type: DATETIME, required: false, format: iso8601 }
+    #     - { name: hecho_fecha_hora_aproximada,  type: STRING,   required: false }
+    #     - { name: denominacion_caso,            type: STRING,   required: false }
+    #     - { name: tags_id,                      type: ARRAY,    required: false }
   outbound:
     efxrate:
       url: https://api.efxrate.example.com

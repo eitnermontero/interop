@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.HashMap;
@@ -38,9 +39,11 @@ import java.util.UUID;
  *   <li>{@code PATCH /api/inbound/{product}/{version}/{id}} — editar recurso.
  *       Resuelve el contrato {@code {product}_EDITAR/{version}} e inyecta el
  *       {@code {id}} del path bajo el campo {@link ContractDefinition#resourceIdField()}.</li>
- *   <li>{@code GET /api/inbound/{product}/{version}} — consultar catálogo de solo
- *       lectura. Sin body de entrada; solo atiende contratos declarados con
- *       {@code method: GET} ({@link ContractDefinition#isReadOnly()}). No exige
+ *   <li>{@code GET /api/inbound/{product}/{version}} — consultar recurso de solo
+ *       lectura. Sin body de entrada; los query params se validan y propagan al
+ *       destino (como placeholder de {@code target-path} o como query string —
+ *       ver {@link #get}). Solo atiende contratos declarados con {@code method: GET}
+ *       ({@link ContractDefinition#isReadOnly()}). No exige
  *       {@code X-Idempotency-Key} (ver {@link bo.com.sintesis.hub.base.hub.HubAuditInterceptor}).</li>
  * </ul>
  *
@@ -172,9 +175,13 @@ public class DispatcherController {
     /**
      * Consulta de catálogo de solo lectura.
      *
-     * <p>Sin cuerpo de petición: el contrato resuelto se reenvía tal cual al backend
-     * configurado en {@code hub.connectors} (path estático, sin placeholders —
-     * estos catálogos no tienen parámetros). No exige {@code X-Idempotency-Key}
+     * <p>Sin cuerpo de petición: el contrato resuelto se reenvía al backend configurado
+     * en {@code hub.connectors}. Los query params de la petición se validan contra
+     * {@code fields} del contrato (igual que el body en POST/PATCH) y se propagan al
+     * destino — como placeholder de {@code target-path} (ej. {@code /operativos/{cud}},
+     * consulta de detalle) o, si no calzan con ningún placeholder, como query string
+     * (ej. {@code pagina}/{@code limite} de un listado) — ver
+     * {@link HttpForwardingAdapter#forward}. No exige {@code X-Idempotency-Key}
      * porque GET es idempotente por naturaleza; el header ni siquiera se declara
      * en este método, y {@link bo.com.sintesis.hub.base.hub.HubAuditInterceptor}
      * ignora cualquier clave que igualmente llegue en la petición.
@@ -189,6 +196,7 @@ public class DispatcherController {
     public ResponseEntity<ApiResponse<Object>> get(
             @PathVariable String product,
             @PathVariable String version,
+            @RequestParam Map<String, String> queryParams,
             @RequestHeader(value = "X-Partner-Id",     required = false) String partnerId,
             @RequestHeader(value = "X-Correlation-ID", required = false) String correlationId,
             HttpServletRequest httpRequest,
@@ -204,7 +212,7 @@ public class DispatcherController {
         }
 
         httpRequest.setAttribute(ATTR_AUDIT_PRODUCT, product);
-        return procesarDispatch(contractOpt.get(), Map.of(), partnerId, cid, httpResponse);
+        return procesarDispatch(contractOpt.get(), new HashMap<>(queryParams), partnerId, cid, httpResponse);
     }
 
     // ─── lógica compartida ────────────────────────────────────────────────────

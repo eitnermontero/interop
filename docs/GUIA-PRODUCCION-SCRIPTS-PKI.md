@@ -19,7 +19,7 @@
 |---|---|---|
 | **PKI** | OpenSSL self-signed (`create-pki.sh`), `ca.key` **en disco** en `deploy/certs/` | Sin CRL/OCSP → **no se puede revocar un cert individual** hoy. Ver §5. |
 | **mTLS gateway** | `application-prod.yml`: `client-auth: want` (opcional), truststore = `ca.crt` | El gateway puede terminar mTLS en `:8443`, pero como `want` no lo **exige**. |
-| **mTLS nginx** | `ssl_verify_client` **comentado**, `proxy_ssl_verify off` | El borde **aún no valida** el cert de cliente. `HUB_MTLS_TEST_MODE` activo. |
+| **mTLS nginx** | `ssl_verify_client optional` activo (corregido 2026-07-14) para `/interop/**`; cada `location` de `partner-locations.conf` exige el cert (403 si falta) | El borde ya valida el cert de cliente en las rutas de partner. `HUB_MTLS_TEST_MODE` sigue activo en el gateway (ver §2.8 para desactivarlo). |
 | **Vault** | Solo KV v2, en **dev mode** (token `root`, memoria, se pierde al reiniciar) | Prod necesita Vault **persistente + unseal**. Ver §6. |
 | **Vault Transit** | **No configurado** | Firma de auditoría corre en `NoOpAuditSigner` (sin firma real). |
 | **Vault PKI** | **No configurado** | La migración del ADR-0001 está pendiente. |
@@ -147,10 +147,18 @@ sudo mkdir -p /etc/nginx/ssl/desarrollo.felcn.gob.bo
 sudo nginx -t && sudo systemctl reload nginx
 ```
 
-Para **activar mTLS real** en el borde (dejar de estar en test mode): descomentar
-en `hub-interop.conf` los bloques `ssl_client_certificate /…/ca.crt`,
-`ssl_verify_client on` y `proxy_set_header X-SSL-Client-Cert $ssl_client_escaped_cert`,
-y poner `HUB_MTLS_TEST_MODE=false` en el gateway. Ver §5 y §7.
+> **Corregido 2026-07-14:** `hub-interop.conf` ya no duplica las rutas de
+> partner a mano — incluye `deploy/nginx/partner-locations.conf` (fuente única
+> de verdad, con el prefijo real `/interop/...`, no `/api/partner/...` como
+> decía una versión anterior de este archivo). `ssl_client_certificate`/
+> `ssl_verify_client optional` ya están activos por defecto (no comentados);
+> el filtrado real de "obligatorio" lo hace cada `location` de
+> `partner-locations.conf` devolviendo 403 si `$ssl_client_verify != SUCCESS`.
+
+Para **activar mTLS real** en el borde (dejar de estar en test mode): cambiar
+`ssl_verify_client optional` a `ssl_verify_client on` en `hub-interop.conf`
+(hoy `optional` porque el gateway aplica su propio `HUB_MTLS_TEST_MODE`) y
+poner `HUB_MTLS_TEST_MODE=false` en el gateway. Ver §5 y §7.
 
 ---
 
@@ -160,7 +168,7 @@ y poner `HUB_MTLS_TEST_MODE=false` en el gateway. Ver §5 y §7.
 # 1. Token de partner (mTLS + client_credentials) vía dominio
 curl --cert deploy/certs/partners/<partner>.crt \
      --key  deploy/certs/partners/<partner>.key \
-     -X POST https://desarrollo.felcn.gob.bo/api/partner/oauth2/token \
+     -X POST https://desarrollo.felcn.gob.bo/interop/oauth2/token \
      -d grant_type=client_credentials -d client_id=<client> -d client_secret=<secret>
 
 # 2. Verificar que el JWT trae el binding cnf.x5t#S256 (holder-of-key)
@@ -168,7 +176,7 @@ curl --cert deploy/certs/partners/<partner>.crt \
 
 # 3. Llamada de negocio con cert + token
 curl --cert ... --key ... -H "Authorization: Bearer $TOKEN" \
-     -X POST https://desarrollo.felcn.gob.bo/api/partner/v1/inbound/CASO_PENAL/v1 \
+     -X POST https://desarrollo.felcn.gob.bo/interop/v1/inbound/CASO_PENAL/v1 \
      -H 'Content-Type: application/json' -d @caso.json
 
 # 4. Confirmar registro en hub_audit_log + outbox_event

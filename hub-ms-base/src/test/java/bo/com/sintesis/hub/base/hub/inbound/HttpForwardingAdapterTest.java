@@ -17,11 +17,13 @@ import java.util.UUID;
 import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
 import static com.github.tomakehurst.wiremock.client.WireMock.configureFor;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.post;
 import static com.github.tomakehurst.wiremock.client.WireMock.postRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
@@ -148,6 +150,48 @@ class HttpForwardingAdapterTest {
 
         wireMock.verify(1, getRequestedFor(urlEqualTo("/catalogos/unidades"))
                 .withHeader("X-Correlation-ID", com.github.tomakehurst.wiremock.client.WireMock.equalTo(correlationId)));
+    }
+
+    @Test
+    @DisplayName("method=GET con target-path sin placeholders — el payload (query params entrantes) se reenvía como query string")
+    void forward_conMethodGet_targetPathSinPlaceholders_reenviaPayloadComoQueryString() {
+        wireMock.stubFor(get(urlPathEqualTo("/operativos"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"total\":38,\"datos\":[]}")));
+
+        HubInteropProperties.ApiProps api = apiProps("GET", "/operativos");
+        Map<String, Object> payload = Map.of("pagina", "1", "limite", "10");
+
+        ForwardResult result = adapter.forward(
+                "backend-fiscalia", connector, api, payload, UUID.randomUUID().toString());
+
+        assertThat(result.ok()).isTrue();
+        wireMock.verify(1, getRequestedFor(urlPathEqualTo("/operativos"))
+                .withQueryParam("pagina", equalTo("1"))
+                .withQueryParam("limite", equalTo("10")));
+    }
+
+    @Test
+    @DisplayName("method=GET con target-path {cud} — el payload resuelve el placeholder de path, no va como query string")
+    void forward_conMethodGet_targetPathConPlaceholder_resuelvePathNoQuery() {
+        wireMock.stubFor(get(urlEqualTo("/operativos/7854695124574"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"cud\":\"7854695124574\"}")));
+
+        HubInteropProperties.ApiProps api = apiProps("GET", "/operativos/{cud}");
+        Map<String, Object> payload = Map.of("cud", "7854695124574");
+
+        ForwardResult result = adapter.forward(
+                "backend-fiscalia", connector, api, payload, UUID.randomUUID().toString());
+
+        assertThat(result.ok()).isTrue();
+        // urlEqualTo exige coincidencia exacta (sin query string) — confirma que "cud" se
+        // consumió como placeholder de path y no se duplicó como query param.
+        wireMock.verify(1, getRequestedFor(urlEqualTo("/operativos/7854695124574")));
     }
 
     @Test

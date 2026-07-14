@@ -2,7 +2,7 @@
   "info": {
     "name": "Hub Interoperabilidad — API Partner",
     "_postman_id": "hub-interop-partner-v1",
-    "description": "Colección de endpoints del Hub de Interoperabilidad para integración de sistemas externos.\n\n⚠️ REQUISITO PREVIO — mTLS:\nEsta API requiere certificado de cliente (mTLS). Antes de usar la colección:\n1. Ir a Postman → Settings → Certificates → Add Certificate\n2. Host: desarrollo.felcn.gob.bo  Puerto: 443\n3. CRT File: seleccionar 'fiscalia-bol-api.crt' (entregado por el Hub)\n4. KEY File: seleccionar 'fiscalia-bol-api.key' (entregado por el Hub)\n5. Guardar. Postman enviará el certificado automáticamente.\n\nFlujo básico:\n1. Configurar el certificado en Settings (arriba)\n2. Completar la variable 'client_secret' con el secret entregado\n3. Ejecutar 'Obtener Token' → el token se guarda automáticamente en {{token}}\n4. Usar cualquier endpoint de negocio — Authorization y certificado ya están configurados\n\nVariables de colección a configurar:\n- base_url: https://desarrollo.felcn.gob.bo (no cambiar)\n- client_id: fiscalia-bol-api (no cambiar)\n- client_secret: (completar con el valor entregado por el Hub)\n\nORDEN DE VALIDACIÓN EN EL SERVIDOR (cada petición):\n1. mTLS — certificado de cliente contra la CA del Hub (único punto de terminación TLS)\n2. JWT — firma / emisor / expiración del Bearer\n3. Binding RFC 8705 — el certificado de la conexión debe ser el mismo ligado al token (si no: 401)\n4. Suscripción / autorización del producto\n5. Registro de la petición + validación del contrato\nPrimero mTLS, luego el JWT, y recién entonces se procesa la petición. Un token sin su certificado es inútil.\n\nNOTA: Swagger (/interop/docs/) es solo referencia — no puede ejecutar por el mTLS. Use esta colección o cURL.",
+    "description": "Colección de endpoints del Hub de Interoperabilidad para integración de sistemas externos.\n\n⚠️ REQUISITO PREVIO — mTLS:\nEsta API requiere certificado de cliente (mTLS). Antes de usar la colección:\n1. Ir a Postman → Settings → Certificates → Add Certificate\n2. Host: desarrollo.felcn.gob.bo  Puerto: 443\n3. CRT File: seleccionar 'fiscalia-bol-api.crt' (entregado por el Hub)\n4. KEY File: seleccionar 'fiscalia-bol-api.key' (entregado por el Hub)\n5. Guardar. Postman enviará el certificado automáticamente.\n\nFlujo básico:\n1. Configurar el certificado en Settings (arriba)\n2. Completar la variable 'client_secret' con el secret entregado\n3. Ejecutar 'Obtener Token' → el token se guarda automáticamente en {{token}}\n4. Usar cualquier endpoint de negocio — Authorization y certificado ya están configurados\n\nVariables de colección a configurar:\n- base_url: https://desarrollo.felcn.gob.bo (no cambiar)\n- client_id: fiscalia-bol-api (no cambiar)\n- client_secret: (completar con el valor entregado por el Hub)\n\nORDEN DE VALIDACIÓN EN EL SERVIDOR (cada petición):\n1. mTLS — certificado de cliente contra la CA del Hub (único punto de terminación TLS)\n2. JWT — firma / emisor / expiración del Bearer\n3. Binding RFC 8705 — el certificado de la conexión debe ser el mismo ligado al token (si no: 401)\n4. Suscripción / autorización del producto\n5. Registro de la petición + validación del contrato\nPrimero mTLS, luego el JWT, y recién entonces se procesa la petición. Un token sin su certificado es inútil.\n\nNOTA: Swagger (/interop/docs/) es solo referencia — no puede ejecutar por el mTLS. Use esta colección o cURL.\n\n⚠️ ACTUALIZADO 2026-07-14: se agregaron las carpetas 'Gestión de Operativos', 'Gestión de Seguimiento' y 'Catálogos' (consultas GET, solo lectura). La carpeta 'Casos Penales' quedó discontinuada — el backend ya no implementa esos endpoints de escritura (responden 404).",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [
@@ -29,6 +29,12 @@
       "value": "",
       "type": "string",
       "description": "Token JWT — se llena automáticamente al ejecutar 'Obtener Token'"
+    },
+    {
+      "key": "cud_ejemplo",
+      "value": "7854695124574",
+      "type": "string",
+      "description": "CUD de ejemplo para las requests de detalle (operativo/seguimiento) — reemplazar por uno real"
     }
   ],
   "auth": {
@@ -142,10 +148,903 @@
       ]
     },
     {
-      "name": "Casos Penales (CASO_PENAL v1)",
+      "name": "Gestión de Operativos",
       "item": [
         {
-          "name": "Registrar Caso Penal",
+          "name": "Listado de operativos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/OPERATIVO/v1?pagina=1&limite=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "OPERATIVO",
+                "v1"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "limite",
+                  "value": "10"
+                },
+                {
+                  "key": "filtro",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "orden",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Listado de operativos (solo lectura). Todos los query params son opcionales: pagina, limite (10 a 50), filtro, orden. Sin body, sin X-Idempotency-Key."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de operativo (por cud)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tiene correlationId', function() {",
+                  "    pm.expect(pm.response.json().correlationId).to.exist;",
+                  "});",
+                  "console.log('Status:', pm.response.code, '- revisar 200 (encontrado) vs 502 (cud inexistente en el backend)');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/OPERATIVO_DETALLE/v1?cud={{cud_ejemplo}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "OPERATIVO_DETALLE",
+                "v1"
+              ],
+              "query": [
+                {
+                  "key": "cud",
+                  "value": "{{cud_ejemplo}}"
+                }
+              ]
+            },
+            "description": "Detalle de un operativo por su Código Único de Denuncia (cud). 'cud' es REQUERIDO como query param (no como segmento de la URL). Si falta, responde 400 VALIDATION_ERROR. Reemplace {{cud_ejemplo}} por un cud real del entorno de pruebas."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Gestión de Seguimiento",
+      "item": [
+        {
+          "name": "Listado de seguimientos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "    var json = pm.response.json();",
+                  "    pm.expect(json.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/SEGUIMIENTO/v1?pagina=1&limite=10",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "SEGUIMIENTO",
+                "v1"
+              ],
+              "query": [
+                {
+                  "key": "pagina",
+                  "value": "1"
+                },
+                {
+                  "key": "limite",
+                  "value": "10"
+                },
+                {
+                  "key": "filtro",
+                  "value": "",
+                  "disabled": true
+                },
+                {
+                  "key": "orden",
+                  "value": "",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "Listado de seguimientos (solo lectura). Mismos query params opcionales que operativos: pagina, limite, filtro, orden."
+          },
+          "response": []
+        },
+        {
+          "name": "Detalle de seguimiento (por cud)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Tiene correlationId', function() {",
+                  "    pm.expect(pm.response.json().correlationId).to.exist;",
+                  "});",
+                  "console.log('Status:', pm.response.code, '- revisar 200 (encontrado) vs 502 (cud inexistente en el backend)');"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/SEGUIMIENTO_DETALLE/v1?cud={{cud_ejemplo}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "SEGUIMIENTO_DETALLE",
+                "v1"
+              ],
+              "query": [
+                {
+                  "key": "cud",
+                  "value": "{{cud_ejemplo}}"
+                }
+              ]
+            },
+            "description": "Detalle de un seguimiento por su cud (query param requerido, no segmento de URL). Si falta, responde 400 VALIDATION_ERROR."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Catálogos",
+      "item": [
+        {
+          "name": "Catálogo de bienes",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_BIENES/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_BIENES",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de bienes (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de calidades de bien",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_CALIDADES_BIEN/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_CALIDADES_BIEN",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de calidades de bien (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de características",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_CARACTERISTICAS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_CARACTERISTICAS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de características (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de clases",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_CLASES/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_CLASES",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de clases (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de contenidos de bien",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_CONTENIDOS_BIEN/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_CONTENIDOS_BIEN",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de contenidos de bien (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de contenidos de caso",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_CONTENIDOS_CASO/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_CONTENIDOS_CASO",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de contenidos de caso (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de estados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_ESTADOS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_ESTADOS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de estados (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de etapas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_ETAPAS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_ETAPAS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de etapas (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de grados",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_GRADOS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_GRADOS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de grados (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de jurídicas",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_JURIDICAS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_JURIDICAS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de jurídicas (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de recursos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_RECURSOS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_RECURSOS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de recursos (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de situaciones legales",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_SITUACIONES_LEGALES/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_SITUACIONES_LEGALES",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de situaciones legales (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de tamaños de documento",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_TAMANOS_DOCUMENTO/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_TAMANOS_DOCUMENTO",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de tamaños de documento (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de tipos",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_TIPOS/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_TIPOS",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de tipos (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de tipos de persona",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_TIPOS_PERSONA/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_TIPOS_PERSONA",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de tipos de persona (solo lectura, sin parámetros)."
+          },
+          "response": []
+        },
+        {
+          "name": "Catálogo de unidades",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Respuesta exitosa', function() {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-ID",
+                "value": "{{$guid}}",
+                "description": "ID de correlación único por request (UUID autogenerado)"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/interop/v1/inbound/CATALOGO_UNIDADES/v1",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "interop",
+                "v1",
+                "inbound",
+                "CATALOGO_UNIDADES",
+                "v1"
+              ]
+            },
+            "description": "Catálogo de unidades (solo lectura, sin parámetros)."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Casos Penales (DESCONTINUADO — ver GUIA_INTEGRACION.md §7.5)",
+      "item": [
+        {
+          "name": "[DESCONTINUADO] Registrar Caso Penal",
           "event": [
             {
               "listen": "test",
@@ -241,7 +1140,7 @@
           ]
         },
         {
-          "name": "Actualizar Caso Penal",
+          "name": "[DESCONTINUADO] Actualizar Caso Penal",
           "event": [
             {
               "listen": "test",
@@ -314,7 +1213,7 @@
           ]
         },
         {
-          "name": "Validación — Payload incompleto (espera 400)",
+          "name": "[DESCONTINUADO] Validación — Payload incompleto (espera 400)",
           "event": [
             {
               "listen": "test",
@@ -371,7 +1270,8 @@
           },
           "response": []
         }
-      ]
+      ],
+      "description": "⚠️ DESCONTINUADO (2026-07-14): el backend de Fiscalía ya no implementa estos endpoints de escritura — responden 404. Se conservan como referencia histórica del contrato. No usar para integraciones nuevas; use las carpetas de consulta (Gestión de Operativos/Seguimiento, Catálogos)."
     }
   ]
 }

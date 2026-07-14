@@ -44,8 +44,11 @@ import java.util.Map;
  *       campo que el dispatcher inyecta bajo {@code resourceIdField}.</li>
  *   <li>Productos de solo lectura ({@link ContractDefinition#isReadOnly()},
  *       {@code httpMethod=GET}): {@code GET /api/inbound/{product}/{version}} — sin
- *       {@code requestBody}, sin cabecera {@code X-Idempotency-Key} y sin respuesta 400/409
- *       (catálogos sin payload de entrada).</li>
+ *       {@code requestBody} ni cabecera {@code X-Idempotency-Key} (GET es idempotente
+ *       por naturaleza), pero cada {@link FieldRule} del contrato se documenta como
+ *       query param (ej. {@code pagina}/{@code limite} de un listado, o {@code cud}
+ *       requerido de una consulta de detalle) — por eso sí puede responder 400 si
+ *       falta un query param requerido.</li>
  * </ul>
  *
  * <p>Mapeo de tipos {@link FieldType} a OpenAPI:
@@ -82,9 +85,54 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
     @Override
     public void customise(OpenAPI openApi) {
         asegurarInfo(openApi);
+        registrarTagsDeCategoria(openApi);
         registrarSchemasComponente(openApi);
         registrarPaths(openApi);
         log.info("OpenAPI inbound customizer: paths generados desde ContractRegistry");
+    }
+
+    // ─── Categorías (agrupan el Swagger por dominio, no por producto) ─────────
+
+    private static final String TAG_OPERATIVOS   = "Gestión de Operativos";
+    private static final String TAG_SEGUIMIENTOS = "Gestión de Seguimiento";
+    private static final String TAG_CATALOGOS    = "Catálogos";
+
+    /**
+     * Deriva la categoría (tag) de un producto por su prefijo — para agrupar el
+     * Swagger por dominio en vez de un tag por producto. Nuevos productos caen
+     * en su categoría automáticamente por convención de nombre, sin tocar código
+     * (ADR-0007): {@code OPERATIVO*} → {@link #TAG_OPERATIVOS}, {@code SEGUIMIENTO*}
+     * → {@link #TAG_SEGUIMIENTOS}, {@code CATALOGO_*} → {@link #TAG_CATALOGOS}.
+     * Cualquier otro prefijo (ej. un futuro dominio nuevo) usa el propio nombre
+     * de producto como tag, igual que antes.
+     */
+    private static String categoriaDe(String productoBase) {
+        if (productoBase.startsWith("CATALOGO_")) {
+            return TAG_CATALOGOS;
+        }
+        if (productoBase.startsWith("OPERATIVO")) {
+            return TAG_OPERATIVOS;
+        }
+        if (productoBase.startsWith("SEGUIMIENTO")) {
+            return TAG_SEGUIMIENTOS;
+        }
+        return productoBase;
+    }
+
+    private static void registrarTagsDeCategoria(OpenAPI openApi) {
+        if (openApi.getTags() == null) {
+            openApi.setTags(new ArrayList<>());
+        }
+        // orden de aparición en el Swagger: operativos, seguimientos, catálogos
+        openApi.addTagsItem(new io.swagger.v3.oas.models.tags.Tag()
+                .name(TAG_OPERATIVOS)
+                .description("Consulta de operativos (listado y detalle por cud)"));
+        openApi.addTagsItem(new io.swagger.v3.oas.models.tags.Tag()
+                .name(TAG_SEGUIMIENTOS)
+                .description("Consulta de seguimientos (listado y detalle por cud)"));
+        openApi.addTagsItem(new io.swagger.v3.oas.models.tags.Tag()
+                .name(TAG_CATALOGOS)
+                .description("Catálogos de referencia de solo lectura (sin parámetros)"));
     }
 
     // ─── Info ─────────────────────────────────────────────────────────────────
@@ -253,10 +301,10 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
         Operation op = new Operation()
                 .operationId(verbo.name().toLowerCase() + "_" + productoBase + "_" + version)
                 .summary(resumenPorVerbo(verbo) + " " + productoBase.replace("_", " ").toLowerCase())
-                .description(construirDescripcion(productoBase, version, verbo))
-                .addTagsItem(productoBase)
+                .description(construirDescripcion(productoBase, version, verbo, !contrato.fields().isEmpty()))
+                .addTagsItem(categoriaDe(productoBase))
                 .parameters(construirParametros(contrato, verbo))
-                .responses(construirResponses(verbo));
+                .responses(construirResponses(verbo, contrato));
 
         // GET no tiene body de entrada — catálogos de solo lectura sin payload.
         if (verbo != Verbo.GET) {
@@ -274,14 +322,17 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
         };
     }
 
-    private static String construirDescripcion(String productoBase, String version, Verbo verbo) {
+    private static String construirDescripcion(String productoBase, String version, Verbo verbo,
+                                                boolean tieneFields) {
         String rutaPartner = "/partner/v1/inbound/" + productoBase + "/" + version
                 + (verbo == Verbo.PATCH ? "/{id}" : "");
 
         String tipoOperacion = switch (verbo) {
             case POST -> "Creación de recurso";
             case PATCH -> "Edición de recurso";
-            case GET -> "Consulta de catálogo (solo lectura, sin payload de entrada)";
+            case GET -> tieneFields
+                    ? "Consulta de solo lectura (sin body; parámetros vía query string)"
+                    : "Consulta de catálogo (solo lectura, sin payload de entrada)";
         };
 
         return String.format("""
@@ -337,6 +388,20 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
                                  "Se inyecta automáticamente en el payload bajo el campo `" +
                                  campoId + "`.")
                     .schema(new Schema<Long>().type("integer").format("int64")));
+        }
+
+        // Query params para operaciones GET con fields declarados: un listado (ej.
+        // pagina/limite/filtro/orden, todos opcionales) o una consulta de detalle
+        // (ej. cud, requerido) — el destino resuelve cada uno como placeholder de su
+        // target-path o como query string según corresponda (ver HttpForwardingAdapter).
+        if (verbo == Verbo.GET) {
+            for (FieldRule regla : contrato.fields()) {
+                params.add(new Parameter()
+                        .name(regla.field())
+                        .in("query")
+                        .required(regla.required())
+                        .schema(schemaParaTipo(regla)));
+            }
         }
 
         return params;
@@ -404,7 +469,7 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
 
     // ─── Responses ────────────────────────────────────────────────────────────
 
-    private static ApiResponses construirResponses(Verbo verbo) {
+    private static ApiResponses construirResponses(Verbo verbo, ContractDefinition contrato) {
         Schema<?> refApiResponse = new Schema<>().$ref("#/components/schemas/" + SCHEMA_API_RESPONSE);
 
         ApiResponses responses = new ApiResponses();
@@ -414,15 +479,16 @@ public class InboundContractOpenApiCustomizer implements OpenApiCustomizer {
         String descripcionExito = switch (verbo) {
             case POST -> "Recurso creado correctamente";
             case PATCH -> "Recurso editado correctamente";
-            case GET -> "Catálogo obtenido correctamente";
+            case GET -> "Catálogo o consulta obtenida correctamente";
         };
         responses.addApiResponse(codigoExito, new ApiResponse()
                 .description(descripcionExito)
                 .content(new Content().addMediaType(MEDIA_TYPE_JSON,
                         new MediaType().schema(refApiResponse))));
 
-        // 400 Validación — no aplica a GET (sin body de entrada que pueda incumplir el contrato)
-        if (verbo != Verbo.GET) {
+        // 400 Validación — en GET solo aplica si el contrato declara fields (query params,
+        // ej. cud requerido); los catálogos sin fields no pueden incumplir nada.
+        if (verbo != Verbo.GET || !contrato.fields().isEmpty()) {
             responses.addApiResponse("400", new ApiResponse()
                     .description("Payload inválido — el contrato no se cumple " +
                                  "(campos requeridos ausentes, tipos incorrectos, maxLength excedido)")

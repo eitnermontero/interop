@@ -40,9 +40,11 @@ import java.util.UUID;
 
 import static com.github.tomakehurst.wiremock.client.WireMock.absent;
 import static com.github.tomakehurst.wiremock.client.WireMock.aResponse;
+import static com.github.tomakehurst.wiremock.client.WireMock.equalTo;
 import static com.github.tomakehurst.wiremock.client.WireMock.get;
 import static com.github.tomakehurst.wiremock.client.WireMock.getRequestedFor;
 import static com.github.tomakehurst.wiremock.client.WireMock.urlEqualTo;
+import static com.github.tomakehurst.wiremock.client.WireMock.urlPathEqualTo;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -89,6 +91,8 @@ class CatalogoInboundGetIT {
     // ─── Propiedades dinámicas: catálogo GET de prueba ─────────────────────────
 
     private static final String CATALOGO_TARGET_PATH = "/v1/external/fiscalia/catalogos/unidades";
+    private static final String LISTA_TARGET_PATH = "/v1/external/fiscalia/lista";
+    private static final String DETALLE_TARGET_PATH_TEMPLATE = "/v1/external/fiscalia/detalle/{cud}";
 
     @DynamicPropertySource
     static void configurarPropiedades(DynamicPropertyRegistry registry) {
@@ -106,6 +110,31 @@ class CatalogoInboundGetIT {
         registry.add("hub.apis.catalogo-test-v1.method", () -> "GET");
         registry.add("hub.apis.catalogo-test-v1.connector", () -> "wiremock-catalogo");
         registry.add("hub.apis.catalogo-test-v1.target-path", () -> CATALOGO_TARGET_PATH);
+
+        // Producto GET de listado con query params (patrón OPERATIVO/SEGUIMIENTO):
+        // ningún field es placeholder de target-path → se reenvían como query string.
+        registry.add("hub.apis.lista-test-v1.product", () -> "LISTA_TEST");
+        registry.add("hub.apis.lista-test-v1.version", () -> "v1");
+        registry.add("hub.apis.lista-test-v1.method", () -> "GET");
+        registry.add("hub.apis.lista-test-v1.connector", () -> "wiremock-catalogo");
+        registry.add("hub.apis.lista-test-v1.target-path", () -> LISTA_TARGET_PATH);
+        registry.add("hub.apis.lista-test-v1.fields[0].name", () -> "pagina");
+        registry.add("hub.apis.lista-test-v1.fields[0].type", () -> "STRING");
+        registry.add("hub.apis.lista-test-v1.fields[0].required", () -> "false");
+        registry.add("hub.apis.lista-test-v1.fields[1].name", () -> "limite");
+        registry.add("hub.apis.lista-test-v1.fields[1].type", () -> "STRING");
+        registry.add("hub.apis.lista-test-v1.fields[1].required", () -> "false");
+
+        // Producto GET de detalle por query (patrón OPERATIVO_DETALLE/SEGUIMIENTO_DETALLE):
+        // "cud" es placeholder del target-path → se resuelve en el path, no va como query.
+        registry.add("hub.apis.detalle-test-v1.product", () -> "DETALLE_TEST");
+        registry.add("hub.apis.detalle-test-v1.version", () -> "v1");
+        registry.add("hub.apis.detalle-test-v1.method", () -> "GET");
+        registry.add("hub.apis.detalle-test-v1.connector", () -> "wiremock-catalogo");
+        registry.add("hub.apis.detalle-test-v1.target-path", () -> DETALLE_TARGET_PATH_TEMPLATE);
+        registry.add("hub.apis.detalle-test-v1.fields[0].name", () -> "cud");
+        registry.add("hub.apis.detalle-test-v1.fields[0].type", () -> "STRING");
+        registry.add("hub.apis.detalle-test-v1.fields[0].required", () -> "true");
     }
 
     // ─── Slice de contexto ────────────────────────────────────────────────────
@@ -295,6 +324,57 @@ class CatalogoInboundGetIT {
         assertThat(captor.getAllValues())
                 .as("Ninguna de las dos invocaciones debe llevar idempotencyKey")
                 .allSatisfy(cmd -> assertThat(cmd.idempotencyKey()).isNull());
+    }
+
+    @Test
+    @DisplayName("GET /api/inbound/LISTA_TEST/v1?pagina=&limite= reenvía los query params entrantes "
+            + "como query string al backend (patrón OPERATIVO/SEGUIMIENTO)")
+    void get_conQueryParams_reenviaComoQueryStringAlBackend() throws Exception {
+        WIRE_MOCK.stubFor(get(urlPathEqualTo(LISTA_TARGET_PATH))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"total\":38,\"datos\":[]}")));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inbound/LISTA_TEST/v1")
+                        .param("pagina", "1")
+                        .param("limite", "10")
+                        .header("X-Partner-Id", "partner-lista-query"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.total").value(38));
+
+        WIRE_MOCK.verify(1, getRequestedFor(urlPathEqualTo(LISTA_TARGET_PATH))
+                .withQueryParam("pagina", equalTo("1"))
+                .withQueryParam("limite", equalTo("10")));
+    }
+
+    @Test
+    @DisplayName("GET /api/inbound/DETALLE_TEST/v1?cud=... resuelve el placeholder {cud} del "
+            + "target-path — no lo duplica como query string (patrón OPERATIVO_DETALLE/SEGUIMIENTO_DETALLE)")
+    void get_conCudDeDetalle_resuelvePlaceholderDePath() throws Exception {
+        WIRE_MOCK.stubFor(get(urlEqualTo("/v1/external/fiscalia/detalle/7854695124574"))
+                .willReturn(aResponse()
+                        .withStatus(200)
+                        .withHeader("Content-Type", "application/json")
+                        .withBody("{\"cud\":\"7854695124574\"}")));
+
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inbound/DETALLE_TEST/v1")
+                        .param("cud", "7854695124574")
+                        .header("X-Partner-Id", "partner-detalle-cud"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.cud").value("7854695124574"));
+
+        // urlEqualTo exige coincidencia exacta (sin query string).
+        WIRE_MOCK.verify(1, getRequestedFor(urlEqualTo("/v1/external/fiscalia/detalle/7854695124574")));
+    }
+
+    @Test
+    @DisplayName("GET /api/inbound/DETALLE_TEST/v1 sin ?cud= responde 400 (campo requerido ausente)")
+    void get_conCudAusente_respondeBadRequest() throws Exception {
+        mockMvc.perform(MockMvcRequestBuilders.get("/api/inbound/DETALLE_TEST/v1")
+                        .header("X-Partner-Id", "partner-detalle-sin-cud"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.error.code").value("VALIDATION_ERROR"));
     }
 
     @Test

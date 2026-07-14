@@ -1,207 +1,103 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "Hub de Interoperabilidad — API Partner",
-    "description": "API para integración de sistemas externos con el Hub de Interoperabilidad.\n\n> ⚠️ **ESTA PÁGINA ES SOLO REFERENCIA — NO SE PUEDE EJECUTAR DESDE AQUÍ.**\n> Toda la API está protegida con **mTLS (certificado de cliente)**. El navegador\n> no adjunta el certificado de cliente a las llamadas de \"Try it out\", por lo que\n> cualquier petición desde Swagger fallará el mTLS en el servidor. Use **cURL** o\n> **Postman** con el certificado configurado (ver Guía de Integración y colección\n> Postman). Swagger sirve para consultar contratos, campos y respuestas.\n\n## Seguridad: doble capa (mTLS + OAuth2 RFC 8705)\n\nCada petición (obtención de token **y** llamadas de negocio) debe presentar **dos** factores:\n\n1. **Certificado de cliente (mTLS)** — validado en el servidor contra la CA del Hub. Sin certificado válido: rechazo en el borde (no llega a la aplicación).\n2. **Bearer token OAuth2** — JWT emitido por `client_credentials`, **ligado criptográficamente al certificado** (claim `cnf.x5t#S256`, RFC 8705).\n\n**Orden de validación en el servidor:**\n\n| # | Etapa | Punto |\n|---|-------|-------|\n| 1 | Validación del certificado de cliente (mTLS) | Borde / terminación TLS (único punto) |\n| 2 | Validación del JWT (firma, issuer, expiración) | Gateway |\n| 3 | Validación del enlace token↔certificado (RFC 8705) | Gateway |\n| 4 | Suscripción / autorización de negocio | Gateway |\n| 5 | Registro de la petición + validación de contrato | Microservicio |\n\nUn token robado es inútil sin la clave privada del certificado del partner.\n\n## Flujo de autenticación\n\n1. Obtener un `access_token` con `client_id` / `client_secret` en **POST /interop/oauth2/token** — **presentando el certificado de cliente (mTLS)**.\n2. Enviar en cada llamada de negocio el header `Authorization: Bearer <token>` **y** el mismo certificado de cliente (mTLS).\n\n## Cabeceras de trazabilidad\n\n| Cabecera | Descripción |\n|----------|-------------|\n| `X-Correlation-ID` | ID de correlación para trazabilidad distribuida. Si no se envía, el hub genera uno automáticamente y lo retorna en la respuesta. |\n| `X-Idempotency-Key` | Clave de idempotencia (UUID recomendado). Evita duplicados en reintentos. |\n\n## Códigos de respuesta\n\n| Código | Significado |\n|--------|-------------|\n| 200 | Operación exitosa |\n| 201 | Recurso creado |\n| 400 | Payload inválido (ver campo `error.violations`) |\n| 401 | Token ausente/expirado, o certificado no coincide con el token (RFC 8705) |\n| 403 | Producto no autorizado para el partner |\n| 500 | Error interno del hub |",
-    "version": "1.0",
-    "contact": {
-      "name": "Equipo Hub Interoperabilidad"
-    }
+    "title": "Hub de Interoperabilidad — APIs de productos",
+    "description": "Catálogo de APIs inbound del hub de interoperabilidad.\n\n**Este catálogo se genera automáticamente** desde la configuración\ndeclarativa (`hub.apis`): cada bloque YAML que agrega una API nueva\naparece aquí sin cambios de código.\n\n## Seguridad\n\nLa seguridad (mTLS + OAuth2 Bearer enlazado al certificado, RFC 8705)\nla aplica el **API Gateway** antes de que la petición llegue a este\nservicio. Los partners obtienen su token en\n`POST /oauth2/token` (gateway) con `grant_type=client_credentials`.\n\n## Cabeceras comunes (operaciones de escritura)\n\n| Cabecera | Obligatoria | Descripción |\n|---|---|---|\n| `X-Idempotency-Key` | Sí | Clave única de la operación; reenvíos con la misma clave son idempotentes |\n| `X-Correlation-ID`  | No | ID de correlación propagado en la respuesta para trazabilidad distribuida |\n| `X-Partner-Id`      | No | Identificador del partner; lo inyecta el gateway automáticamente |\n\n## Ruta equivalente vía gateway (partners)\n\nLas APIs internas están bajo `/api/inbound/…`; el gateway las expone\na los partners en `/partner/v1/inbound/…`.\n\n## Aviso (2026-07-14)\n\nLos endpoints de **escritura** de `CASO_PENAL` y sus sub-entidades (delitos, sujetos, abogados, fiscales, actividades, agendas, etc.) **ya no están disponibles** — el backend de Fiscalía dejó de implementarlos (verificado: responde `404 Cannot POST/PATCH`). Hoy el hub solo expone **consultas de solo lectura**: operativos, seguimientos y catálogos.\n",
+    "version": "1.0"
   },
   "servers": [
     {
-      "url": "https://desarrollo.felcn.gob.bo",
-      "description": "Servidor de desarrollo / pruebas"
-    }
-  ],
-  "tags": [
-    {
-      "name": "Autenticación",
-      "description": "Obtención de tokens de acceso OAuth2"
-    },
-    {
-      "name": "Casos Penales",
-      "description": "Registro y actualización de casos penales (contrato CASO_PENAL/v1)"
+      "url": "https://desarrollo.felcn.gob.bo/interop/v1",
+      "description": "Hub de Interoperabilidad FELCN — Partner API"
     }
   ],
   "paths": {
-    "/interop/oauth2/token": {
-      "post": {
-        "tags": ["Autenticación"],
-        "summary": "Obtener access token",
-        "description": "Emite un `access_token` JWT mediante el flujo OAuth2 `client_credentials`.\n\n**Requiere certificado de cliente (mTLS):** la petición debe realizarse presentando el certificado del partner en la conexión TLS. El token que se emite queda **ligado a ese certificado** (claim `cnf.x5t#S256`, RFC 8705) y solo podrá usarse en llamadas que presenten el mismo certificado.\n\nEl token tiene una vigencia limitada (ver campo `expires_in`, ~300s). Renuévelo antes de que expire.",
-        "operationId": "obtenerToken",
-        "security": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/x-www-form-urlencoded": {
-              "schema": {
-                "type": "object",
-                "required": ["grant_type", "client_id", "client_secret"],
-                "properties": {
-                  "grant_type": {
-                    "type": "string",
-                    "enum": ["client_credentials"],
-                    "description": "Tipo de grant. Siempre `client_credentials`."
-                  },
-                  "client_id": {
-                    "type": "string",
-                    "example": "fiscalia-bol-api",
-                    "description": "Identificador del cliente entregado por el equipo del Hub."
-                  },
-                  "client_secret": {
-                    "type": "string",
-                    "example": "••••••••",
-                    "description": "Secreto del cliente entregado por el equipo del Hub."
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Token generado correctamente",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/TokenResponse"
-                },
-                "example": {
-                  "access_token": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
-                  "token_type": "Bearer",
-                  "expires_in": 300,
-                  "scope": "https://api.sintesis.com.bo/caso.penal"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Credenciales inválidas",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/OAuthError"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/interop/v1/inbound/CASO_PENAL/v1": {
-      "post": {
-        "tags": ["Casos Penales"],
-        "summary": "Registrar caso penal",
-        "description": "Crea un nuevo caso penal en el sistema destino a través del hub. El hub valida el payload contra el contrato canónico `CASO_PENAL/v1` antes de forwarding.\n\nSi el `X-Idempotency-Key` ya fue procesado, el hub retorna la respuesta original sin reprocesar.",
-        "operationId": "crearCasoPenal",
+    "/inbound/OPERATIVO/v1": {
+      "get": {
+        "tags": [
+          "Gestión de Operativos"
+        ],
+        "summary": "Consultar operativo",
+        "description": "Consulta de solo lectura (sin body; parámetros vía query string) del producto **OPERATIVO** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/OPERATIVO/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_OPERATIVO_v1",
         "parameters": [
           {
             "name": "X-Correlation-ID",
             "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
             "required": false,
-            "schema": {"type": "string", "format": "uuid"},
-            "description": "ID de correlación para trazabilidad. El hub lo genera si se omite."
+            "schema": {}
           },
           {
-            "name": "X-Idempotency-Key",
-            "in": "header",
+            "name": "pagina",
+            "in": "query",
             "required": false,
-            "schema": {"type": "string", "format": "uuid"},
-            "description": "Clave de idempotencia. UUID recomendado. Evita duplicados en reintentos."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CasoPenalRequest"
-              },
-              "example": {
-                "cud": "120100240000012345",
-                "id_externo_caso": 98765,
-                "id_tipo_denuncia": 1,
-                "id_oficina": 42,
-                "id_estado": 1,
-                "id_etapa": 2,
-                "id_municipio": 11,
-                "zona": "Norte",
-                "direccion": "Av. 6 de Agosto s/n",
-                "latitud": "-16.500000",
-                "longitud": "-68.150000",
-                "fecha_caso": "2026-06-30T10:30:00-04:00",
-                "denominacion_caso": "Caso de prueba integración",
-                "tags": []
-              }
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Caso registrado correctamente",
-            "headers": {
-              "X-Correlation-ID": {
-                "schema": {"type": "string"},
-                "description": "ID de correlación para trazabilidad"
-              }
-            },
+            "description": "Catálogo o consulta obtenida correctamente",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
-                },
-                "example": {
-                  "success": true,
-                  "status": 200,
-                  "message": "Caso penal registrado correctamente",
-                  "data": {"id_pol_caso": 12345},
-                  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
-                  "timestamp": "2026-06-30T10:30:05.123-04:00"
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Payload inválido — el campo `error.violations` detalla los campos con error",
+            "description": "Payload inválido — el contrato no se cumple (campos requeridos ausentes, tipos incorrectos, maxLength excedido)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseError"
-                },
-                "example": {
-                  "success": false,
-                  "status": 400,
-                  "message": "Error de validación",
-                  "error": {
-                    "code": "VALIDATION_ERROR",
-                    "message": "El payload no cumple el contrato del producto CASO_PENAL/v1",
-                    "violations": [
-                      {"field": "cud", "message": "El campo es requerido"},
-                      {"field": "id_oficina", "message": "El campo es requerido"}
-                    ]
-                  },
-                  "correlationId": "550e8400-e29b-41d4-a716-446655440000",
-                  "timestamp": "2026-06-30T10:30:05.123-04:00"
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
-          "401": {
-            "description": "Token ausente, expirado o inválido",
-            "content": {
-              "application/json": {
-                "schema": {"type": "object"}
-              }
-            }
-          },
           "403": {
-            "description": "Producto no autorizado para el partner",
+            "description": "Producto no autorizado o no registrado en el hub",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseError"
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
@@ -209,366 +105,1141 @@
         }
       }
     },
-    "/interop/v1/inbound/CASO_PENAL/v1/{id}": {
-      "patch": {
-        "tags": ["Casos Penales"],
-        "summary": "Actualizar caso penal",
-        "description": "Actualiza un caso penal existente identificado por `{id}` (ID del sistema destino, `id_pol_caso`). El hub valida el payload contra el contrato `CASO_PENAL_EDITAR/v1`.",
-        "operationId": "actualizarCasoPenal",
+    "/inbound/OPERATIVO_DETALLE/v1": {
+      "get": {
+        "tags": [
+          "Gestión de Operativos"
+        ],
+        "summary": "Consultar operativo detalle",
+        "description": "Consulta de solo lectura (sin body; parámetros vía query string) del producto **OPERATIVO_DETALLE** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/OPERATIVO_DETALLE/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_OPERATIVO_DETALLE_v1",
         "parameters": [
           {
-            "name": "id",
-            "in": "path",
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          },
+          {
+            "name": "cud",
+            "in": "query",
             "required": true,
-            "schema": {"type": "integer", "format": "int64"},
-            "description": "ID del caso en el sistema destino (`id_pol_caso`)"
-          },
-          {
-            "name": "X-Correlation-ID",
-            "in": "header",
-            "required": false,
-            "schema": {"type": "string", "format": "uuid"},
-            "description": "ID de correlación para trazabilidad."
-          },
-          {
-            "name": "X-Idempotency-Key",
-            "in": "header",
-            "required": false,
-            "schema": {"type": "string", "format": "uuid"},
-            "description": "Clave de idempotencia para reintentos seguros."
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CasoPenalEditarRequest"
-              },
-              "example": {
-                "id_tipo_denuncia": 1,
-                "id_municipio": 11,
-                "zona": "Centro",
-                "denominacion_caso": "Actualización denominación caso",
-                "fecha_caso": "2026-06-30T11:00:00-04:00"
-              }
+            "schema": {
+              "type": "string"
             }
           }
-        },
+        ],
         "responses": {
           "200": {
-            "description": "Caso actualizado correctamente",
-            "headers": {
-              "X-Correlation-ID": {
-                "schema": {"type": "string"}
-              }
-            },
+            "description": "Catálogo o consulta obtenida correctamente",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseObject"
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Payload inválido o `{id}` no es un número entero",
+            "description": "Payload inválido — el contrato no se cumple (campos requeridos ausentes, tipos incorrectos, maxLength excedido)",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ApiResponseError"
+                  "$ref": "#/components/schemas/ApiResponse"
                 }
               }
             }
           },
-          "401": {
-            "description": "Token ausente, expirado o inválido"
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/SEGUIMIENTO/v1": {
+      "get": {
+        "tags": [
+          "Gestión de Seguimiento"
+        ],
+        "summary": "Consultar seguimiento",
+        "description": "Consulta de solo lectura (sin body; parámetros vía query string) del producto **SEGUIMIENTO** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/SEGUIMIENTO/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_SEGUIMIENTO_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "limite",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "orden",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo o consulta obtenida correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload inválido — el contrato no se cumple (campos requeridos ausentes, tipos incorrectos, maxLength excedido)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
           },
           "403": {
-            "description": "Producto no autorizado para el partner"
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/SEGUIMIENTO_DETALLE/v1": {
+      "get": {
+        "tags": [
+          "Gestión de Seguimiento"
+        ],
+        "summary": "Consultar seguimiento detalle",
+        "description": "Consulta de solo lectura (sin body; parámetros vía query string) del producto **SEGUIMIENTO_DETALLE** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/SEGUIMIENTO_DETALLE/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_SEGUIMIENTO_DETALLE_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          },
+          {
+            "name": "cud",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo o consulta obtenida correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Payload inválido — el contrato no se cumple (campos requeridos ausentes, tipos incorrectos, maxLength excedido)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_BIENES/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo bienes",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_BIENES** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_BIENES/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_BIENES_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_CALIDADES_BIEN/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo calidades bien",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_CALIDADES_BIEN** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_CALIDADES_BIEN/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_CALIDADES_BIEN_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_CARACTERISTICAS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo caracteristicas",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_CARACTERISTICAS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_CARACTERISTICAS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_CARACTERISTICAS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_CLASES/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo clases",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_CLASES** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_CLASES/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_CLASES_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_CONTENIDOS_BIEN/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo contenidos bien",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_CONTENIDOS_BIEN** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_CONTENIDOS_BIEN/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_CONTENIDOS_BIEN_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_CONTENIDOS_CASO/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo contenidos caso",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_CONTENIDOS_CASO** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_CONTENIDOS_CASO/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_CONTENIDOS_CASO_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_ESTADOS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo estados",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_ESTADOS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_ESTADOS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_ESTADOS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_ETAPAS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo etapas",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_ETAPAS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_ETAPAS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_ETAPAS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_GRADOS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo grados",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_GRADOS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_GRADOS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_GRADOS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_JURIDICAS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo juridicas",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_JURIDICAS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_JURIDICAS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_JURIDICAS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_RECURSOS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo recursos",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_RECURSOS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_RECURSOS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_RECURSOS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_SITUACIONES_LEGALES/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo situaciones legales",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_SITUACIONES_LEGALES** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_SITUACIONES_LEGALES/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_SITUACIONES_LEGALES_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_TAMANOS_DOCUMENTO/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo tamanos documento",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_TAMANOS_DOCUMENTO** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_TAMANOS_DOCUMENTO/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_TAMANOS_DOCUMENTO_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_TIPOS/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo tipos",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_TIPOS** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_TIPOS/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_TIPOS_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_TIPOS_PERSONA/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo tipos persona",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_TIPOS_PERSONA** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_TIPOS_PERSONA/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_TIPOS_PERSONA_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/inbound/CATALOGO_UNIDADES/v1": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Consultar catalogo unidades",
+        "description": "Consulta de catálogo (solo lectura, sin payload de entrada) del producto **CATALOGO_UNIDADES** (`GET`).\n\n**Ruta partner equivalente vía gateway:** `GET /partner/v1/inbound/CATALOGO_UNIDADES/v1`\n\nEl catálogo de campos y sus reglas de validación proviene directamente de\n`hub.apis` — no requiere cambios de código al añadir o modificar campos.\n",
+        "operationId": "get_CATALOGO_UNIDADES_v1",
+        "parameters": [
+          {
+            "name": "X-Correlation-ID",
+            "in": "header",
+            "description": "ID de correlación para trazabilidad distribuida. Si se omite, el servicio genera uno automáticamente y lo devuelve en la cabecera de respuesta.",
+            "required": false,
+            "schema": {}
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Catálogo obtenido correctamente",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Producto no autorizado o no registrado en el hub",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Error interno del hub — contactar al equipo de operaciones",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiResponse"
+                }
+              }
+            }
           }
         }
       }
     }
   },
   "components": {
-    "securitySchemes": {
-      "BearerAuth": {
-        "type": "http",
-        "scheme": "bearer",
-        "bearerFormat": "JWT",
-        "description": "Token JWT obtenido del endpoint POST /interop/oauth2/token"
-      }
-    },
     "schemas": {
-      "TokenResponse": {
+      "ApiViolation": {
         "type": "object",
+        "description": "Violación de contrato de un campo individual",
         "properties": {
-          "access_token": {
-            "type": "string",
-            "description": "JWT firmado. Incluir en cabecera Authorization: Bearer {token}"
+          "field": {
+            "description": "Nombre del campo que incumple la regla"
           },
-          "token_type": {
-            "type": "string",
-            "example": "Bearer"
-          },
-          "expires_in": {
-            "type": "integer",
-            "description": "Tiempo de vigencia en segundos",
-            "example": 300
-          },
-          "scope": {
-            "type": "string",
-            "example": "https://api.sintesis.com.bo/caso.penal"
+          "message": {
+            "description": "Descripción legible del incumplimiento"
           }
-        }
-      },
-      "OAuthError": {
-        "type": "object",
-        "properties": {
-          "error": {"type": "string", "example": "unauthorized_client"},
-          "error_description": {"type": "string"}
-        }
-      },
-      "ApiResponseObject": {
-        "type": "object",
-        "properties": {
-          "success": {"type": "boolean", "example": true},
-          "status": {"type": "integer", "example": 200},
-          "message": {"type": "string"},
-          "data": {
-            "type": "object",
-            "description": "Datos de la respuesta del sistema destino. Presente solo en éxito.",
-            "additionalProperties": true
-          },
-          "correlationId": {
-            "type": "string",
-            "format": "uuid",
-            "description": "ID de correlación para trazabilidad distribuida"
-          },
-          "timestamp": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Instante de la respuesta (ISO 8601 con offset)"
-          }
-        }
-      },
-      "ApiResponseError": {
-        "type": "object",
-        "properties": {
-          "success": {"type": "boolean", "example": false},
-          "status": {"type": "integer", "example": 400},
-          "message": {"type": "string"},
-          "error": {
-            "$ref": "#/components/schemas/ApiError"
-          },
-          "correlationId": {"type": "string", "format": "uuid"},
-          "timestamp": {"type": "string", "format": "date-time"}
         }
       },
       "ApiError": {
         "type": "object",
+        "description": "Detalle estructurado del error",
         "properties": {
           "code": {
-            "type": "string",
-            "description": "Código de error canónico",
-            "enum": [
-              "VALIDATION_ERROR",
-              "PRODUCT_NOT_AUTHORIZED",
-              "FORWARD_ERROR",
-              "INVALID_RESOURCE_ID"
-            ]
+            "description": "Código de error máquina (ej. VALIDATION_ERROR)"
           },
-          "message": {"type": "string"},
+          "detail": {
+            "description": "Descripción legible del error"
+          },
           "violations": {
             "type": "array",
+            "description": "Lista de violaciones de contrato; vacía si el error no es de validación",
             "items": {
               "$ref": "#/components/schemas/ApiViolation"
-            },
-            "description": "Lista de violaciones de validación (solo presente en VALIDATION_ERROR)"
+            }
           }
         }
       },
-      "ApiViolation": {
+      "ApiResponse": {
         "type": "object",
+        "description": "Sobre genérico de respuesta HTTP del hub (ADR-0005)",
         "properties": {
-          "field": {
-            "type": "string",
-            "description": "Nombre del campo que falló validación"
+          "success": {
+            "description": "true si la operación fue exitosa"
+          },
+          "status": {
+            "description": "Código HTTP del resultado"
           },
           "message": {
-            "type": "string",
-            "description": "Descripción del error de validación"
-          }
-        }
-      },
-      "CasoPenalRequest": {
-        "type": "object",
-        "required": [
-          "cud",
-          "id_externo_caso",
-          "id_tipo_denuncia",
-          "id_oficina",
-          "id_estado",
-          "id_etapa"
-        ],
-        "properties": {
-          "cud": {
-            "type": "string",
-            "maxLength": 50,
-            "description": "Código Único de Denuncia (CUD)"
+            "description": "Mensaje legible resumiendo el resultado"
           },
-          "id_externo_caso": {
-            "type": "integer",
-            "description": "ID del caso en el sistema externo (MP/FELCN)"
+          "data": {
+            "type": "object",
+            "description": "Datos del negocio; null en respuestas de error"
           },
-          "id_tipo_denuncia": {
-            "type": "integer",
-            "description": "Tipo de denuncia según catálogo del sistema destino"
+          "error": {
+            "$ref": "#/components/schemas/ApiError",
+            "description": "Detalle del error; null en respuestas exitosas"
           },
-          "id_oficina": {
-            "type": "integer",
-            "description": "ID de la oficina registrante"
+          "correlationId": {
+            "description": "ID de correlación para trazabilidad distribuida"
           },
-          "id_estado": {
-            "type": "integer",
-            "description": "Estado del caso según catálogo"
-          },
-          "id_etapa": {
-            "type": "integer",
-            "description": "Etapa procesal del caso"
-          },
-          "id_externo_caso_referencia": {
-            "type": "integer",
-            "description": "ID del caso padre/referencia (opcional)"
-          },
-          "es_reservado": {
-            "type": "boolean",
-            "description": "Indica si el caso es reservado"
-          },
-          "id_municipio": {
-            "type": "integer",
-            "description": "ID del municipio donde ocurrió el hecho"
-          },
-          "zona": {
-            "type": "string",
-            "maxLength": 255,
-            "description": "Zona geográfica"
-          },
-          "direccion": {
-            "type": "string",
-            "description": "Dirección del hecho"
-          },
-          "latitud": {
-            "type": "string",
-            "maxLength": 30,
-            "description": "Latitud en formato decimal (ej. -16.500000)"
-          },
-          "longitud": {
-            "type": "string",
-            "maxLength": 30,
-            "description": "Longitud en formato decimal (ej. -68.150000)"
-          },
-          "referencia": {
-            "type": "string",
-            "description": "Referencia de ubicación"
-          },
-          "relato": {
-            "type": "string",
-            "description": "Relato del hecho"
-          },
-          "fecha_caso": {
-            "type": "string",
+          "timestamp": {
             "format": "date-time",
-            "description": "Fecha y hora del hecho (ISO 8601 con offset, ej. 2026-06-30T10:30:00-04:00)"
-          },
-          "fecha_fin": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Fecha y hora de fin del hecho (ISO 8601 con offset)"
-          },
-          "fecha_aproximada": {
-            "type": "string",
-            "maxLength": 255,
-            "description": "Descripción textual de la fecha si es aproximada"
-          },
-          "denominacion_caso": {
-            "type": "string",
-            "maxLength": 500,
-            "description": "Denominación/nombre del caso"
-          },
-          "tags": {
-            "type": "array",
-            "items": {},
-            "description": "Etiquetas asociadas al caso"
-          }
-        }
-      },
-      "CasoPenalEditarRequest": {
-        "type": "object",
-        "required": ["id_tipo_denuncia"],
-        "description": "El ID del caso en el sistema destino (`id_pol_caso`) se toma del path `{id}` — no incluirlo en el body.",
-        "properties": {
-          "id_tipo_denuncia": {
-            "type": "integer",
-            "description": "Tipo de denuncia según catálogo del sistema destino"
-          },
-          "id_externo_caso_referencia": {
-            "type": "integer",
-            "description": "ID del caso padre/referencia (mpCasoPadreId)"
-          },
-          "id_municipio": {
-            "type": "integer",
-            "description": "ID del municipio"
-          },
-          "zona": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "direccion": {
-            "type": "string"
-          },
-          "latitud": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "longitud": {
-            "type": "string",
-            "maxLength": 30
-          },
-          "referencia": {
-            "type": "string"
-          },
-          "relato": {
-            "type": "string"
-          },
-          "fecha_caso": {
-            "type": "string",
-            "format": "date-time",
-            "description": "Fecha y hora del hecho (ISO 8601 con offset)"
-          },
-          "fecha_fin": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "fecha_aproximada": {
-            "type": "string",
-            "maxLength": 255
-          },
-          "denominacion_caso": {
-            "type": "string",
-            "maxLength": 500
-          },
-          "tags": {
-            "type": "array",
-            "items": {},
-            "description": "IDs de etiquetas (tagsId)"
+            "description": "Instante ISO 8601 con offset de la respuesta"
           }
         }
       }
+    },
+    "securitySchemes": {
+      "bearer-jwt": {
+        "type": "http",
+        "description": "Token JWT obtenido desde Keycloak.\n\n**Para obtener un token:**\n\n```bash\ncurl -X POST 'http://localhost:8180/realms/hub-admin/protocol/openid-connect/token' \\\n  -H 'Content-Type: application/x-www-form-urlencoded' \\\n  -d 'grant_type=client_credentials' \\\n  -d 'client_id=hubadminservice' \\\n  -d 'client_secret=hubadminservice-secret'\n```\n\n**Respuesta:**\n```json\n{\n  \"access_token\": \"eyJhbGciOiJSUzI1NiIs...\",\n  \"expires_in\": 300,\n  \"token_type\": \"Bearer\"\n}\n```\n\n**Usar en Swagger:**\nIngresa el token completo en el campo de arriba (Authorize).\n",
+        "name": "bearer-jwt",
+        "in": "header",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
     }
   },
-  "security": [
-    {"BearerAuth": []}
+  "tags": [
+    {
+      "name": "Gestión de Operativos",
+      "description": "Consulta de operativos (listado y detalle por cud)"
+    },
+    {
+      "name": "Gestión de Seguimiento",
+      "description": "Consulta de seguimientos (listado y detalle por cud)"
+    },
+    {
+      "name": "Catálogos",
+      "description": "Catálogos de referencia de solo lectura (sin parámetros)"
+    }
   ]
 }

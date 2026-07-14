@@ -12,7 +12,10 @@ import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
 import java.time.Duration;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -24,7 +27,12 @@ import java.util.concurrent.ConcurrentHashMap;
  * {@code {campo}} resueltos desde el payload (p. ej. {@code /casos/{id_pol_caso}}).
  *
  * <p>Para contratos de solo lectura ({@code method: GET}) el reenvío se hace sin
- * body — los catálogos declarados así no reciben payload de entrada.
+ * body: las claves del payload (originadas en los query params de la petición
+ * entrante, ver {@code DispatcherController#get}) que calzan con un placeholder
+ * de {@code target-path} lo resuelven (p. ej. {@code /operativos/{cud}}, consulta
+ * de detalle); las que no se usan como placeholder se reenvían tal cual como
+ * query string del request saliente (p. ej. {@code pagina}/{@code limite} de un
+ * listado). Los catálogos sin parámetros simplemente no tienen claves que reenviar.
  *
  * <p>Semántica de errores (catálogo ADR-0005 §7):
  * <ul>
@@ -57,8 +65,16 @@ public class HttpForwardingAdapter {
                                  String correlationId) {
 
         RestClient client = clients.computeIfAbsent(connectorName, n -> buildClient(connector));
-        String path = resolverPlaceholders(api.getTargetPath(), payload);
         HttpMethod httpMethod = HttpMethod.valueOf(api.getMethod().toUpperCase());
+
+        Set<String> usadasComoPlaceholder = new HashSet<>();
+        String path = resolverPlaceholders(api.getTargetPath(), payload, usadasComoPlaceholder);
+        // Claves del payload (query params de la petición entrante) que no se
+        // consumieron como placeholder de path se reenvían tal cual como query
+        // string del request saliente (p. ej. pagina/limite de un listado).
+        Map<String, Object> queryParamsSobrantes = (httpMethod == HttpMethod.GET)
+                ? sobrantes(payload, usadasComoPlaceholder)
+                : Map.of();
 
         try {
             // toEntity(Object.class): la forma real de la respuesta depende del destino —
@@ -68,8 +84,14 @@ public class HttpForwardingAdapter {
             // extracting response" en cualquier destino que respondiera un array.
             ResponseEntity<Object> response = (httpMethod == HttpMethod.GET)
                     // GET: sin body — los catálogos de solo lectura no tienen payload de entrada.
+                    // uri(Function<UriBuilder,URI>): deja que el propio RestClient codifique
+                    // los query params (evita el doble-encoding de armar el query string a mano).
                     ? client.method(httpMethod)
-                            .uri(path)
+                            .uri(uriBuilder -> {
+                                uriBuilder.path(path);
+                                queryParamsSobrantes.forEach(uriBuilder::queryParam);
+                                return uriBuilder.build();
+                            })
                             .header("X-Correlation-ID", correlationId)
                             .retrieve()
                             .toEntity(Object.class)
@@ -127,15 +149,37 @@ public class HttpForwardingAdapter {
                 .build();
     }
 
-    /** Reemplaza cada {@code {campo}} del path con el valor correspondiente del payload. */
-    private static String resolverPlaceholders(String targetPath, Map<String, Object> payload) {
-        if (targetPath == null || !targetPath.contains("{")) {
-            return targetPath == null ? "" : targetPath;
+    /**
+     * Reemplaza cada {@code {campo}} del path con el valor correspondiente del payload.
+     *
+     * @param usadasComoPlaceholder se completa con las claves del payload que sí se
+     *                              usaron para resolver un placeholder — permite al
+     *                              caller distinguir el resto (query string en GET).
+     */
+    private static String resolverPlaceholders(String targetPath, Map<String, Object> payload,
+                                                Set<String> usadasComoPlaceholder) {
+        if (targetPath == null) {
+            return "";
         }
         String resolved = targetPath;
         for (Map.Entry<String, Object> e : payload.entrySet()) {
-            resolved = resolved.replace("{" + e.getKey() + "}", String.valueOf(e.getValue()));
+            String placeholder = "{" + e.getKey() + "}";
+            if (targetPath.contains(placeholder)) {
+                resolved = resolved.replace(placeholder, String.valueOf(e.getValue()));
+                usadasComoPlaceholder.add(e.getKey());
+            }
         }
         return resolved;
+    }
+
+    /** Claves del payload que no se usaron como placeholder de path (candidatas a query string). */
+    private static Map<String, Object> sobrantes(Map<String, Object> payload, Set<String> usadasComoPlaceholder) {
+        Map<String, Object> resultado = new HashMap<>();
+        payload.forEach((key, value) -> {
+            if (!usadasComoPlaceholder.contains(key) && value != null) {
+                resultado.put(key, value);
+            }
+        });
+        return resultado;
     }
 }

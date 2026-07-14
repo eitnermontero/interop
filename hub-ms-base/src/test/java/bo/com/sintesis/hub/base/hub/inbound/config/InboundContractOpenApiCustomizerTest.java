@@ -41,6 +41,7 @@ class InboundContractOpenApiCustomizerTest {
         registry.register(contratoCasoPenalPost());
         registry.register(contratoCasoPenalEditar());
         registry.register(contratoCatalogoGet());
+        registry.register(contratoConsultaDetalleGet());
 
         customizer = new InboundContractOpenApiCustomizer(registry);
         openApi = new OpenAPI();
@@ -300,6 +301,18 @@ class InboundContractOpenApiCustomizerTest {
         return new ContractDefinition("CATALOGO_UNIDADES", "v1", List.of(), null, "GET");
     }
 
+    /**
+     * Contrato de consulta de detalle GET (patrón OPERATIVO_DETALLE/SEGUIMIENTO_DETALLE):
+     * un único field requerido, resuelto por el destino como placeholder de su
+     * {@code target-path} (ej. {@code /operativos/{cud}}) — a diferencia del catálogo
+     * de arriba, este SÍ puede responder 400 si {@code cud} falta.
+     */
+    private ContractDefinition contratoConsultaDetalleGet() {
+        return new ContractDefinition("OPERATIVO_DETALLE", "v1",
+                List.of(new FieldRule("cud", FieldType.STRING, true, null, null)),
+                null, "GET");
+    }
+
     // ─── Path GET (catálogo de solo lectura) ───────────────────────────────────
 
     @Test
@@ -370,13 +383,71 @@ class InboundContractOpenApiCustomizerTest {
     }
 
     @Test
-    @DisplayName("La operacion GET debe tener el tag del producto")
-    void getDebeTenerTagDelProducto() {
+    @DisplayName("La operacion GET de un catálogo usa el tag de categoría 'Catálogos', no el producto")
+    void getDebeTenerTagDeCategoria() {
         List<String> tags = openApi.getPaths()
                 .get("/api/inbound/CATALOGO_UNIDADES/v1")
                 .getGet()
                 .getTags();
 
-        assertThat(tags).containsExactly("CATALOGO_UNIDADES");
+        assertThat(tags).containsExactly("Catálogos");
+    }
+
+    @Test
+    @DisplayName("Un producto OPERATIVO_DETALLE usa el tag de categoría 'Gestión de Operativos'")
+    void getDeConsultaDetalleUsaTagDeCategoria() {
+        List<String> tags = openApi.getPaths()
+                .get("/api/inbound/OPERATIVO_DETALLE/v1")
+                .getGet()
+                .getTags();
+
+        assertThat(tags).containsExactly("Gestión de Operativos");
+    }
+
+    @Test
+    @DisplayName("El spec declara las 3 categorías de nivel superior con descripción")
+    void declaraTagsDeCategoriaDeNivelSuperior() {
+        assertThat(openApi.getTags())
+                .extracting(io.swagger.v3.oas.models.tags.Tag::getName)
+                .contains("Gestión de Operativos", "Gestión de Seguimiento", "Catálogos");
+
+        assertThat(openApi.getTags())
+                .allSatisfy(tag -> assertThat(tag.getDescription()).isNotBlank());
+    }
+
+    // ─── GET con fields (consulta de detalle / listado con query params) ──────
+
+    @Test
+    @DisplayName("GET con fields declarados documenta cada uno como query param")
+    void getConFieldsDocumentaQueryParams() {
+        List<Parameter> params = openApi.getPaths()
+                .get("/api/inbound/OPERATIVO_DETALLE/v1")
+                .getGet()
+                .getParameters();
+
+        Parameter cud = params.stream()
+                .filter(p -> "cud".equals(p.getName()))
+                .findFirst()
+                .orElse(null);
+
+        assertThat(cud).as("cud debe estar documentado como parámetro").isNotNull();
+        assertThat(cud.getIn()).isEqualTo("query");
+        assertThat(cud.getRequired()).isTrue();
+        assertThat(cud.getSchema().getType()).isEqualTo("string");
+    }
+
+    @Test
+    @DisplayName("Responses de GET con fields sí deben incluir 400 (query param requerido puede faltar)")
+    void responsesDeGetConFieldsIncluyen400() {
+        var getOp = openApi.getPaths()
+                .get("/api/inbound/OPERATIVO_DETALLE/v1")
+                .getGet();
+
+        assertThat(getOp.getResponses())
+                .containsKey("200")
+                .containsKey("400")
+                .containsKey("403")
+                .doesNotContainKey("409")
+                .doesNotContainKey("201");
     }
 }
